@@ -23,7 +23,7 @@ Test setup for all spikes so far: niri 26.04 nested in the GNOME 51 session
 | S11 | Does `OverviewOpenedOrClosed` fire at animation start? | **Pass** | The event arrived 9 ms and 11 ms after `open-overview` / `close-overview` were sent (animations off in the test config, so this measures event delivery, not the animation itself). |
 | S12 | Stage input region behaviour | **Pass** | See below. |
 | S13 | GtkPopover fallback | Not needed | S2 passed. |
-| S14 | JXL wallpaper load and offscreen blur | **Load: pass. Blur: open** | `Gdk.Texture` loads the 5120x5120 Fedora JXL in about 160 ms. At that size it is about 105 MB uncompressed, so M1 must scale it to the output size once and drop the original. The file has a wide-gamut ICC profile; GTK converts it as GNOME does (four sample points agree to 0.1%). The backdrop needs a Gaussian of sigma 7.5 logical px times 0.6 (S5); rendering it is not yet tested. |
+| S14 | JXL wallpaper load and offscreen blur | **Pass** | GTK loads the Fedora JXL in about 160 ms and honours its colour profile; the blurred backdrop rendered once with GSK matches GNOME's overview background. See below. |
 | S15 | GNOME Eval walker and screenshots | **Pass** | 12 states on three wallpapers plus actor-tree dumps, all checked by eye. See below. |
 | S16 | Clean start on a private session bus | **Pass** | Under `dbus-run-session` gniri paints its first frame in about 530 ms (220 ms on the host bus; the difference is the private bus starting xdg-desktop-portal). GTK warns that there is no accessibility bus, so the harness sets `GTK_A11Y=none`. |
 | S17 | niri hot corner with the panel in the corner | **Pass** | Moving a virtual pointer to 0,0 opens the overview with the top-layer panel covering the corner. No shell-side hot corner needed. |
@@ -142,6 +142,29 @@ output scale; whether niri's `offset` does is untested.
 The user's blur-my-shell settings are all defaults except that application
 blur is on for `com.mitchellh.ghostty`. The niri equivalent is a window rule
 in the user's own config, not something gniri does.
+
+## S14: wallpaper and backdrop (pass)
+
+Code: `crates/shell/src/surfaces/wallpaper.rs`.
+
+- `Gdk.Texture` loads the 5120x5120 Fedora JXL in about 160 ms. It is about
+  105 MB uncompressed, so gniri renders it once to the output's pixel size
+  with `GskRenderer::render_texture` and drops the original. With the real
+  wallpaper the debug build sits at 118 MB resident (104 MB with none).
+- The file carries a wide-gamut ICC profile. GTK converts it as GNOME does:
+  four sample points agree with GNOME's desktop shot to within 0.1%.
+  (ImageMagick does not convert unless told to; without `-profile` its
+  colours are visibly less saturated.)
+- The backdrop is the same texture through a GSK blur node and a 40% black
+  layer. GSK's blur radius is twice the Gaussian sigma, so sigma 7.5 logical
+  px is radius 15. Against GNOME's overview background over the same
+  wallpaper pixels: RMSE 0.37%, no pixel more than 2% off. Over flat
+  `#808080` it reads (77,77,77), as GNOME's does.
+- A blur node sees transparency beyond its child's edges, which would darken
+  the screen edges. Mirrored copies of the image around it stand in for
+  blur-my-shell's clamp-to-edge sampling.
+- `cargo xtask shot` with the overview open is pixel-identical across three
+  runs.
 
 ## S8: nested niri behind the lock screen (fail, handled)
 

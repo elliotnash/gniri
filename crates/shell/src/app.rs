@@ -53,7 +53,11 @@ fn activate(app: &adw::Application, cli: &Cli) {
 
     if let Some(spec) = &cli.wallpaper {
         match WallpaperSource::parse(spec) {
-            Ok(source) => ready.watch(&wallpaper::build(app, &source)),
+            Ok(source) => {
+                for window in wallpaper::build(app, &source) {
+                    ready.watch(&window);
+                }
+            }
             Err(error) => eprintln!("gniri: ignoring --wallpaper: {error}"),
         }
     }

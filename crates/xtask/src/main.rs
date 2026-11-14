@@ -28,6 +28,9 @@ enum Command {
     Shot {
         /// Name of the screenshot: written to target/visual/<NAME>.png.
         name: String,
+        /// Open niri's overview before the screenshot.
+        #[arg(long)]
+        overview: bool,
         #[command(flatten)]
         session: SessionArgs,
     },
@@ -70,8 +73,15 @@ fn main() -> Result<()> {
             println!("Running. Press Ctrl-C to stop.");
             session.wait()
         }
-        Command::Shot { name, session } => {
+        Command::Shot {
+            name,
+            overview,
+            session,
+        } => {
             let session = Session::start(&session.options(&name))?;
+            if overview {
+                session.action(niri_ipc::Action::OpenOverview {})?;
+            }
             // Readiness means each surface committed a frame; give niri a
             // moment to composite it (and its blur) before capturing.
             std::thread::sleep(Duration::from_millis(250));

@@ -10,6 +10,9 @@ publish = false
 [dependencies]
 anyhow = "1"
 clap.workspace = true
+# "termination": also catch SIGTERM and SIGHUP, so `timeout` and a closed
+# terminal stop the nested session too.
+ctrlc = { version = "3", features = ["termination"] }
 niri-ipc.workspace = true
 
 [lints]

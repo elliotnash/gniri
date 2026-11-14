@@ -9,7 +9,8 @@ use std::fs::{self, File};
 use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
-use std::sync::mpsc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, mpsc};
 use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result, anyhow, bail};
@@ -273,9 +274,19 @@ impl Session {
         Ok(())
     }
 
-    /// Blocks until the session ends (for `xtask nest`).
+    /// Blocks until the session ends or this process is told to stop (for
+    /// `xtask nest`).
+    ///
+    /// The session runs in its own process group, so a Ctrl-C in the terminal
+    /// does not reach it: catch the signal here and let `Drop` end the session.
     pub fn wait(mut self) -> Result<()> {
-        self.process.wait()?;
+        let stop = Arc::new(AtomicBool::new(false));
+        let flag = Arc::clone(&stop);
+        ctrlc::set_handler(move || flag.store(true, Ordering::SeqCst))
+            .context("installing the Ctrl-C handler")?;
+        while self.process.try_wait()?.is_none() && !stop.load(Ordering::SeqCst) {
+            std::thread::sleep(Duration::from_millis(50));
+        }
         Ok(())
     }
 
