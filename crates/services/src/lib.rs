@@ -6,10 +6,18 @@
 //! GTK here: backends hand events to the main loop over a channel.
 
 pub mod audio;
+pub mod bluetooth;
+pub mod brightness;
 pub mod fixture;
 pub mod keyboard;
+pub mod model;
 pub mod network;
 pub mod niri;
 pub mod power;
+pub mod rfkill;
+pub mod system_bus;
+pub mod toggles;
 
 pub use fixture::Fixture;
+pub use model::{Link, Model};
+pub use system_bus::SystemBus;

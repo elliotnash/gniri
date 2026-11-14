@@ -10,7 +10,7 @@ use std::path::Path;
 use gniri_core::{FixedClock, LocalTime};
 use serde::Deserialize;
 
-use crate::{audio, network, power};
+use crate::{audio, bluetooth, brightness, network, power, rfkill, toggles};
 
 #[derive(Clone, Debug, Default, PartialEq, Deserialize)]
 #[serde(default, deny_unknown_fields)]
@@ -20,6 +20,12 @@ pub struct Fixture {
     pub power: power::State,
     pub audio: audio::State,
     pub network: network::State,
+    pub bluetooth: bluetooth::State,
+    pub brightness: brightness::State,
+    pub rfkill: rfkill::State,
+    pub dark_style: toggles::State,
+    pub night_light: toggles::State,
+    pub do_not_disturb: toggles::State,
 }
 
 impl Fixture {
@@ -65,6 +71,16 @@ mod tests {
 
             [network]
             primary = { kind = "wifi", strength = 70 }
+
+            [bluetooth]
+            adapter = { powered = true }
+
+            [brightness]
+            level = 1.0
+
+            [dark_style]
+            available = true
+            on = true
             "#,
         )
         .unwrap();
@@ -79,9 +95,12 @@ mod tests {
             "audio-volume-low-symbolic"
         );
         assert_eq!(
-            fixture.network.primary.as_ref().unwrap().icon_name(),
-            "network-wireless-signal-good-symbolic"
+            fixture.network.panel_icon_name(),
+            Some("network-wireless-signal-good-symbolic")
         );
+        assert_eq!(fixture.brightness.level, Some(1.0));
+        assert!(fixture.dark_style.on);
+        assert_eq!(fixture.bluetooth.subtitle(), None);
     }
 
     #[test]
