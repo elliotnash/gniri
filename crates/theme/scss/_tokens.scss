@@ -1,0 +1,29 @@
+// Design tokens, exported as CSS custom properties.
+//
+// build.rs reads this block back out of the compiled CSS to generate the
+// `TOKENS` table, which tests compare against values measured from GNOME
+// Shell. Widget styles use the Sass variables directly; the custom
+// properties exist for inspection and for the token check.
+
+:root {
+    --gniri-base-color: #{$base_color};
+    --gniri-bg-color: #{$bg_color};
+    --gniri-fg-color: #{$fg_color};
+    --gniri-panel-bg-color: #{$panel_bg_color};
+    --gniri-panel-fg-color: #{$panel_fg_color};
+    --gniri-card-bg-color: #{$card_bg_color};
+    --gniri-outer-borders-color: #{$outer_borders_color};
+    --gniri-osd-bg-color: #{$osd_bg_color};
+    --gniri-osd-fg-color: #{$osd_fg_color};
+    --gniri-system-base-color: #{$system_base_color};
+    --gniri-system-bg-color: #{$system_bg_color};
+    --gniri-system-fg-color: #{$system_fg_color};
+    --gniri-system-overlay-bg-color: #{$system_overlay_bg_color};
+    --gniri-insensitive-fg-color: #{$insensitive_fg_color};
+    --gniri-hover-bg-color: #{$hover_bg_color};
+    --gniri-active-bg-color: #{$active_bg_color};
+    --gniri-checked-bg-color: #{$checked_bg_color};
+    --gniri-warning-color: #{$warning_color};
+    --gniri-destructive-color: #{$destructive_color};
+    --gniri-accent-color: #{$accent_color};
+}

@@ -1,11 +1,3 @@
-// Spikes S4 and S10: real (non-xray) blur for the popup stage, and the
-// overview backdrop surface.
+// Spikes S4 and S10 ran with the popup `xray false` rule that now lives in
+// data/niri/gniri.kdl, so the test config is all they need.
 include "../../tests/visual/niri/test.kdl"
-
-layer-rule {
-    match namespace="^gniri-stage$"
-
-    background-effect {
-        xray false
-    }
-}

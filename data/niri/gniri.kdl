@@ -3,8 +3,32 @@
 // Add one line to ~/.config/niri/config.kdl to use it:
 //     include "/absolute/path/to/gniri.kdl"
 //
-// Blur strength and popup xray rules are added once spikes S4 and S5
-// (docs/DECISIONS.md) have settled their values.
+// docs/DECISIONS.md records the measurements behind each value here.
+
+// blur-my-shell's default blur adds no noise and leaves saturation alone;
+// niri's defaults (noise 0.02, saturation 1.5) would tint every blurred
+// surface differently from GNOME. Its 0.6 brightness has no niri equivalent
+// and is folded into gniri's tint colours instead (crates/theme/scss/_bms.scss).
+//
+// `passes` and `offset` (blur strength) are still niri's defaults; they are
+// set once the fit against GNOME's panel has been run (spike S5).
+//
+// This section is global: it also changes blur for other apps.
+blur {
+    noise 0
+    saturation 1
+}
+
+// Menus, dialogs, banners and the OSD blur what is really behind them, as
+// blur-my-shell's popups do. Without this rule niri blurs only the wallpaper
+// ("xray"), which is what the panel wants and is also much cheaper.
+layer-rule {
+    match namespace="^gniri-(stage|banner|osd)$"
+
+    background-effect {
+        xray false
+    }
+}
 
 // The pre-blurred wallpaper copy sits behind the zoomed-out workspaces in the
 // overview, like blur-my-shell's overview background.

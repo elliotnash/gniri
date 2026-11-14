@@ -1,0 +1,16 @@
+[package]
+name = "xtask"
+description = "Development and visual-test driver for gniri (run as `cargo xtask`)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+anyhow = "1"
+clap.workspace = true
+niri-ipc.workspace = true
+
+[lints]
+workspace = true

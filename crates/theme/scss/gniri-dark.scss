@@ -1,0 +1,13 @@
+// gniri dark theme entry point. Mirrors gnome-shell-dark.scss upstream.
+
+$variant: 'dark';
+$contrast: 'normal';
+
+@import 'st';
+@import 'upstream/colors';
+@import 'tokens';
+@import 'base';
+@import 'widgets/panel';
+
+// Last, so it overrides the stock look above.
+@import 'bms';

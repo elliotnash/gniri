@@ -14,18 +14,18 @@ Test setup for all spikes so far: niri 26.04 nested in the GNOME 51 session
 | S2 | Does `backdrop-filter` on a child widget give a per-widget, rounded blur region on a layer surface? | **Pass** | See below. |
 | S3 | Does the region track animation and hiding? | **Pass with a rule** | Follows layout every frame, but a surface with nothing left to draw is never repainted. See below. |
 | S4 | Is `xray false` usable for popups? | **Pass (function)** | Works; GPU cost not yet measured. See below. |
-| S5 | Do niri blur settings plus tint folding match blur-my-shell? | Open | Needs GNOME reference shots. |
-| S6 | Vulkan or GL renderer? | Partial | The default `GskVulkanRenderer` rendered S2 and S4 correctly. GL not yet compared. |
+| S5 | Do niri blur settings plus tint folding match blur-my-shell? | **Colour: pass. Strength: open** | Panel colour matches GNOME exactly on flat wallpapers. The `passes`/`offset` fit on the real wallpaper has not run yet. See below. |
+| S6 | Vulkan or GL renderer? | **Pass: keep the default** | Vulkan and GL both render the panel and send its blur region; same startup (about 220 ms to first frame), idle CPU zero for both. Vulkan used less memory (104 MB against 124 MB resident, debug build). No pin in the shell; the harness sets `GSK_RENDERER=vulkan` so runs are comparable. |
 | S7 | Does `output "winit" { scale 1.25 }` apply? | **Pass** | `niri msg -j outputs`: mode 1600x1000, logical 1280x800, scale 1.25. Screenshots are 1600x1000. |
-| S8 | Does nested niri render while covered; can it be full-screen sized? | Open | |
+| S8 | Does nested niri keep working when the host does not show it? | **Fail: handled** | Behind the lock screen nested niri stalls completely. See below. Covered-but-unlocked and full-screen sizing are untested. |
 | S9 | Do typed keys reach an exclusive top-layer surface in the overview? | **Pass** | See below. |
 | S10 | Does the backdrop surface sit behind zoomed-out workspaces? | **Pass** | See below. |
 | S11 | Does `OverviewOpenedOrClosed` fire at animation start? | **Pass** | The event arrived 9 ms and 11 ms after `open-overview` / `close-overview` were sent (animations off in the test config, so this measures event delivery, not the animation itself). |
 | S12 | Stage input region behaviour | **Pass** | See below. |
 | S13 | GtkPopover fallback | Not needed | S2 passed. |
-| S14 | JXL wallpaper load and offscreen blur | Open | |
-| S15 | GNOME Eval walker and screenshots | **Pass** | `tools/gnome-ref/capture.py` captured 12 states on 3 wallpapers. See below. |
-| S16 | Clean start on a private session bus | Open | |
+| S14 | JXL wallpaper load and offscreen blur | **Load: pass. Blur: open** | `Gdk.Texture` loads the 5120x5120 Fedora JXL in about 160 ms. At that size it is about 105 MB uncompressed, so M1 must scale it to the output size once and drop the original. Rendering the blurred backdrop copy is not yet tested. |
+| S15 | GNOME Eval walker and screenshots | **Pass, set incomplete** | The method works, but one pass was captured behind the lock screen and must be redone. See below. |
+| S16 | Clean start on a private session bus | **Pass** | Under `dbus-run-session` gniri paints its first frame in about 530 ms (220 ms on the host bus; the difference is the private bus starting xdg-desktop-portal). GTK warns that there is no accessibility bus, so the harness sets `GTK_A11Y=none`. |
 | S17 | niri hot corner with the panel in the corner | **Pass** | Moving a virtual pointer to 0,0 opens the overview with the top-layer panel covering the corner. No shell-side hot corner needed. |
 
 ## S2: blur region from CSS (pass)
@@ -92,6 +92,48 @@ Unmap the stage (and the banner and OSD surfaces) the moment their last
 visible child goes away, including at the end of a fade-out. Unmapping is
 clean (`attach(nil)`, verified in S12).
 
+## S5: matching blur-my-shell (colour pass, strength open)
+
+Measured on GNOME's flat-wallpaper reference shots, at a panel pixel with no
+widget:
+
+| Wallpaper | GNOME panel | Predicted by `0.5 * (30,30,33) + 0.5 * 0.6 * wallpaper` |
+|---|---|---|
+| `#808080` (128,128,128) | (53,53,55) | (53.4, 53.4, 54.9) |
+| `#3584e4` (53,132,228) | (31,54,85) | (30.9, 54.6, 84.9) |
+
+So blur-my-shell's panel is exactly its tint over the backdrop dimmed to 0.6,
+with no saturation change. The transparent panel in the overview reads
+(77,77,77) over grey: the overview background is the blurred wallpaper times
+0.6 with no tint.
+
+gniri's panel with the folded tint `rgba(21, 21, 24, 0.7)` over the same grey
+in nested niri reads (53,53,55): identical. `crates/theme/scss/_bms.scss`
+holds the folding function, and `data/niri/gniri.kdl` sets niri's blur to
+`noise 0` and `saturation 1` so colours pass through unchanged.
+
+Open: the blur strength. `tools/blur-fit/fit.py` searches niri's `passes` and
+`offset` for the closest match to GNOME's panel over the real wallpaper. It
+has not produced a result yet (the screen locked during the first attempt).
+
+## S8: nested niri behind the lock screen (fail, handled)
+
+When the host session locks or blanks, a nested niri stops entirely: no
+frames, no IPC replies, and it ignores SIGTERM. A harness run started then
+hangs until its timeout, and killing only the wrapper process leaves niri and
+gniri running.
+
+The harness therefore:
+
+- refuses to start if `org.gnome.ScreenSaver.GetActive` is true;
+- wraps the session in `gnome-session-inhibit --inhibit idle`, so a long
+  unattended run cannot let the screen lock halfway;
+- runs the session in its own process group and stops the whole group with
+  SIGKILL on timeout.
+
+Visual tests need an unlocked session. Whether niri also stalls when its
+window is merely covered or on another workspace is not yet tested.
+
 ## S9: typing into search during the overview (pass)
 
 Script: `spikes/gjs/interact.js`, command `search on`, keys sent with `wtype`.
@@ -136,10 +178,21 @@ GNOME.
 - Output is in `tests/visual/reference/gnome-51.1/raw/`, git-ignored because
   it contains notification text, search results and the desktop. Curated
   per-component extracts get committed as each milestone needs them.
+- **State of the set.** The two flat-wallpaper passes are complete and
+  checked by eye. The real-wallpaper pass, which is also the pass that writes
+  the actor-tree dumps, ran while the screen was locked: only
+  notification-banner, run-dialog and polkit-dialog are valid in `real/` and
+  `metrics/`. The other nine states must be recaptured (unsafe mode again).
+- The locked shots and dumps were kept under `raw/lock-accidental/`. They are
+  a usable reference for the lock screen clock and the unlock prompt (M4),
+  which the plan had assumed could not be captured.
 - Stage coordinates are logical (1792x1120 at scale 1.25); screenshots are
   physical pixels.
 
-Lessons kept in the script: a banner never times out while the user is idle,
+Lessons kept in the script: it refuses to run while the screen is locked,
+re-checks before every shot, and holds an idle inhibitor for the run (menus
+open and screenshots succeed over the lock screen, so a locked capture looks
+plausible until someone views it); a banner never times out while the user is idle,
 so banners are dismissed explicitly; each state first makes sure the overview
 is closed; the unsafe-mode shield icon is hidden so the panel matches normal
 use; capture runs on the empty last workspace to keep windows out of shots.

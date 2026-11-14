@@ -1,0 +1,10 @@
+[package]
+name = "gniri-core"
+description = "State container and shared types for gniri. No GTK, GLib or D-Bus."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true

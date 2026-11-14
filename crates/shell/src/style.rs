@@ -1,0 +1,45 @@
+//! Loads the compiled theme into GTK.
+
+use gtk::gdk;
+
+/// Installs the gniri stylesheet for the default display.
+///
+/// CSS that GTK cannot parse is reported on stderr with its location. With
+/// `GNIRI_STRICT_CSS=1` (set by the test harness) it aborts instead, so a bad
+/// rule cannot slip through as a silently unstyled widget.
+pub fn load() {
+    let strict = std::env::var_os("GNIRI_STRICT_CSS").is_some_and(|value| value == "1");
+
+    let provider = gtk::CssProvider::new();
+    provider.connect_parsing_error(move |_, section, error| {
+        let location = section.start_location();
+        let message = format!(
+            "gniri: theme CSS error at line {}, column {}: {}",
+            location.lines() + 1,
+            location.line_chars() + 1,
+            error.message()
+        );
+        if strict {
+            panic!("{message}");
+        }
+        eprintln!("{message}");
+    });
+    provider.load_from_string(gniri_theme::DARK_CSS);
+
+    gtk::style_context_add_provider_for_display(
+        &gdk::Display::default().expect("GTK is initialised, so there is a display"),
+        &provider,
+        gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
+    );
+}
+
+/// Adds one extra rule for the default display, above the theme.
+pub fn add_rule(css: &str) {
+    let provider = gtk::CssProvider::new();
+    provider.load_from_string(css);
+    gtk::style_context_add_provider_for_display(
+        &gdk::Display::default().expect("GTK is initialised, so there is a display"),
+        &provider,
+        gtk::STYLE_PROVIDER_PRIORITY_APPLICATION + 1,
+    );
+}

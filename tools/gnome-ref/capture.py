@@ -26,7 +26,7 @@ from pathlib import Path
 import gi
 
 gi.require_version("Gio", "2.0")
-from gi.repository import Gio  # noqa: E402
+from gi.repository import Gio, GLib  # noqa: E402
 
 from shell_eval import Shell, ShellError  # noqa: E402
 
@@ -36,6 +36,15 @@ LOGO_EXTENSION = "background-logo@fedorahosted.org"
 QS = "Main.panel.statusArea.quickSettings"
 DATE = "Main.panel.statusArea.dateMenu"
 POLKIT = "Main.componentManager._allComponents.polkitAgent"
+
+# True while the lock screen is up. Menus still open over it and screenshots
+# still work, so a capture taken then looks plausible but shows the wrong UI.
+IS_LOCKED = "Main.sessionMode.isLocked || Main.screenShield.locked"
+
+
+class Locked(RuntimeError):
+    """The session is locked: nothing captured now would be valid."""
+
 
 # The Power Mode toggle: its submenu has fixed content, unlike the Wi-Fi and
 # Bluetooth ones, which list nearby networks and devices.
@@ -125,10 +134,36 @@ class Capture:
         self.saved_animations = None
         self.logo_was_enabled = False
         self.original_workspace = None
+        self.idle_cookie = None
 
     # --- setup and restore -------------------------------------------------
 
+    def check_unlocked(self):
+        if self.shell.eval(IS_LOCKED):
+            raise Locked("the screen is locked; unlock it and run the capture again")
+
+    def inhibit_idle(self):
+        """Stop the screen blanking and locking while nobody touches the machine."""
+        (self.idle_cookie,) = self.shell.bus.call_sync(
+            "org.gnome.SessionManager", "/org/gnome/SessionManager",
+            "org.gnome.SessionManager", "Inhibit",
+            GLib.Variant("(susu)", ("gniri-capture", 0, "Reference capture in progress", 8)),
+            None, Gio.DBusCallFlags.NONE, 5000, None,
+        ).unpack()
+
+    def uninhibit_idle(self):
+        if self.idle_cookie is not None:
+            self.shell.bus.call_sync(
+                "org.gnome.SessionManager", "/org/gnome/SessionManager",
+                "org.gnome.SessionManager", "Uninhibit",
+                GLib.Variant("(u)", (self.idle_cookie,)),
+                None, Gio.DBusCallFlags.NONE, 5000, None,
+            )
+            self.idle_cookie = None
+
     def setup(self):
+        self.check_unlocked()
+        self.inhibit_idle()
         for key in BACKGROUND_KEYS:
             self.saved_background[key] = self.background.get_value(key)
         self.saved_animations = self.interface.get_boolean("enable-animations")
@@ -188,6 +223,7 @@ class Capture:
         if self.logo_was_enabled:
             step("logo extension", lambda: subprocess.run(
                 ["gnome-extensions", "enable", LOGO_EXTENSION], check=True))
+        step("idle inhibitor", self.uninhibit_idle)
         Gio.Settings.sync()
         return problems
 
@@ -218,6 +254,7 @@ class Capture:
     def run_state(self, wallpaper, state, dump):
         name, enter, leave, settle = state
         note = None
+        self.check_unlocked()
         # Every state starts from the plain desktop. Something else (a stray
         # Super press, a hot corner) may have opened the overview meanwhile.
         if self.shell.eval(js(
@@ -228,6 +265,7 @@ class Capture:
             if enter:
                 note = self.shell.eval(enter)
             time.sleep(settle)
+            self.check_unlocked()
             self.shoot(wallpaper, name, dump)
         finally:
             if leave:
@@ -251,6 +289,7 @@ class Capture:
             else:
                 return "polkit dialog did not appear"
             time.sleep(0.7)
+            self.check_unlocked()
             self.shoot(wallpaper, "polkit-dialog", dump)
             return None
         finally:
@@ -320,9 +359,12 @@ def main():
 
     capture = Capture(out_dir)
     notes = {}
+    aborted = None
     try:
         capture.setup()
         notes = capture.run(only, wallpapers)
+    except Locked as error:
+        aborted = str(error)
     finally:
         problems = capture.restore()
 
@@ -338,6 +380,8 @@ def main():
     }
     (out_dir / "meta.json").write_text(json.dumps(meta, indent=1))
     print(json.dumps({"notes": notes, "restore_problems": problems}, indent=1))
+    if aborted:
+        sys.exit(f"ABORTED: {aborted}. Shots taken before this point may be incomplete.")
     if problems:
         sys.exit(1)
 

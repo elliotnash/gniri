@@ -1,0 +1,40 @@
+// The blur-my-shell layer: what the extension changes on top of stock GNOME
+// Shell, restated for niri's blur.
+//
+// blur-my-shell draws a blurred copy of the background dimmed to
+// `brightness` (0.6 by default) and puts a translucent tint over it. niri's
+// blur has no brightness control, so the dimming is folded into the tint:
+//
+//     extension:  out = a * T + (1 - a) * b * B
+//     gniri:      out = a' * T' + (1 - a') * B
+//     therefore   a' = 1 - (1 - a) * b   and   T' = a * T / a'
+//
+// with T, a the extension's tint colour and alpha, b its brightness and B the
+// blurred backdrop.
+
+$bms_brightness: 0.6;
+
+@function bms-fold($tint) {
+    $a: alpha($tint);
+    $folded_alpha: 1 - (1 - $a) * $bms_brightness;
+    $scale: $a / $folded_alpha;
+    @return rgba(red($tint) * $scale, green($tint) * $scale, blue($tint) * $scale, $folded_alpha);
+}
+
+// GTK only sends a blur region to the compositor for a backdrop blur of at
+// least 10px (docs/DECISIONS.md, S2). The compositor sets the real strength.
+@mixin bms-blur {
+    backdrop-filter: blur(10px);
+}
+
+// stylesheet.css: `#panel.dark-panel { background-color: rgba(30,30,33,0.5) }`
+$bms_dark_tint: rgba(30, 30, 33, 0.5);
+
+.gniri-panel {
+    @include bms-blur;
+    background-color: bms-fold($bms_dark_tint);
+}
+
+:root {
+    --gniri-bms-surface-color: #{bms-fold($bms_dark_tint)};
+}

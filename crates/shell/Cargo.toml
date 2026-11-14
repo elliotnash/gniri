@@ -7,9 +7,12 @@ rust-version.workspace = true
 license.workspace = true
 
 [dependencies]
+gniri-core.workspace = true
+gniri-theme.workspace = true
 gtk.workspace = true
 adw.workspace = true
 gtk4-layer-shell.workspace = true
+clap.workspace = true
 
 [lints]
 workspace = true

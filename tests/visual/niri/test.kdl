@@ -11,13 +11,10 @@ output "winit" {
     scale 1.25
 }
 
-// Deterministic screenshots: no animations, no blur noise.
+// Deterministic screenshots: no animations. (Blur noise is already off in
+// the production fragment.)
 animations {
     off
-}
-
-blur {
-    noise 0
 }
 
 hotkey-overlay {

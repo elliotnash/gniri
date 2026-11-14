@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/shell"]
+members = ["crates/core", "crates/theme", "crates/shell", "crates/xtask"]
 
 [workspace.package]
 version = "0.1.0"
@@ -10,9 +10,14 @@ license = "GPL-3.0-or-later"
 
 # Every version is pinned here so the crates cannot drift apart.
 [workspace.dependencies]
+gniri-core = { path = "crates/core" }
+gniri-theme = { path = "crates/theme" }
 gtk = { package = "gtk4", version = "0.11", features = ["v4_24"] }
 adw = { package = "libadwaita", version = "0.9", features = ["v1_10"] }
 gtk4-layer-shell = { version = "0.8", features = ["v1_3"] }
+clap = { version = "4", features = ["derive"] }
+# Follows niri releases and is not semver-stable: pin to the installed niri.
+niri-ipc = "=26.4.0"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

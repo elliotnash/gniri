@@ -1,0 +1,13 @@
+// Top panel. Upstream: widgets/_panel.scss.
+//
+// M0 carries only the bar itself; buttons and indicators arrive in M1.
+
+$panel_height: 2.2em; // upstream $panel_height
+
+.gniri-panel {
+    min-height: $panel_height;
+    background-color: $panel_bg_color;
+    color: $panel_fg_color;
+    font-weight: bold;
+    font-feature-settings: "tnum";
+}

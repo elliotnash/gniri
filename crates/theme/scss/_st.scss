@@ -1,0 +1,58 @@
+// GTK equivalents of St's runtime colour functions.
+//
+// In GNOME Shell, st-mix(), st-lighten(), st-darken() and st-transparentize()
+// are evaluated by St at runtime because the accent colour is only known
+// then. Their semantics match the Sass functions of the same name (see
+// src/st/st-theme-node.c in gnome-shell). Here:
+//
+//  - if every colour argument is a real colour, compute it at build time;
+//  - if one is the accent colour, emit CSS that GTK resolves at runtime
+//    against libadwaita's accent variables.
+
+@function _st-color($color) {
+    @if type-of($color) == 'string' {
+        @if $color == '-st-accent-color' {
+            @return unquote('var(--accent-bg-color)');
+        }
+        @if $color == '-st-accent-fg-color' {
+            @return unquote('var(--accent-fg-color)');
+        }
+    }
+    @return $color;
+}
+
+@function _st-number($amount) {
+    // 20% and 0.2 both mean 0.2, as in St.
+    @if unit($amount) == '%' {
+        @return $amount / 100%;
+    }
+    @return $amount;
+}
+
+@function st-mix($color1, $color2, $weight) {
+    @if type-of($color1) == 'color' and type-of($color2) == 'color' {
+        @return mix($color1, $color2, $weight);
+    }
+    @return unquote('color-mix(in srgb, #{_st-color($color1)} #{$weight}, #{_st-color($color2)})');
+}
+
+@function st-transparentize($color, $amount) {
+    @if type-of($color) == 'color' {
+        @return transparentize($color, _st-number($amount));
+    }
+    @return unquote('rgb(from #{_st-color($color)} r g b / calc(alpha - #{_st-number($amount)}))');
+}
+
+@function st-lighten($color, $amount) {
+    @if type-of($color) == 'color' {
+        @return lighten($color, _st-number($amount) * 100%);
+    }
+    @return unquote('hsl(from #{_st-color($color)} h s calc(l + #{_st-number($amount) * 100}))');
+}
+
+@function st-darken($color, $amount) {
+    @if type-of($color) == 'color' {
+        @return darken($color, _st-number($amount) * 100%);
+    }
+    @return unquote('hsl(from #{_st-color($color)} h s calc(l - #{_st-number($amount) * 100}))');
+}

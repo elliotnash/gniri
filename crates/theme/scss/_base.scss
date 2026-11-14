@@ -1,0 +1,12 @@
+// Rules every gniri surface shares.
+
+// Layer surfaces are transparent; widgets inside paint what should be seen.
+window.gniri-layer {
+    background: transparent;
+}
+
+// Upstream `stage { font-size: 1em; color: $fg_color }`. The font family and
+// size come from the system font setting, as in GNOME Shell.
+window.gniri-layer {
+    color: $fg_color;
+}
