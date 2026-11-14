@@ -12,12 +12,12 @@ Test setup for all spikes so far: niri 26.04 nested in the GNOME 51 session
 |---|---|---|---|
 | S1 | Does the layer-shell shim initialise from a cargo build? | **Pass** | `readelf -d target/debug/gniri` lists `libgtk4-layer-shell.so.0` first in NEEDED, and the panel maps as a layer surface with no preload. Keep it that way: never enable gdk4-wayland's `wayland_crate` feature. (gjs still needs `LD_PRELOAD`.) |
 | S2 | Does `backdrop-filter` on a child widget give a per-widget, rounded blur region on a layer surface? | **Pass** | See below. |
-| S3 | Does the region track animation and hiding? | **Pass with a rule** | Follows layout every frame, but a surface with nothing left to draw is never repainted. See below. |
-| S4 | Is `xray false` usable for popups? | **Pass (function)** | Works; GPU cost not yet measured. See below. |
+| S3 | Does the region track animation and hiding? | **Pass with two rules** | Follows layout and CSS translate; opacity leaves it alone; CSS scale breaks it; an emptied surface is never repainted. See below. |
+| S4 | Is `xray false` usable for popups? | **Pass** | Works, and costs nested niri no more CPU than xray blur. GPU cost on battery is for the real session. See below. |
 | S5 | Do niri blur settings plus tint folding match blur-my-shell? | **Pass** | Panel colour matches GNOME exactly on flat wallpapers. With `passes 3`, `offset 1.3` the panel over the real wallpaper has no pixel more than 2% from GNOME's. See below. |
 | S6 | Vulkan or GL renderer? | **Pass: keep the default** | Vulkan and GL both render the panel and send its blur region; same startup (about 220 ms to first frame), idle CPU zero for both. Vulkan used less memory (104 MB against 124 MB resident, debug build). No pin in the shell; the harness sets `GSK_RENDERER=vulkan` so runs are comparable. |
 | S7 | Does `output "winit" { scale 1.25 }` apply? | **Pass** | `niri msg -j outputs`: mode 1600x1000, logical 1280x800, scale 1.25. Screenshots are 1600x1000. |
-| S8 | Does nested niri keep working when the host does not show it? | **Fail: handled** | Behind the lock screen nested niri stalls completely. See below. Covered-but-unlocked and full-screen sizing are untested. |
+| S8 | Does nested niri keep working when the host does not show it? | **Covered: pass. Locked: fail, handled** | Covered by a full-screen window it keeps answering, drawing client changes and taking screenshots. Behind the lock screen it stalls completely. See below. |
 | S9 | Do typed keys reach an exclusive top-layer surface in the overview? | **Pass** | See below. |
 | S10 | Does the backdrop surface sit behind zoomed-out workspaces? | **Pass** | See below. |
 | S11 | Does `OverviewOpenedOrClosed` fire at animation start? | **Pass** | The event arrived 9 ms and 11 ms after `open-overview` / `close-overview` were sent (animations off in the test config, so this measures event delivery, not the animation itself). |
@@ -48,7 +48,7 @@ Script: `spikes/gjs/s2_blur.js`, config `tests/visual/niri/test.kdl`.
 Consequence: the full-screen stage design stands. Bubbles are plain widgets
 with `backdrop-filter`; no per-bubble surfaces and no niri blur rules needed.
 
-## S4: real blur behind popups (pass on function)
+## S4: real blur behind popups (pass)
 
 Script: `spikes/gjs/s4_s10.js`, config `spikes/gjs/s4_s10.kdl`.
 
@@ -59,8 +59,18 @@ Script: `spikes/gjs/s4_s10.js`, config `spikes/gjs/s4_s10.kdl`.
   blurred wallpaper even where a window is behind it. This matches
   blur-my-shell's static panel blur.
 
-Still to measure: niri CPU/GPU cost of non-xray blur over a repainting window
-on this GPU. If it is too high, fall back to xray for popups.
+Cost, measured as nested niri's CPU time over 5 s with a spinner repainting
+the window under the bubble (`interact.js`, commands `spin` and `stage on`):
+
+| | xray false (real content) | xray true (wallpaper only) |
+|---|---|---|
+| Window repainting, no popup | 32% of one core | 32% |
+| Same, blurred popup over it | 38% | 38% |
+
+So blurring real content costs niri no more CPU than xray blur. This says
+nothing about GPU load, which nested niri cannot show; that is checked in the
+real session on battery once the stage exists (M2). If it is too high there,
+remove the rule to fall back to xray.
 
 ## S10: overview backdrop (pass)
 
@@ -75,17 +85,31 @@ Same script, after `niri msg action open-overview`.
 
 Consequence: the wallpaper + pre-blurred backdrop pair works as planned.
 
-## S3: region tracking (pass, with a rule)
+## S3: region tracking (pass, with two rules)
 
 Script: `spikes/gjs/interact.js`, command `anim`.
 
 - Sliding the bubble by changing its top margin every 50 ms produced one
   `set_blur_region` per step, each with the new position, in the same commit
-  as the frame. Animation by CSS `transform` or `opacity` is not yet tested.
+  as the frame.
+- CSS `transform: translateY(60px)` on the bubble: the region moved by 60 px
+  with it, and the blur shows in the new place.
+- Opacity 0.5 on the bubble: no new region is sent and niri keeps blurring at
+  full strength behind the half-faded tint. So during a fade the blur does
+  not fade; it disappears when the surface unmaps. blur-my-shell fades the
+  blur with the menu. GNOME's menu fades are short (about 150 ms), so this is
+  a small, recorded difference.
+- CSS `transform: scale(0.8)` on the bubble: GTK sent a wrong region (the
+  lower right part of the bubble only, 110x91 instead of 240x120) and the
+  screenshot shows no blur under most of the bubble.
 - Hiding the bubble, which left the stage with nothing to draw, produced **no
   commit at all**: the last frame and its blur region stayed on screen until
   the surface was unmapped. GTK skips rendering when the window's render node
   is empty.
+
+Rule: **never scale a blurred widget.** Animate blurred bubbles with
+translation and opacity only. GNOME's menus, banners and OSD do exactly that
+(slide and fade), so nothing is lost.
 
 Rule: **a mapped transparent surface must always have something to draw.**
 Unmap the stage (and the banner and OSD surfaces) the moment their last
@@ -166,7 +190,7 @@ Code: `crates/shell/src/surfaces/wallpaper.rs`.
 - `cargo xtask shot` with the overview open is pixel-identical across three
   runs.
 
-## S8: nested niri behind the lock screen (fail, handled)
+## S8: nested niri when the host does not show it
 
 When the host session locks or blanks, a nested niri stops entirely: no
 frames, no IPC replies, and it ignores SIGTERM. A harness run started then
@@ -181,8 +205,17 @@ The harness therefore:
 - runs the session in its own process group and stops the whole group with
   SIGKILL on timeout.
 
-Visual tests need an unlocked session. Whether niri also stalls when its
-window is merely covered or on another workspace is not yet tested.
+Visual tests need an unlocked session.
+
+Covered is fine. With a focused full-screen window of the host session over
+the nested niri window, niri answered IPC in 10 ms, a layer surface mapped by
+a client during that time was drawn, and the screenshot showed it. So the
+user can keep working in other windows during a run. Another workspace and a
+minimised window are untested.
+
+The nested output stays 1280x800 logical. Comparisons with GNOME's 1792x1120
+use the same wallpaper pixels and component crops, so a full-screen nested
+output is not needed.
 
 ## S9: typing into search during the overview (pass)
 

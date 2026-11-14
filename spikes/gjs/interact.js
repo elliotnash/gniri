@@ -7,6 +7,11 @@
 //                   is everything except the panel strip (S12).
 //   search on|off   map/unmap a top-layer entry with exclusive keyboard (S9).
 //   anim            slide the stage bubble down in steps, then hide it (S3).
+//   fade|shift|scale|reset
+//                   give the bubble opacity 0.5, a CSS translate or a CSS
+//                   scale, or undo all three (S3).
+//   spin            put a spinner in the app window, so it repaints every
+//                   frame under the bubble (S4 cost).
 //   quit
 //
 // Run inside nested niri:
@@ -40,6 +45,8 @@ window.app { background: #f6f5f4; }
     background-color: rgba(30, 30, 33, 0.5);
     color: white;
 }
+.bubble.shift { transform: translateY(60px); }
+.bubble.scaled { transform: scale(0.8); }
 .search { min-width: 300px; }
 `;
 
@@ -157,6 +164,17 @@ app.connect('activate', () => {
                 return GLib.SOURCE_REMOVE;
             });
         },
+        'fade': () => bubble.set_opacity(0.5),
+        'shift': () => bubble.add_css_class('shift'),
+        'scale': () => bubble.add_css_class('scaled'),
+        'reset': () => {
+            bubble.set_opacity(1);
+            bubble.remove_css_class('shift');
+            bubble.remove_css_class('scaled');
+        },
+        'spin': () => appArea.append(new Gtk.Spinner({
+            spinning: true, hexpand: true, vexpand: true,
+        })),
         'quit': () => app.quit(),
     };
 
