@@ -1,0 +1,37 @@
+// Global values. Upstream: the "Global Values" block of _common.scss, with
+// the same names so widget files read like their upstream counterparts.
+
+$base_font_size: 11pt;      // font size
+$base_padding: 6px;         // internal padding of elements
+$base_margin: 4px;          // margin between elements
+$base_border_radius: 8px;   // radii on all elements
+
+// Radius used to make sure elements that have rounded corners stay as such.
+$forced_circular_radius: 999px;
+
+// radii of things that display over other things, e.g. popovers
+$modal_radius: $base_border_radius * 2;
+
+// radii of dialogs
+$alert_radius: 18px;
+
+// Fixed icon sizes
+$base_icon_size: 16px;
+$medium_icon_size: $base_icon_size * 1.5; // 24px
+$large_icon_size: $base_icon_size * 2; // 32px
+
+// Scaled values: follow the text size.
+$scaled_padding: to_em(6px); // same as $base_padding
+
+// Used for symbolic icons that scale
+$scalable_icon_size: to_em(16px);
+$medium_scalable_icon_size: $scalable_icon_size * 1.5;
+$large_scalable_icon_size: $scalable_icon_size * 2;
+
+// animation definition
+$ease_out_quad: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+
+// St cross-fades between two styles with an ease-in-out-quad timeline when a
+// rule sets `transition-duration` (st-theme-node-transition.c). This is the
+// CSS timing function for the same curve.
+$st_transition_easing: cubic-bezier(0.455, 0.03, 0.515, 0.955);

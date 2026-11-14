@@ -1,0 +1,9 @@
+# The gniri configuration every test run uses, in place of the user's.
+# It mirrors the GNOME settings the reference captures were taken with:
+# 12-hour clock with the date, battery percentage shown.
+
+[clock]
+format = "12h"
+
+[panel]
+show_battery_percentage = true

@@ -10,3 +10,11 @@ window.gniri-layer {
 window.gniri-layer {
     color: $fg_color;
 }
+
+// The colours symbolic icons use for their "success", "warning" and "error"
+// parts (the charge level in a battery icon, for one). GNOME's theme never
+// sets them, so the shell draws St's built-in defaults (st-theme-node.c,
+// DEFAULT_SUCCESS_COLOR and friends), not the brighter libadwaita ones.
+window.gniri-layer {
+    -gtk-icon-palette: success #4e9a06, warning #f5793e, error #cc0000;
+}

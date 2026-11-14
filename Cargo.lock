@@ -491,6 +491,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "glib-build-tools"
+version = "0.22.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f9871f38b67853c358b8190f77b9f878eb27d933a950f1045b244c4559a9f5f0"
+
+[[package]]
 name = "glib-macros"
 version = "0.22.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -516,12 +522,19 @@ dependencies = [
 name = "gniri"
 version = "0.1.0"
 dependencies = [
+ "async-channel",
  "clap",
+ "glib-build-tools",
+ "gniri-config",
  "gniri-core",
+ "gniri-services",
  "gniri-theme",
  "gtk4",
  "gtk4-layer-shell",
  "libadwaita",
+ "niri-ipc",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -554,6 +567,7 @@ name = "gniri-theme"
 version = "0.1.0"
 dependencies = [
  "grass",
+ "serde_json",
 ]
 
 [[package]]
@@ -1359,6 +1373,9 @@ dependencies = [
  "clap",
  "ctrlc",
  "niri-ipc",
+ "serde",
+ "serde_json",
+ "toml",
 ]
 
 [[package]]

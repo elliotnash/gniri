@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gresources>
+  <!-- Laid out as an icon theme, so GtkIconTheme can search it. -->
+  <gresource prefix="/dev/gniri/icons">
+    <file preprocess="xml-stripblanks" alias="scalable/actions/screencast-stop-symbolic.svg">icons/scalable/actions/screencast-stop-symbolic.svg</file>
+  </gresource>
+</gresources>

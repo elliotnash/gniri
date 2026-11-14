@@ -1,0 +1,25 @@
+# The panel with the overview open, as in GNOME's `overview` reference
+# capture. Same workspaces as panel.toml.
+
+[fixture]
+time = "2026-11-14T08:28:00"
+power = { profile = "performance", battery = { percentage = 91 } }
+audio = { output = { volume = 0.3 } }
+network = { primary = { kind = "wifi", strength = 70 } }
+
+[variants.flat-808080]
+time = "2026-11-13T22:09:00"
+power = { profile = "performance", battery = { percentage = 36, charge = "charging" } }
+
+[variants.flat-3584e4]
+time = "2026-11-13T22:09:00"
+power = { profile = "performance", battery = { percentage = 36, charge = "charging" } }
+
+[[steps]]
+window = "#f6f5f4"
+
+[[steps]]
+action = { FocusWorkspaceDown = {} }
+
+[[steps]]
+action = { OpenOverview = {} }

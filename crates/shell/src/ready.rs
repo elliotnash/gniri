@@ -31,10 +31,13 @@ impl State {
         };
         let var = |name: &str| std::env::var(name).unwrap_or_default();
         let contents = format!(
-            "pid={}\nniri_socket={}\nwayland_display={}\n",
+            "pid={}\nniri_socket={}\nwayland_display={}\ngniri_socket={}\n",
             std::process::id(),
             var("NIRI_SOCKET"),
             var("WAYLAND_DISPLAY"),
+            crate::ipc::socket_path()
+                .map(|path| path.display().to_string())
+                .unwrap_or_default(),
         );
         // Write to a sibling and rename, so a reader never sees half a file.
         let path = std::path::PathBuf::from(path);

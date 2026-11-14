@@ -1,13 +1,200 @@
-// Top panel. Upstream: widgets/_panel.scss.
+// Top bar. Upstream: widgets/_panel.scss.
 //
-// M0 carries only the bar itself; buttons and indicators arrive in M1.
+// Widget tree (crates/shell/src/panel/), with the upstream selector each
+// node stands in for:
+//
+//   .gniri-panel                              #panel
+//     button.panel-button#panelActivities     .panel-button#panelActivities
+//       box.workspace-indicators                StBoxLayout
+//         box.workspace-dot                     .workspace-dot
+//     button.panel-button.clock-display       .panel-button.clock-display
+//       box.clock-display-box                   .clock-display-box
+//         label.clock                           .clock
+//     button.panel-button                     .panel-button (quick settings)
+//       box.panel-status-indicators-box         .panel-status-indicators-box
+//         box.panel-status-indicators-box       one per indicator
+//           image.system-status-icon            .system-status-icon
 
-$panel_height: 2.2em; // upstream $panel_height
+$privacy_indicator_color: if($variant == 'light', $orange_4, $orange_3);
+$recording_indicator_color: $red_4;
+
+$transparent_panel_fg_color: $light_1;    // always white for transparent lock screens
+$system_panel_fg_color: $system_fg_color; // always light for lockscreen, overview
+
+// Upstream: 2.2em, which is 32.27px at the 11pt base font and which St rounds
+// to 32px. GTK rounds a minimum size up, to 33px, so this is the largest
+// three-decimal em value that is not above 32px.
+$panel_height: 2.181em;
+$panel_transition_duration: 250ms; // same as the overview transition duration
+
+// St's `border` on a panel button is part of its 12px natural padding.
+$panel_button_border: 3px;
+$panel_button_hpadding: $base_padding * 2;
 
 .gniri-panel {
-    min-height: $panel_height;
     background-color: $panel_bg_color;
     color: $panel_fg_color;
     font-weight: bold;
-    font-feature-settings: "tnum";
+    min-height: $panel_height;
+    font-feature-settings: "tnum"; // upstream %numeric
+    transition: background-color $panel_transition_duration $st_transition_easing;
+
+    // panel menus
+    .panel-button {
+        // Drop everything libadwaita gives a button.
+        all: unset;
+        @include panel_button();
+        // -natural-hpadding, less the border St counts inside it
+        padding: 0 ($panel_button_hpadding - $panel_button_border);
+
+        // St gives a panel button's child the button's full height, over
+        // the transparent border. Negative margins do the same here, so
+        // children sit exactly where GNOME's do.
+        > * {
+            margin-top: -$panel_button_border;
+            margin-bottom: -$panel_button_border;
+            // Never let the margins take a child below zero height.
+            min-height: $panel_button_border * 2;
+        }
+
+        // St measures a line of the interface font one pixel taller than
+        // Pango does under GTK (19px against 18px at the base size) and
+        // centres that, which leaves its glyphs one pixel higher in the bar
+        // than ours. Two pixels of padding below a label move its centre up
+        // by that one pixel.
+        label {
+            padding-bottom: 2px;
+        }
+
+        // status area icons
+        .system-status-icon {
+            -gtk-icon-size: $scalable_icon_size;
+            // Upstream pads these by $base_padding, then removes it again
+            // for icons in an indicators box, which is every icon we have.
+            padding: 0;
+            margin: 0 $base_margin;
+        }
+
+        // The keyboard layout's short name is a status "icon" on its own,
+        // outside any indicators box, so it keeps upstream's padding.
+        .keyboard-layout {
+            padding: 0 $base_padding;
+        }
+
+        // reduce margin between icons in combined menu
+        .panel-status-indicators-box {
+            border-spacing: $base_margin;
+        }
+
+        &#panelActivities {
+            .workspace-indicators {
+                padding: 0 to_em(3px); // upstream $scaled_padding * 0.5
+                border-spacing: 5px;
+            }
+
+            .workspace-dot {
+                border-radius: $forced_circular_radius;
+                background-color: $panel_fg_color;
+            }
+        }
+
+        // screen activity indicators
+        &.screen-recording-indicator,
+        &.screen-sharing-indicator {
+            > box { border-spacing: $scaled_padding; }
+
+            image { -gtk-icon-size: $scalable_icon_size; }
+        }
+
+        &.screen-recording-indicator {
+            @include panel_button($bg: $recording_indicator_color, $fg: $_base_color_light, $style: filled);
+        }
+
+        &.screen-sharing-indicator {
+            @include panel_button($bg: $privacy_indicator_color, $fg: $_base_color_light, $style: filled);
+        }
+
+        // clock
+        &.clock-display {
+            // The background is on .clock, not the button, to leave the
+            // do-not-disturb indicator outside it.
+            @include panel_button($highlighted_child: true, $child_class: '.clock');
+            padding: 0 $panel_button_hpadding;
+
+            // No border here for the child to reach over.
+            > * {
+                margin-top: 0;
+                margin-bottom: 0;
+            }
+        }
+    }
+
+    // transparent panel on overview
+    &.overview {
+        background-color: transparent;
+
+        // use system text styles for overview panel
+        .panel-button {
+            @include panel_button($fg: $system_panel_fg_color);
+
+            &#panelActivities .workspace-dot {
+                background-color: $system_panel_fg_color;
+            }
+
+            &.clock-display {
+                @include panel_button($fg: $system_panel_fg_color, $highlighted_child: true, $child_class: '.clock');
+            }
+
+            // keep indicator style in this state
+            &.screen-recording-indicator {
+                @include panel_button($bg: $recording_indicator_color, $fg: $_base_color_light, $style: filled);
+            }
+
+            &.screen-sharing-indicator {
+                @include panel_button($bg: $privacy_indicator_color, $fg: $_base_color_light, $style: filled);
+            }
+        }
+    }
+
+    // Outside a .panel-button upstream spaces indicator boxes by 2px; inside
+    // one the rule above wins.
+    .panel-status-indicators-box {
+        border-spacing: 2px;
+    }
+
+    // spacing between power icon and (optional) percentage label
+    .power-status.panel-status-indicators-box {
+        border-spacing: 0;
+    }
+
+    // important privacy related indicators
+    .privacy-indicator { color: $privacy_indicator_color; }
+}
+
+// Clock
+.clock-display-box {
+    border-spacing: 2px;
+
+    .clock {
+        padding-left: to_em(12px); // upstream $scaled_padding * 2
+        padding-right: to_em(12px);
+    }
+}
+
+:root {
+    --gniri-panel-height: #{$panel_height};
+    --gniri-panel-button-border: #{$panel_button_border};
+    --gniri-panel-button-hpadding: #{$panel_button_hpadding};
+    --gniri-panel-overview-fg-color: #{$system_panel_fg_color};
+    --gniri-panel-button-hover-fill: #{transparentize($panel_fg_color, .83)};
+    --gniri-panel-button-active-fill: #{transparentize($panel_fg_color, .72)};
+    --gniri-panel-overview-button-active-fill: #{transparentize($system_panel_fg_color, .72)};
+    --gniri-panel-clock-padding: #{to_em(12px)};
+    --gniri-panel-status-icon-size: #{$scalable_icon_size};
+    --gniri-panel-status-icon-margin: #{$base_margin};
+    --gniri-panel-status-spacing: #{$base_margin};
+    --gniri-workspace-indicators-padding: #{to_em(3px)};
+    --gniri-workspace-indicators-spacing: 5px;
+    --gniri-workspace-dot-size: #{$scalable_icon_size * 0.5};
+    --gniri-screen-sharing-color: #{$privacy_indicator_color};
 }

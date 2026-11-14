@@ -27,14 +27,27 @@ $bms_brightness: 0.6;
     backdrop-filter: blur(10px);
 }
 
-// stylesheet.css: `#panel.dark-panel { background-color: rgba(30,30,33,0.5) }`
+// stylesheet.css: `#panel.dark-panel { background-color: rgba(30,30,33,0.5);
+// transition-duration: 500ms }`
 $bms_dark_tint: rgba(30, 30, 33, 0.5);
+$bms_panel_transition_duration: 500ms;
 
 .gniri-panel {
     @include bms-blur;
     background-color: bms-fold($bms_dark_tint);
+    transition-duration: $bms_panel_transition_duration;
+
+    // stylesheet.css `#panel.transparent-panel`: with the default "unblur
+    // in overview" the extension removes the panel blur while the overview
+    // is open, leaving the bar clear over the overview's own background.
+    &.overview {
+        backdrop-filter: none;
+        background-color: transparent;
+    }
 }
 
 :root {
     --gniri-bms-surface-color: #{bms-fold($bms_dark_tint)};
+    --gniri-bms-panel-tint: #{$bms_dark_tint};
+    --gniri-bms-panel-transition-duration: #{$bms_panel_transition_duration};
 }

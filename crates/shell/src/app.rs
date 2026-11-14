@@ -1,15 +1,21 @@
 //! Application setup: one `adw::Application` owning every surface.
 
+use std::cell::RefCell;
 use std::rc::Rc;
 
 use adw::prelude::*;
-use gtk::{gio, glib};
+use gniri_config::Config;
+use gniri_services::Fixture;
+use gtk::{gdk, gio, glib};
 
 use crate::Cli;
+use crate::debug;
+use crate::ipc;
+use crate::outputs::Outputs;
 use crate::ready::ReadyTracker;
+use crate::services::Services;
 use crate::style;
 use crate::surfaces::wallpaper::WallpaperSource;
-use crate::surfaces::{panel, wallpaper};
 
 /// Reverse-DNS application ID. Not final; change here before publishing.
 const APP_ID: &str = "dev.gniri.Shell";
@@ -25,7 +31,25 @@ fn application_id() -> String {
     }
 }
 
+/// Everything that must live as long as the application.
+struct Running {
+    _outputs: Rc<Outputs>,
+    _ipc: Option<gio::SocketService>,
+}
+
 pub fn run(cli: Cli) -> glib::ExitCode {
+    // Read both files before anything is shown, so a mistake in them is the
+    // first thing on stderr. A broken config falls back to the defaults; a
+    // broken fixture is fatal, since the screenshot would be meaningless.
+    let config = load_config(&cli);
+    let fixture = match cli.fixture.as_deref().map(Fixture::load).transpose() {
+        Ok(fixture) => fixture,
+        Err(error) => {
+            eprintln!("gniri: {error}");
+            return glib::ExitCode::FAILURE;
+        }
+    };
+
     let app = adw::Application::builder()
         .application_id(application_id())
         // We parsed the command line ourselves; GApplication must not.
@@ -37,30 +61,102 @@ pub fn run(cli: Cli) -> glib::ExitCode {
         adw::StyleManager::default().set_color_scheme(adw::ColorScheme::ForceDark);
         style::load();
     });
-    app.connect_activate(move |app| activate(app, &cli));
+
+    let running: Rc<RefCell<Option<Running>>> = Rc::default();
+    let setup = RefCell::new(Some((config, fixture)));
+    app.connect_activate({
+        let running = Rc::clone(&running);
+        move |app| {
+            // `activate` can fire again; build everything only once.
+            if let Some((config, fixture)) = setup.borrow_mut().take() {
+                *running.borrow_mut() = activate(app, &cli, config, fixture);
+            }
+        }
+    });
+    app.connect_shutdown(move |_| {
+        if running.borrow_mut().take().is_some() {
+            ipc::cleanup();
+        }
+    });
     // Pass no arguments: clap already consumed them.
     app.run_with_args::<&str>(&[])
 }
 
-fn activate(app: &adw::Application, cli: &Cli) {
+fn load_config(cli: &Cli) -> Config {
+    let path = cli.config.clone().or_else(gniri_config::default_path);
+    let Some(path) = path else {
+        return Config::default();
+    };
+    Config::load(&path).unwrap_or_else(|error| {
+        eprintln!("gniri: {error}");
+        eprintln!("gniri: using the default configuration");
+        Config::default()
+    })
+}
+
+/// The wallpaper to draw: `--wallpaper` if given, else the config file's.
+fn wallpaper_source(cli: &Cli, config: &Config) -> Option<WallpaperSource> {
+    if let Some(spec) = &cli.wallpaper {
+        return match WallpaperSource::parse(spec) {
+            Ok(source) => Some(source),
+            Err(error) => {
+                eprintln!("gniri: ignoring --wallpaper: {error}");
+                None
+            }
+        };
+    }
+    if let Some(image) = &config.wallpaper.image {
+        if image.is_file() {
+            return Some(WallpaperSource::Image(image.clone()));
+        }
+        eprintln!("gniri: wallpaper image {} does not exist", image.display());
+    }
+    let colour = config.wallpaper.color.as_deref()?;
+    gdk::RGBA::parse(colour).ok().map(WallpaperSource::Colour)
+}
+
+fn activate(
+    app: &adw::Application,
+    cli: &Cli,
+    config: Config,
+    fixture: Option<Fixture>,
+) -> Option<Running> {
     if !gtk4_layer_shell::is_supported() {
         eprintln!("gniri: the compositor does not support layer-shell");
         app.quit();
-        return;
+        return None;
     }
 
-    let ready = Rc::new(ReadyTracker::new());
-
-    if let Some(spec) = &cli.wallpaper {
-        match WallpaperSource::parse(spec) {
-            Ok(source) => {
-                for window in wallpaper::build(app, &source) {
-                    ready.watch(&window);
-                }
-            }
-            Err(error) => eprintln!("gniri: ignoring --wallpaper: {error}"),
-        }
+    // A fixture is for reproducible screenshots: nothing may be half way
+    // through an animation when one is taken.
+    if fixture.is_some()
+        && let Some(settings) = gtk::Settings::default()
+    {
+        settings.set_gtk_enable_animations(false);
     }
-    ready.watch(&panel::build(app));
+
+    let wallpaper = wallpaper_source(cli, &config);
+    let services = Services::start(config, fixture);
+
+    let ready = ReadyTracker::new();
+    let outputs = Outputs::start(app, &services, wallpaper, &ready);
     ready.arm();
+
+    let ipc = ipc::serve({
+        let app = app.clone();
+        move |request| match request {
+            ipc::Request::DumpTree => {
+                serde_json::to_value(debug::dump::dump(&app)).map_err(|error| error.to_string())
+            }
+        }
+    });
+
+    // Layer surfaces do not count as application windows that keep the
+    // process alive on every platform; hold the application explicitly.
+    std::mem::forget(app.hold());
+
+    Some(Running {
+        _outputs: outputs,
+        _ipc: ipc,
+    })
 }

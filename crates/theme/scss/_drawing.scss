@@ -1,0 +1,85 @@
+// Drawing helpers. Upstream: _drawing.scss. Only what gniri's widgets use so
+// far is here; each helper names its upstream counterpart.
+
+// Upstream to_em(): a pixel size as an em value at the 11pt base font.
+//
+// One difference. St rounds a computed length to the nearest pixel, GTK
+// rounds it down, and upstream's three-decimal em values often land just
+// under the pixel (6px becomes 0.409em, which is 5.9987px). So this rounds
+// the em value up instead of to nearest: 0.410em is 6.013px, which GTK
+// floors to the 6px St shows.
+@function to_em($input, $base: 16px) {
+    $em_value: ($input / $base) * 1.091 * 1000;
+    @return ceil($em_value) / 1000 * 1em;
+}
+
+// Upstream panel_button(), restated for GTK.
+//
+// St fills the button with an inset box-shadow so that the fill stops at the
+// inside of a transparent 3px border, which fakes a margin. In GTK the same
+// look is a background clipped to the padding box.
+//
+// $bg:                 background colour for the 'filled' style
+// $fg:                 foreground colour; the state fills derive from it
+// $style:              'filled' for a coloured button
+// $highlighted_child:  draw the states on a child instead of the button
+// $child_class:        selector of that child
+@mixin panel_button($bg: $panel_fg_color, $fg: $panel_fg_color, $style: null, $highlighted_child: false, $child_class: "") {
+    $transition: 150ms $st_transition_easing;
+
+    transition: background-color $transition, color $transition;
+    border: 3px solid transparent;
+    background-clip: padding-box;
+    border-radius: $forced_circular_radius;
+
+    font-weight: bold;
+    color: $fg;
+
+    $fill: transparent;
+    $hover_fill: transparentize($fg, .83);
+    $active_fill: transparentize($fg, .72);
+    $active_hover_fill: transparentize($fg, .68);
+
+    @if $style == 'filled' {
+        $fill: $bg;
+        $hover_fill: if($variant == 'light', darken($bg, 5%), lighten($bg, 5%));
+        $active_fill: if($variant == 'light', darken($bg, 9%), lighten($bg, 9%));
+        $active_hover_fill: if($variant == 'light', darken($bg, 11%), lighten($bg, 11%));
+    }
+
+    @if $highlighted_child {
+        // The button itself draws nothing; its child does.
+        background-color: transparent;
+        border: none;
+
+        #{$child_class} {
+            transition: background-color $transition, color $transition;
+            border: 3px solid transparent;
+            background-clip: padding-box;
+            border-radius: $forced_circular_radius;
+            background-color: $fill;
+        }
+
+        &:focus-visible, &:hover {
+            #{$child_class} { background-color: $hover_fill; }
+        }
+
+        &:active, &:checked {
+            #{$child_class} { background-color: $active_fill; }
+
+            &:hover #{$child_class} { background-color: $active_hover_fill; }
+        }
+    } @else {
+        background-color: $fill;
+
+        &:focus-visible, &:hover {
+            background-color: $hover_fill;
+        }
+
+        &:active, &:checked {
+            background-color: $active_fill;
+
+            &:hover { background-color: $active_hover_fill; }
+        }
+    }
+}

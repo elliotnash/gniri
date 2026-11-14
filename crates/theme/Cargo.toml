@@ -12,3 +12,6 @@ grass = { version = "0.13", default-features = false }
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true

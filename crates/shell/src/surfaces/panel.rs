@@ -1,17 +1,35 @@
-//! The top panel.
+//! The top panel's surface.
+
+use std::rc::Rc;
 
 use adw::prelude::*;
+use gtk::gdk;
 use gtk4_layer_shell::Layer;
 
 use super::layer::{self, Anchor, Zone};
+use crate::panel::{self, Bar};
+use crate::services::Services;
 
-/// Builds and maps the panel. M0: the bar only.
-pub fn build(app: &adw::Application) -> gtk::ApplicationWindow {
-    let window = layer::window(app, "panel", Layer::Top, Anchor::TopBar, Zone::Reserve);
-    let bar = gtk::CenterBox::builder()
-        .css_classes(["gniri-panel"])
-        .build();
-    window.set_child(Some(&bar));
+/// A mapped panel. Dropping it stops its updates; `window` must still be
+/// destroyed by whoever owns it.
+pub struct Panel {
+    pub window: gtk::ApplicationWindow,
+    _bar: Bar,
+}
+
+/// Builds and maps the panel on `monitor`.
+pub fn build(app: &adw::Application, monitor: &gdk::Monitor, services: &Rc<Services>) -> Panel {
+    let window = layer::window(
+        app,
+        monitor,
+        "panel",
+        Layer::Top,
+        Anchor::TopBar,
+        Zone::Reserve,
+    );
+    let output = monitor.connector();
+    let bar = panel::build(services, output.as_deref());
+    window.set_child(Some(&bar.widget));
     window.present();
-    window
+    Panel { window, _bar: bar }
 }

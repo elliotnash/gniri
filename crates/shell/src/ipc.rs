@@ -1,0 +1,121 @@
+//! `gniri msg`: requests to the running shell over a Unix socket.
+//!
+//! One request per connection: the client writes a line of JSON, the shell
+//! answers with a line of JSON and closes. The socket is
+//! `$XDG_RUNTIME_DIR/gniri.<wayland display>.sock`, so each compositor
+//! session has its own, and `$GNIRI_SOCKET` overrides it.
+
+use std::io::{BufRead, BufReader, Write};
+use std::os::unix::net::UnixStream;
+use std::path::PathBuf;
+
+use gtk::prelude::*;
+use gtk::{gio, glib};
+use serde::{Deserialize, Serialize};
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum Request {
+    /// Describe every mapped widget of every surface (`debug::dump`).
+    DumpTree,
+}
+
+/// What the shell answers: the result, or why it could not be produced.
+pub type Reply = Result<serde_json::Value, String>;
+
+pub fn socket_path() -> Option<PathBuf> {
+    if let Some(path) = std::env::var_os("GNIRI_SOCKET").filter(|path| !path.is_empty()) {
+        return Some(PathBuf::from(path));
+    }
+    let runtime = std::env::var_os("XDG_RUNTIME_DIR").filter(|dir| !dir.is_empty())?;
+    let display = std::env::var("WAYLAND_DISPLAY").unwrap_or_else(|_| "wayland-0".to_owned());
+    // The display may itself be a path; only its last part names it.
+    let display = display.rsplit('/').next().unwrap_or("wayland-0").to_owned();
+    Some(PathBuf::from(runtime).join(format!("gniri.{display}.sock")))
+}
+
+/// Sends one request to the running shell and waits for the reply.
+pub fn send(request: &Request) -> Result<serde_json::Value, String> {
+    let path = socket_path().ok_or("XDG_RUNTIME_DIR is not set")?;
+    let mut stream = UnixStream::connect(&path)
+        .map_err(|error| format!("cannot reach gniri at {}: {error}", path.display()))?;
+    let mut line = serde_json::to_string(request).map_err(|error| error.to_string())?;
+    line.push('\n');
+    stream
+        .write_all(line.as_bytes())
+        .map_err(|error| error.to_string())?;
+
+    let mut answer = String::new();
+    BufReader::new(stream)
+        .read_line(&mut answer)
+        .map_err(|error| error.to_string())?;
+    let reply: Reply =
+        serde_json::from_str(&answer).map_err(|error| format!("unreadable reply: {error}"))?;
+    reply
+}
+
+/// Starts answering requests. `handle` runs on the main loop.
+///
+/// Returns the listener, which must be kept alive, or `None` (after saying
+/// why on stderr) if the socket cannot be set up: the shell works without.
+pub fn serve(handle: impl Fn(Request) -> Reply + 'static) -> Option<gio::SocketService> {
+    let path = socket_path()?;
+    // A socket file left by a shell that crashed would block the bind. If
+    // nothing answers on it, it is stale.
+    if path.exists() {
+        if UnixStream::connect(&path).is_ok() {
+            eprintln!(
+                "gniri: another gniri already answers on {}; `gniri msg` will reach that one",
+                path.display()
+            );
+            return None;
+        }
+        let _ = std::fs::remove_file(&path);
+    }
+
+    let service = gio::SocketService::new();
+    let address = gio::UnixSocketAddress::new(&path);
+    if let Err(error) = service.add_address(
+        &address,
+        gio::SocketType::Stream,
+        gio::SocketProtocol::Default,
+        None::<&glib::Object>,
+    ) {
+        eprintln!("gniri: cannot listen on {}: {error}", path.display());
+        return None;
+    }
+
+    let handle = std::rc::Rc::new(handle);
+    service.connect_incoming(move |_, connection, _| {
+        let connection = connection.clone();
+        let handle = std::rc::Rc::clone(&handle);
+        glib::spawn_future_local(async move {
+            let input = gio::DataInputStream::new(&connection.input_stream());
+            let reply: Reply = match input.read_line_utf8_future(glib::Priority::DEFAULT).await {
+                Ok(Some(line)) => match serde_json::from_str::<Request>(&line) {
+                    Ok(request) => handle(request),
+                    Err(error) => Err(format!("not a request: {error}")),
+                },
+                Ok(None) => return,
+                Err(error) => Err(error.to_string()),
+            };
+            let mut line = serde_json::to_string(&reply).unwrap_or_else(|error| {
+                format!("{{\"Err\":\"cannot encode the reply: {error}\"}}")
+            });
+            line.push('\n');
+            let _ = connection
+                .output_stream()
+                .write_all_future(line.into_bytes(), glib::Priority::DEFAULT)
+                .await;
+            let _ = connection.close_future(glib::Priority::DEFAULT).await;
+        });
+        true
+    });
+    Some(service)
+}
+
+/// Removes the socket file at exit.
+pub fn cleanup() {
+    if let Some(path) = socket_path() {
+        let _ = std::fs::remove_file(path);
+    }
+}

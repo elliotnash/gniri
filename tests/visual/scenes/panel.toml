@@ -1,0 +1,24 @@
+# The panel on an empty desktop, as in GNOME's `desktop` reference capture:
+# two workspaces, the first with a window on it, the second (empty) active.
+
+# What the real-wallpaper capture showed.
+[fixture]
+time = "2026-11-14T08:28:00"
+power = { profile = "performance", battery = { percentage = 91 } }
+audio = { output = { volume = 0.3 } }
+network = { primary = { kind = "wifi", strength = 70 } }
+
+# The flat-wallpaper captures were taken the evening before, on the charger.
+[variants.flat-808080]
+time = "2026-11-13T22:10:00"
+power = { profile = "performance", battery = { percentage = 37, charge = "charging" } }
+
+[variants.flat-3584e4]
+time = "2026-11-13T22:09:00"
+power = { profile = "performance", battery = { percentage = 36, charge = "charging" } }
+
+[[steps]]
+window = "#f6f5f4"
+
+[[steps]]
+action = { FocusWorkspaceDown = {} }

@@ -281,6 +281,39 @@ so banners are dismissed explicitly; each state first makes sure the overview
 is closed; the unsafe-mode shield icon is hidden so the panel matches normal
 use; capture runs on the empty last workspace to keep windows out of shots.
 
+## M1: what porting the panel taught
+
+These hold for every widget port that follows.
+
+- **GTK rounds computed lengths differently from St.** St rounds to the
+  nearest pixel. GTK rounds paddings, margins and borders down when it
+  measures, and minimum sizes up. Upstream's three-decimal em values often
+  land just under a pixel (6px is 0.409em, which is 5.9987px), so
+  `to_em()` in `crates/theme/scss/_drawing.scss` rounds the em value up, and
+  a minimum size that must not grow is written as the largest em value not
+  above the pixel size (`$panel_height`).
+- **A St button's child covers the button's border.** `PanelMenu.ButtonBox`
+  gives its child the full height, over the transparent 3px border that
+  fakes a margin. In GTK the child gets negative margins of the border width
+  to sit in the same place.
+- **St's inset box-shadow fill is a background clipped to the padding box**
+  in GTK (`background-clip: padding-box`).
+- **Text sits one pixel lower by default.** St measures a line of Adwaita
+  Sans 11 as 19px tall and Pango under GTK as 18px; centred in the bar that
+  put our glyphs a pixel lower. Labels in the panel get 2px of bottom padding
+  to move their centre up one pixel. Calibrated for the default font at
+  scale 1.25.
+- **Symbolic icon palette.** The "success", "warning" and "error" parts of
+  symbolic icons are drawn in St's built-in colours (`#4e9a06`, `#f5793e`,
+  `#cc0000`), because GNOME's theme never sets them. libadwaita's are
+  brighter, so the theme sets `-gtk-icon-palette`.
+- **`all: unset`** on a `GtkButton` removes everything libadwaita styles it
+  with, which is what a port of an St widget wants to start from.
+- **niri hides top-layer surfaces under fullscreen windows** by itself; the
+  shell does nothing for that.
+- **A fixture turns GTK animations off**, so a screenshot or a widget dump
+  never catches something half way.
+
 ## Standing rules
 
 - Nested niri: never `--session`; find the instance through the `NIRI_SOCKET`

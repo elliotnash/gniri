@@ -1,6 +1,6 @@
 //! Loads the compiled theme into GTK.
 
-use gtk::gdk;
+use gtk::{gdk, gio};
 
 /// Installs the gniri stylesheet for the default display.
 ///
@@ -26,11 +26,17 @@ pub fn load() {
     });
     provider.load_from_string(gniri_theme::DARK_CSS);
 
+    let display = gdk::Display::default().expect("GTK is initialised, so there is a display");
     gtk::style_context_add_provider_for_display(
-        &gdk::Display::default().expect("GTK is initialised, so there is a display"),
+        &display,
         &provider,
         gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
     );
+
+    // Icons GNOME Shell bundles instead of taking from the icon theme
+    // (crates/shell/resources/icons).
+    gio::resources_register_include!("gniri.gresource").expect("the bundled resources are valid");
+    gtk::IconTheme::for_display(&display).add_resource_path("/dev/gniri/icons");
 }
 
 /// Adds one extra rule for the default display, above the theme.

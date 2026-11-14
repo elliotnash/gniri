@@ -6,6 +6,8 @@
 //! already holds, and nothing it does leaks into the real session.
 
 use std::fs::{self, File};
+use std::io::{BufRead, BufReader, Write};
+use std::os::unix::net::UnixStream;
 use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -15,7 +17,7 @@ use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result, anyhow, bail};
 use niri_ipc::socket::Socket;
-use niri_ipc::{Action, Event, Request};
+use niri_ipc::{Action, Event, Request, Response};
 
 const READY_TIMEOUT: Duration = Duration::from_secs(15);
 const SCREENSHOT_TIMEOUT: Duration = Duration::from_secs(5);
@@ -32,6 +34,9 @@ pub struct Session {
     /// `dbus-run-session`, whose child is niri, whose child is gniri.
     process: Child,
     gniri_pid: u32,
+    /// The gniri binary the session runs.
+    gniri: PathBuf,
+    gniri_socket: PathBuf,
     pub niri_socket: PathBuf,
     pub wayland_display: String,
 }
@@ -200,6 +205,8 @@ impl Session {
         Ok(Self {
             process,
             gniri_pid: field("pid")?.parse().context("pid in ready file")?,
+            gniri,
+            gniri_socket: PathBuf::from(field("gniri_socket")?),
             niri_socket: PathBuf::from(field("niri_socket")?),
             wayland_display: field("wayland_display")?,
         })
@@ -222,6 +229,71 @@ impl Session {
         reply
             .map(drop)
             .map_err(|message| anyhow!("niri refused the action: {message}"))
+    }
+
+    /// Sends niri a request that has a reply.
+    pub fn request(&self, request: Request) -> Result<Response> {
+        self.connect()?
+            .send(request)?
+            .map_err(|message| anyhow!("niri refused the request: {message}"))
+    }
+
+    /// Whether niri's overview is open.
+    pub fn overview_is_open(&self) -> Result<bool> {
+        match self.request(Request::OverviewState)? {
+            Response::OverviewState(overview) => Ok(overview.is_open),
+            other => bail!("unexpected reply to OverviewState: {other:?}"),
+        }
+    }
+
+    fn window_count(&self) -> Result<usize> {
+        match self.request(Request::Windows)? {
+            Response::Windows(windows) => Ok(windows.len()),
+            other => bail!("unexpected reply to Windows: {other:?}"),
+        }
+    }
+
+    /// Opens a flat-coloured application window (`gniri debug-window`) in the
+    /// session and waits until niri has mapped it.
+    pub fn spawn_window(&self, colour: &str) -> Result<()> {
+        let before = self.window_count()?;
+        let gniri = self
+            .gniri
+            .to_str()
+            .ok_or_else(|| anyhow!("non-UTF-8 path to gniri"))?;
+        self.action(Action::Spawn {
+            command: vec![
+                gniri.to_owned(),
+                "debug-window".to_owned(),
+                "--color".to_owned(),
+                colour.to_owned(),
+            ],
+        })?;
+        wait_until("the debug window to open", || {
+            Ok(self.window_count()? > before)
+        })
+    }
+
+    /// Every mapped widget of the shell (`gniri msg debug dump-tree`).
+    pub fn dump_tree(&self) -> Result<serde_json::Value> {
+        let mut stream = UnixStream::connect(&self.gniri_socket)
+            .with_context(|| format!("connecting to {}", self.gniri_socket.display()))?;
+        stream.write_all(b"\"DumpTree\"\n")?;
+        let mut line = String::new();
+        BufReader::new(stream).read_line(&mut line)?;
+        let mut reply: serde_json::Value =
+            serde_json::from_str(&line).context("gniri's reply is not JSON")?;
+        if let Some(error) = reply.get("Err") {
+            bail!("gniri could not dump its widgets: {error}");
+        }
+        Ok(reply["Ok"].take())
+    }
+
+    /// Runs a command as a client of the nested compositor (for `wlrctl`).
+    pub fn client_command(&self, program: &str) -> Command {
+        let mut command = Command::new(program);
+        command.env("WAYLAND_DISPLAY", &self.wayland_display);
+        command
     }
 
     /// Captures the nested output to `path` (PNG, physical pixels).
@@ -332,6 +404,20 @@ fn kill_group(process: &mut Child) {
     let group = format!("-{}", process.id());
     let _ = Command::new("kill").args(["-KILL", "--", &group]).status();
     let _ = process.wait();
+}
+
+/// Polls `done` until it returns true, for at most three seconds.
+pub fn wait_until(what: &str, mut done: impl FnMut() -> Result<bool>) -> Result<()> {
+    let started = Instant::now();
+    loop {
+        if done()? {
+            return Ok(());
+        }
+        if started.elapsed() > Duration::from_secs(3) {
+            bail!("timed out waiting for {what}");
+        }
+        std::thread::sleep(Duration::from_millis(25));
+    }
 }
 
 /// The last lines of a log, for error messages.

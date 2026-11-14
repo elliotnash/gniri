@@ -1,0 +1,16 @@
+# Pass marks for `cargo xtask diff` (crates/xtask/src/diff.rs).
+
+# Tier 1, layout: largest difference of any box edge, in logical pixels.
+layout_px = 0.5
+
+# Tier 2, flat wallpaper: two pixels are equal if their colours are within
+# the fuzz; at most this share of a strip's pixels may differ. Text is
+# excluded. What remains differing is antialiasing at icon and pill edges.
+flat_fuzz_percent = 2.0
+flat_differing_percent = 0.5
+
+# Tier 3, real wallpaper: both sides are blurred by this sigma (pixels)
+# first, then compared by RMS error and by mean brightness.
+real_lowpass_sigma = 2.0
+real_rmse_percent = 3.0
+real_brightness_percent = 2.0

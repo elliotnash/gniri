@@ -1,0 +1,144 @@
+# The top panel: gniri's widgets against GNOME Shell's actors.
+# Read by `cargo xtask diff panel` (crates/xtask/src/diff.rs).
+
+surface = "gniri-panel"
+wallpaper = "/usr/share/backgrounds/f45/default/f45-01-night.jxl"
+
+[[states]]
+scene = "panel"
+reference = "panel"
+
+# niri's overview stacks workspaces vertically, so the one above the active
+# workspace shows through the transparent panel around the clock. GNOME's
+# overview has only its background there. The centre is therefore not
+# compared pixel by pixel in this state (docs/FIDELITY.md).
+[[states]]
+scene = "panel-overview"
+reference = "panel-overview"
+regions = ["left", "right"]
+
+# Strips compared pixel by pixel, each wide enough to hold its content.
+[[regions]]
+name = "left"
+anchor = "left"
+width = 120
+
+[[regions]]
+name = "centre"
+anchor = "center"
+width = 240
+
+[[regions]]
+name = "right"
+anchor = "right"
+width = 200
+
+# Selectors: crates/xtask/src/tree.rs.
+#
+# Pairs that depend on the size of a piece of text allow one pixel. Pango
+# measures the same string in the same font up to a pixel differently under
+# GTK than under Clutter (the clock: 130x18 against 129x19), and the label
+# and everything sized by it inherit that. The extra tenth covers em-sized
+# paddings, which GTK does not round to whole pixels when it allocates.
+
+[[pairs]]
+name = "bar"
+ours = "#panel"
+theirs = "#panel"
+anchor = "stretch"
+
+[[pairs]]
+name = "activities button"
+ours = "#panelActivities"
+theirs = "#panelActivities"
+anchor = "left"
+
+[[pairs]]
+name = "workspace dots"
+ours = "#panelActivities .workspace-indicators"
+theirs = "#panelActivities Gjs_ui_panel_WorkspaceIndicators"
+anchor = "left"
+
+[[pairs]]
+name = "inactive dot"
+ours = "#panelActivities .workspace-dot:0"
+theirs = "#panelActivities .workspace-dot:0"
+anchor = "left"
+
+[[pairs]]
+name = "active dot"
+ours = "#panelActivities .workspace-dot:1"
+theirs = "#panelActivities .workspace-dot:1"
+anchor = "left"
+
+[[pairs]]
+name = "clock button"
+ours = ".clock-display"
+theirs = ".clock-display"
+anchor = "center"
+tolerance_px = 1.1
+
+[[pairs]]
+name = "clock pill"
+ours = ".clock"
+theirs = ".clock"
+anchor = "center"
+tolerance_px = 1.1
+
+[[pairs]]
+name = "clock text"
+ours = ".clock"
+ours_box = "text"
+theirs = ".clock ClutterText"
+anchor = "center"
+tolerance_px = 1.1
+
+[[pairs]]
+name = "status button"
+ours = "#panelRight .panel-button:0"
+theirs = "Gjs_ui_panel_QuickSettings"
+anchor = "right"
+
+[[pairs]]
+name = "status icons box"
+ours = "#panelRight .panel-button .panel-status-indicators-box"
+theirs = "Gjs_ui_panel_QuickSettings .panel-status-indicators-box"
+anchor = "right"
+
+[[pairs]]
+name = "network icon"
+ours = "#panelRight .system-status-icon:0"
+theirs = "Gjs_status_network_Indicator .system-status-icon"
+anchor = "right"
+
+[[pairs]]
+name = "volume icon"
+ours = "#panelRight .system-status-icon:1"
+theirs = "Gjs_status_volume_OutputIndicator .system-status-icon"
+anchor = "right"
+
+[[pairs]]
+name = "power profile icon"
+ours = "#panelRight .system-status-icon:2"
+theirs = "Gjs_status_powerProfiles_Indicator .system-status-icon"
+anchor = "right"
+
+[[pairs]]
+name = "battery indicator"
+ours = "#panelRight .power-status"
+theirs = "Gjs_status_system_Indicator"
+anchor = "right"
+
+[[pairs]]
+name = "battery icon"
+ours = "#panelRight .power-status .system-status-icon"
+theirs = "Gjs_status_system_Indicator .system-status-icon"
+anchor = "right"
+
+[[pairs]]
+name = "battery percentage"
+ours = "#panelRight .power-status GtkLabel"
+ours_box = "text"
+theirs = "Gjs_status_system_Indicator ClutterText"
+anchor = "right"
+tolerance_px = 1.1

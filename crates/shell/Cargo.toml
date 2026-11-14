@@ -5,14 +5,24 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+build = "build.rs"
 
 [dependencies]
 gniri-core.workspace = true
+gniri-config.workspace = true
+gniri-services.workspace = true
 gniri-theme.workspace = true
 gtk.workspace = true
 adw.workspace = true
 gtk4-layer-shell.workspace = true
 clap.workspace = true
+niri-ipc.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+async-channel.workspace = true
+
+[build-dependencies]
+glib-build-tools = "0.22"
 
 [lints]
 workspace = true

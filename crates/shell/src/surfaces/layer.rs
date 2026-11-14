@@ -1,5 +1,6 @@
 //! Common setup for layer-shell windows.
 
+use gtk::gdk;
 use gtk4_layer_shell::{Edge, Layer, LayerShell};
 
 /// Which screen edges a surface is attached to.
@@ -20,12 +21,13 @@ pub enum Zone {
     Ignore,
 }
 
-/// Creates an unmapped, transparent layer-shell window.
+/// Creates an unmapped, transparent layer-shell window on `monitor`.
 ///
 /// `name` becomes the namespace `gniri-<name>`, which niri layer rules in
 /// `data/niri/gniri.kdl` match on.
 pub fn window(
     app: &adw::Application,
+    monitor: &gdk::Monitor,
     name: &str,
     layer: Layer,
     anchor: Anchor,
@@ -39,6 +41,7 @@ pub fn window(
     window.init_layer_shell();
     window.set_namespace(Some(&format!("gniri-{name}")));
     window.set_layer(layer);
+    window.set_monitor(Some(monitor));
 
     let edges: &[Edge] = match anchor {
         Anchor::TopBar => &[Edge::Top, Edge::Left, Edge::Right],

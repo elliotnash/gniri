@@ -49,9 +49,22 @@ impl WallpaperSource {
     }
 }
 
-/// Builds and maps the wallpaper and backdrop surfaces.
-pub fn build(app: &adw::Application, source: &WallpaperSource) -> [gtk::ApplicationWindow; 2] {
-    let fill = |name| layer::window(app, name, Layer::Background, Anchor::Fill, Zone::Ignore);
+/// Builds and maps the wallpaper and backdrop surfaces for `monitor`.
+pub fn build(
+    app: &adw::Application,
+    monitor: &gdk::Monitor,
+    source: &WallpaperSource,
+) -> [gtk::ApplicationWindow; 2] {
+    let fill = |name| {
+        layer::window(
+            app,
+            monitor,
+            name,
+            Layer::Background,
+            Anchor::Fill,
+            Zone::Ignore,
+        )
+    };
     let wallpaper = fill("wallpaper");
     let backdrop = fill("backdrop");
 
