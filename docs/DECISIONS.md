@@ -259,8 +259,10 @@ GNOME.
   and a 2240x1400 screenshot on the real wallpaper, flat `#808080` and flat
   `#3584e4`.
 - Output is in `tests/visual/reference/gnome-51.1/raw/`, git-ignored because
-  it contains notification text, search results and the desktop. Curated
-  per-component extracts get committed as each milestone needs them.
+  it contains notification text, search results and the desktop.
+  `tools/gnome-ref/extract.py` cuts the committed per-component references
+  out of it (`metrics/` and `shots/` beside `raw/`); the panel is there now,
+  other components are added as each milestone needs them.
 - **State of the set.** All three passes and the dumps are complete and every
   shot was checked by eye. (The first real-wallpaper pass ran behind the lock
   screen and was redone on 2026-11-14.)
