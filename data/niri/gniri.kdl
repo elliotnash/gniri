@@ -1,0 +1,15 @@
+// gniri: niri config fragment.
+//
+// Add one line to ~/.config/niri/config.kdl to use it:
+//     include "/absolute/path/to/gniri.kdl"
+//
+// Blur strength and popup xray rules are added once spikes S4 and S5
+// (docs/DECISIONS.md) have settled their values.
+
+// The pre-blurred wallpaper copy sits behind the zoomed-out workspaces in the
+// overview, like blur-my-shell's overview background.
+layer-rule {
+    match namespace="^gniri-backdrop$"
+
+    place-within-backdrop true
+}

@@ -1,0 +1,6 @@
+/target/
+/reference/upstream/
+/tests/visual/baseline/
+*.log
+/tests/visual/reference/*/raw/
+__pycache__/

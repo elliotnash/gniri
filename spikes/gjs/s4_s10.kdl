@@ -1,0 +1,11 @@
+// Spikes S4 and S10: real (non-xray) blur for the popup stage, and the
+// overview backdrop surface.
+include "../../tests/visual/niri/test.kdl"
+
+layer-rule {
+    match namespace="^gniri-stage$"
+
+    background-effect {
+        xray false
+    }
+}

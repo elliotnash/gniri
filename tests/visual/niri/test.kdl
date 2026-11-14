@@ -1,0 +1,31 @@
+// Nested niri config for gniri development and visual tests.
+// Run with: niri -c tests/visual/niri/test.kdl -- <command>
+// Never pass --session: that would export this instance's environment to the
+// real user session.
+
+// The production fragment, so tests exercise the real layer rules.
+include "../../../data/niri/gniri.kdl"
+
+// The nested output is always called "winit". Match the laptop panel's scale.
+output "winit" {
+    scale 1.25
+}
+
+// Deterministic screenshots: no animations, no blur noise.
+animations {
+    off
+}
+
+blur {
+    noise 0
+}
+
+hotkey-overlay {
+    skip-at-startup
+}
+
+// Mod is Alt when nested, so these do not fight GNOME's Super bindings.
+binds {
+    Mod+O repeat=false { toggle-overview; }
+    Mod+Shift+E { quit skip-confirmation=true; }
+}
