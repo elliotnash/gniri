@@ -13,6 +13,39 @@
     @return ceil($em_value) / 1000 * 1em;
 }
 
+// A minimum size in em that St shows as $input pixels.
+//
+// St rounds a computed size to the nearest pixel; GTK rounds a minimum size
+// up. Upstream's em values often land just above the pixel (12em is 176px
+// plus a rounding error, three 16px icons are 48.004px), which GTK would
+// make a pixel larger. This gives the largest three-decimal em value that is
+// not above $input.
+@function em_at_most($input) {
+    $em_value: ($input / 1px) / (11 * 96 / 72) * 1000;
+    @return floor($em_value) / 1000 * 1em;
+}
+
+// Upstream fontsize(): a size in points as an em value at the 11pt base.
+@mixin fontsize($size, $base: 16px) {
+    $adjusted_size: ($size / 1pt) * 1.091 * 1000;
+    font-size: round($adjusted_size / ($base / 1px)) / 1000 * 1em;
+}
+
+// A box-shadow as St draws it, for GTK.
+//
+// St blurs a shadow with a Gaussian of sigma blur/2, as CSS does, but its
+// shadow reaches further: measured on GNOME Shell 51.1 at scale 1.25, the
+// 4px shadow of a popup menu fits a box grown by 0.4 times the blur on each
+// side (tests/visual, the quick settings menu on a flat wallpaper). GTK
+// grows a shadow with the spread length.
+//
+// St also paints the shadow under the element itself, which shows through
+// a translucent background; GTK and CSS clip it away there. That part is
+// folded into the background colour where it matters (_bms-popup.scss).
+@function st-shadow($x, $y, $blur, $color) {
+    @return $x $y $blur ($blur * 0.4) $color;
+}
+
 // Upstream panel_button(), restated for GTK.
 //
 // St fills the button with an inset box-shadow so that the fill stops at the

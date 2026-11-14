@@ -15,6 +15,7 @@ pub mod network;
 pub mod niri;
 pub mod power;
 pub mod rfkill;
+pub mod session;
 pub mod system_bus;
 pub mod toggles;
 

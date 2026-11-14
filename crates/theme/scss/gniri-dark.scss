@@ -9,7 +9,13 @@ $contrast: 'normal';
 @import 'common';
 @import 'tokens';
 @import 'base';
+@import 'widgets/buttons';
 @import 'widgets/panel';
+@import 'widgets/popovers';
+@import 'widgets/slider';
+@import 'widgets/quick-settings';
+@import 'widgets/osd';
 
 // Last, so it overrides the stock look above.
 @import 'bms';
+@import 'bms-popup';

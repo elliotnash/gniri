@@ -3,12 +3,17 @@
 mod app;
 mod debug;
 mod ipc;
+mod keys;
+mod menus;
 mod outputs;
 mod panel;
+mod quick_settings;
 mod ready;
 mod services;
+mod settings;
 mod style;
 mod surfaces;
+mod widgets;
 
 use std::path::PathBuf;
 
@@ -53,7 +58,13 @@ enum Command {
 
 #[derive(Subcommand, Debug, Clone)]
 enum Message {
-    /// Inspect the running shell.
+    /// Change the output volume by one step, or toggle mute, and show the
+    /// on-screen display. Bind this to the volume keys.
+    Volume { key: ipc::VolumeKey },
+    /// Change the screen brightness by one step and show the on-screen
+    /// display. Bind this to the brightness keys.
+    Brightness { step: ipc::Step },
+    /// Inspect or drive the running shell (for tests).
     Debug {
         #[command(subcommand)]
         request: DebugRequest,
@@ -64,6 +75,35 @@ enum Message {
 enum DebugRequest {
     /// Print every mapped widget of every surface as JSON.
     DumpTree,
+    /// Print every command the shell has sent to a service.
+    Commands,
+    /// Open a panel menu.
+    OpenMenu {
+        menu: menus::Menu,
+        /// Connector name of the output; the first with a panel if unset.
+        #[arg(long)]
+        output: Option<String>,
+    },
+    /// Open a menu inside the quick settings menu.
+    OpenSubmenu { submenu: menus::Submenu },
+    /// Close whatever menu is open.
+    CloseMenu,
+}
+
+impl Message {
+    fn request(&self) -> ipc::Request {
+        match self.clone() {
+            Self::Volume { key } => ipc::Request::Volume(key),
+            Self::Brightness { step } => ipc::Request::Brightness(step),
+            Self::Debug { request } => match request {
+                DebugRequest::DumpTree => ipc::Request::DumpTree,
+                DebugRequest::Commands => ipc::Request::Commands,
+                DebugRequest::OpenMenu { menu, output } => ipc::Request::OpenMenu { menu, output },
+                DebugRequest::OpenSubmenu { submenu } => ipc::Request::OpenSubmenu(submenu),
+                DebugRequest::CloseMenu => ipc::Request::CloseMenu,
+            },
+        }
+    }
 }
 
 fn main() -> glib::ExitCode {
@@ -71,22 +111,17 @@ fn main() -> glib::ExitCode {
     match &cli.command {
         None => app::run(cli),
         Some(Command::DebugWindow { color }) => debug::window::run(color),
-        Some(Command::Msg { message }) => {
-            let request = match message {
-                Message::Debug {
-                    request: DebugRequest::DumpTree,
-                } => ipc::Request::DumpTree,
-            };
-            match ipc::send(&request) {
-                Ok(value) => {
+        Some(Command::Msg { message }) => match ipc::send(&message.request()) {
+            Ok(value) => {
+                if !value.is_null() {
                     println!("{value:#}");
-                    glib::ExitCode::SUCCESS
                 }
-                Err(error) => {
-                    eprintln!("gniri: {error}");
-                    glib::ExitCode::FAILURE
-                }
+                glib::ExitCode::SUCCESS
             }
-        }
+            Err(error) => {
+                eprintln!("gniri: {error}");
+                glib::ExitCode::FAILURE
+            }
+        },
     }
 }

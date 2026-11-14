@@ -14,9 +14,11 @@
 
 $bms_brightness: 0.6;
 
-@function bms-fold($tint) {
+// $backdrop is how bright the blurred backdrop is drawn: the extension's
+// brightness, times anything else St puts between the blur and the tint.
+@function bms-fold($tint, $backdrop: $bms_brightness) {
     $a: alpha($tint);
-    $folded_alpha: 1 - (1 - $a) * $bms_brightness;
+    $folded_alpha: 1 - (1 - $a) * $backdrop;
     $scale: $a / $folded_alpha;
     @return rgba(red($tint) * $scale, green($tint) * $scale, blue($tint) * $scale, $folded_alpha);
 }

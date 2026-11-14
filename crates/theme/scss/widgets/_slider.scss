@@ -1,0 +1,18 @@
+// Slider. Upstream: widgets/_slider.scss.
+//
+// The trough and handle are drawn in code (crates/shell/src/widgets) from
+// the token table; St's -barlevel-* properties have no GTK counterpart.
+
+$slider_size: em_at_most(16px); // $scalable_icon_size
+
+.slider {
+    // The handle's colour.
+    color: if($variant == 'light', $fg_color, darken($fg_color, 9%));
+    min-height: $slider_size;
+    // Wide enough for the handle at both ends.
+    min-width: $slider_size * 2;
+
+    &:hover {
+        color: if($variant == 'light', lighten($fg_color, 7%), $fg_color);
+    }
+}

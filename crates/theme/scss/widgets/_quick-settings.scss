@@ -1,0 +1,183 @@
+// Quick settings. Upstream: widgets/_quick-settings.scss.
+//
+// Widget tree (crates/shell/src/quick_settings/), with the upstream
+// selector each node stands in for:
+//
+//   box.popup-menu-content.quick-settings        .quick-settings
+//     GniriQuickGrid.quick-settings-grid           .quick-settings-grid
+//       box.quick-settings-system-item             .quick-settings-system-item
+//         box.quick-settings-system-box              its StBoxLayout
+//           button.quick-toggle.button.power-item
+//           button.icon-button
+//       box.quick-slider                           .quick-slider
+//         button.icon-button.flat
+//         box.slider-bin > drawingarea.slider
+//       button.quick-toggle.button                 .quick-toggle
+//         box.quick-toggle-box                       its StBoxLayout
+//           image.quick-toggle-icon
+//           box > label.quick-toggle-title, label.quick-toggle-subtitle
+//       box.quick-toggle-has-menu                  .quick-toggle-has-menu
+//         button.quick-toggle.button
+//         box.quick-toggle-separator
+//         button.quick-toggle-menu-button.icon-button
+//       box.quick-toggle-menu-container            .quick-toggle-menu-container
+//         box.quick-toggle-menu                      .quick-toggle-menu
+//           box.header > image.icon, label.title
+
+// quickSettings.js POPUP_ANIMATION_TIME: dimming under an open submenu
+$quick_settings_dim_time: 400ms;
+// quickSettings.js DIM_BRIGHTNESS is -0.4
+$quick_settings_dim_brightness: 0.6;
+
+$quick_toggle_width: 12em;
+$quick_toggle_height: 48px; // $scalable_icon_size * 3
+
+.quick-settings {
+    padding: $base_padding * 3;
+    border-radius: $modal_radius * 2.25;
+
+    // Upstream writes $base_padding * 1.75, which is 10.5px; St rounds
+    // that up to 11px and GTK would round it down.
+    .icon-button, .button {
+        padding: ceil($base_padding * 1.75);
+    }
+
+    // `QuickSettingsMenu._setDimmed`
+    .quick-settings-grid > * {
+        transition: filter $quick_settings_dim_time $ease_out_quad;
+
+        &.dimmed { filter: brightness($quick_settings_dim_brightness); }
+    }
+}
+
+.quick-toggle, .quick-toggle-has-menu {
+    border-radius: $forced_circular_radius;
+    min-width: em_at_most(176px); // $quick_toggle_width
+    min-height: em_at_most($quick_toggle_height); // use icon size so the button scales
+}
+
+// standalone toggle button
+.quick-toggle {
+    transition: background-color 150ms $st_transition_easing;
+
+    /* Move padding into the box; this is to allow menu arrows
+       to extend to the border */
+    &.button { padding: 0; }
+
+    > .quick-toggle-box {
+        border-spacing: $base_padding * 1.5;
+        padding: 0 ($base_padding * 2);
+        padding-left: $base_padding * 2.5;
+    }
+
+    .quick-toggle-title {
+        @include heading;
+        @include st_line_height;
+    }
+
+    .quick-toggle-subtitle {
+        @include caption;
+        @include st_line_height;
+        font-weight: normal;
+    }
+
+    .quick-toggle-icon { -gtk-icon-size: $scalable_icon_size; }
+}
+
+// toggle with a menu button
+.quick-toggle-has-menu {
+    .quick-toggle {
+        min-width: 0;
+        border-radius: $forced_circular_radius 0 0 $forced_circular_radius;
+
+        > .quick-toggle-box { padding-right: to_em(9px); } // $scaled_padding * 1.5
+
+        &:last-child { border-radius: $forced_circular_radius; }
+    }
+
+    .quick-toggle-menu-button {
+        padding: $scaled_padding to_em(10.5px); // $scaled_padding * 1.75
+        border-radius: 0 $forced_circular_radius $forced_circular_radius 0;
+        transition: background-color 150ms $st_transition_easing;
+    }
+
+    .quick-toggle-separator {
+        min-width: 1px;
+        background-color: transparentize($fg_color, .75);
+    }
+}
+
+.quick-slider {
+    border-spacing: $base_padding;
+
+    .icon-button { padding: $base_padding; }
+
+    .slider-bin {
+        padding: $base_padding;
+        border-radius: $forced_circular_radius;
+    }
+}
+
+.quick-toggle-menu {
+    // %card_common
+    padding: $scaled_padding * 2;
+    border: 1px solid transparent;
+
+    border-radius: $base_border_radius * 3;
+
+    margin: ($base_padding * 2) 0 0;
+
+    .header {
+        border-spacing: $base_padding * 2;
+        padding-bottom: $base_padding * 2;
+
+        .icon {
+            -gtk-icon-size: $medium_scalable_icon_size;
+            border-radius: $forced_circular_radius;
+            padding: 1.5 * $base_padding;
+            background-color: transparentize($fg_color, 0.8);
+
+            &.active {
+                background-color: st-transparentize(-st-accent-color, 0);
+                color: st-transparentize(-st-accent-fg-color, 0);
+            }
+        }
+
+        .title {
+            @include title_3;
+        }
+
+        .subtitle {
+            @include caption_heading;
+        }
+    }
+}
+
+.quick-settings-system-item {
+    > .quick-settings-system-box { border-spacing: $base_padding * 2; }
+
+    .power-item {
+        min-height: 0;
+        min-width: 0;
+    }
+}
+
+// .nm-network-item .wireless-secure-icon: half-size symbolic
+.popup-menu-badge { -gtk-icon-size: $scalable_icon_size * 0.5; }
+
+.bt-menu-placeholder.popup-menu-item {
+    @include title_4;
+    padding: 2em 4em;
+}
+
+.device-subtitle { color: transparentize($fg_color, 0.5); }
+
+:root {
+    --gniri-quick-settings-padding: #{$base_padding * 3};
+    --gniri-quick-settings-radius: #{$modal_radius * 2.25};
+    --gniri-quick-settings-grid-spacing: #{$base_padding * 2};
+    --gniri-quick-toggle-width: #{$quick_toggle_width};
+    --gniri-quick-toggle-height: #{$quick_toggle_height};
+    --gniri-quick-toggle-menu-radius: #{$base_border_radius * 3};
+    --gniri-quick-settings-dim-brightness: #{$quick_settings_dim_brightness};
+}

@@ -9,7 +9,9 @@ use gtk::{gdk, gio};
 
 use crate::ready::ReadyTracker;
 use crate::services::Services;
+use crate::surfaces::osd::{self, Osd};
 use crate::surfaces::panel::{self, Panel};
+use crate::surfaces::stage::{self, Stage};
 use crate::surfaces::wallpaper::{self, WallpaperSource};
 
 /// What gniri shows on one output.
@@ -17,9 +19,14 @@ struct Output {
     monitor: gdk::Monitor,
     panel: Option<Panel>,
     wallpaper: Vec<gtk::ApplicationWindow>,
+    /// Unmapped until a menu opens.
+    stage: Stage,
+    /// Unmapped until a volume or brightness key is pressed.
+    osd: Osd,
 }
 
 impl Output {
+    /// The surfaces that are mapped from the start.
     fn windows(&self) -> impl Iterator<Item = &gtk::ApplicationWindow> {
         self.panel
             .iter()
@@ -33,6 +40,8 @@ impl Drop for Output {
         for window in self.windows() {
             window.destroy();
         }
+        self.stage.window.destroy();
+        self.osd.window.destroy();
     }
 }
 
@@ -106,10 +115,39 @@ impl Outputs {
             .connector()
             .is_none_or(|name| self.services.config.panel.shows_on(&name));
         let panel = wants_panel.then(|| panel::build(&self.app, &monitor, &self.services));
+        let panel_window = panel.as_ref().map(|panel| panel.window.downgrade());
+        let stage = stage::build(&self.app, &monitor, &self.services, move || {
+            panel_window
+                .as_ref()
+                .and_then(|window| window.upgrade())
+                .map_or(0, |window| window.height())
+        });
+        let osd = osd::build(&self.app, &monitor);
         Output {
             monitor,
             panel,
             wallpaper,
+            stage,
+            osd,
         }
+    }
+
+    /// Shows `content` on every output's on-screen display, as GNOME does
+    /// for the volume and brightness keys.
+    pub fn show_osd(&self, content: &osd::Content) {
+        for output in self.outputs.borrow().iter() {
+            output.osd.show(content);
+        }
+    }
+
+    /// Connector name of the first output that has a panel: where a menu
+    /// opens when nobody says which output.
+    pub fn default_output(&self) -> Option<String> {
+        let outputs = self.outputs.borrow();
+        let output = outputs
+            .iter()
+            .find(|output| output.panel.is_some())
+            .or(outputs.first())?;
+        output.monitor.connector().map(Into::into)
     }
 }

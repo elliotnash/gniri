@@ -1,0 +1,32 @@
+// Buttons. Upstream: widgets/_buttons.scss.
+//
+// Only the geometry is here. Every button gniri has so far sits on a
+// blurred popup, where blur-my-shell replaces all of upstream's button
+// colours; those are in _bms-popup.scss.
+
+// Start from nothing: libadwaita styles GtkButton heavily.
+button.button,
+button.icon-button {
+    all: unset;
+}
+
+.button {
+    // %button_common
+    border-radius: $base_border_radius;
+    padding: ($base_padding * .5) ($base_padding * 4);
+    font-weight: bold;
+    // uses scalable value since it's a text element
+    min-height: em_at_most(22px);
+}
+
+.icon-button {
+    border-radius: $forced_circular_radius; // is circular
+    padding: $scaled_padding * 2;
+    min-height: em_at_most(16px); // $scalable_icon_size
+    font-weight: bold;
+
+    image {
+        -gtk-icon-size: $scalable_icon_size;
+        -gtk-icon-style: symbolic;
+    }
+}

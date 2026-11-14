@@ -1,0 +1,81 @@
+// Popovers and menus. Upstream: widgets/_popovers.scss.
+//
+// Widget tree (crates/shell/src/quick_settings/menu.rs):
+//
+//   button.popup-menu-item                       .popup-menu-item
+//     box.popup-menu-box                           (the item's own layout)
+//       image.popup-menu-icon                      .popup-menu-icon
+//       label
+//       image.popup-menu-ornament                  .popup-menu-ornament
+//   box.popup-menu-item.popup-separator-menu-item  .popup-separator-menu-item
+//     box.popup-separator-menu-item-separator      its line
+
+$menuitem_border_radius: $base_border_radius * 1.5;
+// boxpointer.js POPUP_ANIMATION_TIME
+$popup_animation_time: 150ms;
+// .popup-menu-boxpointer { -arrow-rise }: distance from the panel & screen edge
+$popup_arrow_rise: $base_padding;
+
+// popover content
+.popup-menu-content {
+    padding: $base_padding;
+    background-color: $bg_color;
+    border-radius: $modal_radius * 1.25;
+    border: 1px solid $outer_borders_color;
+    box-shadow: st-shadow(0, 2px, 4px, $shadow_color);
+
+    // `BoxPointer.open`: a menu fades in while it slides down from the
+    // panel by the arrow rise. GNOME also scales it from 96%; a blurred
+    // widget must not be scaled (docs/DECISIONS.md, S3).
+    opacity: 0;
+    transform: translateY(-$popup_arrow_rise);
+    transition: opacity $popup_animation_time $ease_out_quad,
+                transform $popup_animation_time $ease_out_quad;
+
+    &.open {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+// menu items
+button.popup-menu-item {
+    all: unset;
+}
+
+.popup-menu-item {
+    // %menuitem
+    font-weight: normal;
+    transition: background-color 100ms $st_transition_easing;
+    padding: ($base_padding * 1.5) ($base_padding * 2);
+    border-radius: $menuitem_border_radius;
+
+    > .popup-menu-box { border-spacing: $base_padding; }
+
+    label { @include st_line_height; }
+}
+
+// symbolic icons in popover
+.popup-menu-icon {
+    -gtk-icon-size: $scalable_icon_size;
+    -gtk-icon-style: symbolic;
+}
+
+// container for radio and check boxes
+.popup-menu-ornament {
+    -gtk-icon-size: $scalable_icon_size;
+    min-width: em_at_most(16px);
+}
+
+// separator
+.popup-separator-menu-item {
+    .popup-separator-menu-item-separator {
+        min-height: 1px; // not really the whole box
+        background-color: $borders_color;
+    }
+}
+
+:root {
+    --gniri-popup-arrow-rise: #{$popup_arrow_rise};
+    --gniri-popup-animation-time: #{$popup_animation_time};
+}

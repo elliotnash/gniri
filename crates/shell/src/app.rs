@@ -11,6 +11,7 @@ use gtk::{gdk, gio, glib};
 use crate::Cli;
 use crate::debug;
 use crate::ipc;
+use crate::keys;
 use crate::outputs::Outputs;
 use crate::ready::ReadyTracker;
 use crate::services::Services;
@@ -143,12 +144,8 @@ fn activate(
     ready.arm();
 
     let ipc = ipc::serve({
-        let app = app.clone();
-        move |request| match request {
-            ipc::Request::DumpTree => {
-                serde_json::to_value(debug::dump::dump(&app)).map_err(|error| error.to_string())
-            }
-        }
+        let (app, services, outputs) = (app.clone(), Rc::clone(&services), Rc::clone(&outputs));
+        move |request| handle(&app, &services, &outputs, request)
     });
 
     // Layer surfaces do not count as application windows that keep the
@@ -159,4 +156,70 @@ fn activate(
         _outputs: outputs,
         _ipc: ipc,
     })
+}
+
+/// Answers one `gniri msg` request.
+fn handle(
+    app: &adw::Application,
+    services: &Rc<Services>,
+    outputs: &Rc<Outputs>,
+    request: ipc::Request,
+) -> ipc::Reply {
+    use serde_json::Value;
+    match request {
+        ipc::Request::DumpTree => {
+            serde_json::to_value(debug::dump::dump(app)).map_err(|error| error.to_string())
+        }
+        ipc::Request::Commands => Ok(Value::from(services.commands.entries())),
+        ipc::Request::OpenMenu { menu, output } => {
+            let output = output.or_else(|| outputs.default_output());
+            services
+                .menus
+                .update(|menus| menus.open(menu, output.as_deref()));
+            Ok(Value::Null)
+        }
+        ipc::Request::OpenSubmenu(submenu) => {
+            if services.menus.with(|menus| menus.open.is_none()) {
+                return Err("no menu is open".to_owned());
+            }
+            services
+                .menus
+                .update(|menus| menus.set_submenu(Some(submenu)));
+            Ok(Value::Null)
+        }
+        ipc::Request::CloseMenu => {
+            services.menus.update(|menus| menus.close());
+            Ok(Value::Null)
+        }
+        ipc::Request::Volume(key) => {
+            let command = services.audio.state.with(|state| match key {
+                ipc::VolumeKey::Up => state.step_output(1),
+                ipc::VolumeKey::Down => state.step_output(-1),
+                ipc::VolumeKey::Mute => state.toggle_output_mute(),
+            });
+            let command = command.ok_or("there is no sound output")?;
+            services.audio.send(command);
+            // The state now holds the predicted result; show that.
+            if let Some(content) = services.audio.state.with(keys::volume_osd) {
+                outputs.show_osd(&content);
+            }
+            Ok(Value::Null)
+        }
+        ipc::Request::Brightness(step) => {
+            let steps = match step {
+                ipc::Step::Up => 1,
+                ipc::Step::Down => -1,
+            };
+            let command = services
+                .brightness
+                .state
+                .with(|state| state.step(steps))
+                .ok_or("this screen's brightness cannot be set")?;
+            services.brightness.send(command);
+            if let Some(content) = services.brightness.state.with(keys::brightness_osd) {
+                outputs.show_osd(&content);
+            }
+            Ok(Value::Null)
+        }
+    }
 }

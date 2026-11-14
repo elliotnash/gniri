@@ -4,3 +4,6 @@
 *.log
 /tests/visual/reference/*/raw/
 __pycache__/
+
+# Worktrees of helper agents
+/.claude/worktrees/

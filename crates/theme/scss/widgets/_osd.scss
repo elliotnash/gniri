@@ -1,0 +1,51 @@
+// OSD. Upstream: widgets/_osd.scss.
+//
+// Widget tree (crates/shell/src/surfaces/osd.rs):
+//
+//   box.osd-window                .osd-window
+//     image                         StIcon
+//     box
+//       label                       StLabel
+//       drawingarea.level           .level
+
+// osdWindow.js FADE_TIME
+$osd_fade_time: 100ms;
+$osd_levelbar_height: 6px;
+
+.osd-window {
+    // %osd_panel
+    color: $osd_fg_color;
+    background-color: $osd_bg_color;
+    border: 1px solid $osd_outer_borders_color;
+    border-radius: $forced_circular_radius;
+
+    @include heading;
+    font-weight: bold;
+    border-spacing: $base_padding * 2;
+    padding: ($base_padding * 2) ($base_padding * 3);
+    margin-bottom: 4em;
+
+    // `OsdWindow.show` and `_hide`
+    opacity: 0;
+    transition: opacity $osd_fade_time $ease_out_quad;
+
+    &.open { opacity: 1; }
+
+    > box { border-spacing: $base_margin * 2; }
+
+    image { -gtk-icon-size: $large_icon_size; }
+
+    label { margin-right: $base_padding; }
+
+    .level {
+        min-width: 160px;
+        min-height: $osd_levelbar_height;
+        margin-right: $base_padding;
+    }
+}
+
+:root {
+    --gniri-osd-padding: #{$base_padding * 2} #{$base_padding * 3};
+    --gniri-osd-level-width: 160px;
+    --gniri-osd-level-height: #{$osd_levelbar_height};
+}

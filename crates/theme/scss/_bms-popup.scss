@@ -1,0 +1,178 @@
+// blur-my-shell's popup component: what the extension changes about menus,
+// the OSD and (later) dialogs and notifications. Ported from its
+// `src/styles/popup/base.css`, `dark.css` and `menu-items.css` (v78) for the
+// default settings: popups blurred, dark style.
+//
+// The extension replaces every background colour of the widgets on a popup
+// with a translucent white, so upstream's own button colours for these
+// widgets are never seen and are not ported.
+
+// base.css: `.bms-popup-background-dark .popup-menu-content, .quick-settings,
+// .osd-window { background: rgba(30,30,33,0.5); border-color: rgba(255,255,255,0.06) }`
+$bms_popup_tint: rgba(30, 30, 33, 0.5);
+$bms_popup_border_color: rgba(255, 255, 255, 0.06);
+$bms_popup_fg_color: rgba(255, 255, 255, 0.9);
+
+// St paints a menu's box-shadow under the menu as well as around it, so the
+// blurred backdrop of a menu is darkened once more by the shadow's alpha.
+// Measured: the quick settings menu over flat #808080 reads (46,46,48),
+// which is the tint over 128 * 0.6 * 0.8. The OSD has no shadow and reads
+// the same as the panel.
+$bms_menu_backdrop: $bms_brightness * (1 - alpha($shadow_color));
+
+.popup-menu-content,
+.quick-settings {
+    @include bms-blur;
+    color: $bms_popup_fg_color;
+    background-color: bms-fold($bms_popup_tint, $bms_menu_backdrop);
+    border-color: $bms_popup_border_color;
+}
+
+.osd-window {
+    @include bms-blur;
+    color: $bms_popup_fg_color;
+    background-color: bms-fold($bms_popup_tint);
+    border-color: $bms_popup_border_color;
+    // The extension's "volume and brightness OSD corner radius", 48px.
+    border-radius: 48px;
+}
+
+// While a submenu is open GNOME dims the menu's own pixels to 60%, and not
+// the blurred backdrop behind them. For the tint that is the same alpha
+// over a darker colour.
+.quick-settings {
+    transition: opacity $popup_animation_time $ease_out_quad,
+                transform $popup_animation_time $ease_out_quad,
+                background-color $quick_settings_dim_time $ease_out_quad,
+                border-color $quick_settings_dim_time $ease_out_quad;
+
+    &.dimmed {
+        $dimmed_tint: rgba(
+            red($bms_popup_tint) * $quick_settings_dim_brightness,
+            green($bms_popup_tint) * $quick_settings_dim_brightness,
+            blue($bms_popup_tint) * $quick_settings_dim_brightness,
+            alpha($bms_popup_tint)
+        );
+        background-color: bms-fold($dimmed_tint, $bms_menu_backdrop);
+        border-color: rgba(
+            255 * $quick_settings_dim_brightness,
+            255 * $quick_settings_dim_brightness,
+            255 * $quick_settings_dim_brightness,
+            alpha($bms_popup_border_color)
+        );
+    }
+}
+
+// A button on a popup: translucent white, brighter when pointed at or
+// pressed. dark.css.
+@mixin bms-button($normal, $hover, $active) {
+    color: $bms_popup_fg_color;
+    background-color: rgba(255, 255, 255, $normal);
+
+    &:hover, &:focus-visible { background-color: rgba(255, 255, 255, $hover); }
+    &:active { background-color: rgba(255, 255, 255, $active); }
+}
+
+// `box-shadow: inset 0 0 0 2px st-transparentize(st-mix(-st-accent-color,
+// rgba(255,255,255,0.9), 60%), 0.2)`
+@mixin bms-focus-ring {
+    &:focus-visible {
+        box-shadow: inset 0 0 0 2px st-transparentize(st-mix(-st-accent-color, rgba(255, 255, 255, 0.9), 60%), 0.2);
+    }
+}
+
+.quick-toggle,
+.quick-settings .icon-button,
+.quick-settings-system-item .button,
+.quick-settings-system-item .icon-button,
+.quick-settings-system-item .power-item {
+    @include bms-button(0.1, 0.15, 0.3);
+    @include bms-focus-ring;
+}
+
+.quick-toggle:checked {
+    color: st-transparentize(-st-accent-fg-color, 0);
+    background-color: st-transparentize(-st-accent-color, 0);
+
+    &:hover { background-color: st-lighten(-st-accent-color, 4%); }
+    &:active { background-color: st-lighten(-st-accent-color, 9%); }
+}
+
+.quick-toggle-has-menu .quick-toggle-menu-button {
+    @include bms-button(0.14, 0.19, 0.34);
+    @include bms-focus-ring;
+
+    &:checked {
+        color: st-transparentize(-st-accent-fg-color, 0);
+        background-color: st-mix(-st-accent-color, #ffffff, 85%);
+
+        &:hover { background-color: st-lighten(st-mix(-st-accent-color, #ffffff, 85%), 4%); }
+        &:active { background-color: st-lighten(st-mix(-st-accent-color, #ffffff, 85%), 9%); }
+    }
+}
+
+.quick-toggle-has-menu:checked .quick-toggle-separator {
+    background-color: st-mix(-st-accent-fg-color, -st-accent-color, 30%);
+}
+
+// menu-items.css: the slider row's buttons are clear until pointed at.
+.quick-slider .icon-button,
+.quick-slider .button {
+    @include bms-button(0, 0.13, 0.19);
+    @include bms-focus-ring;
+}
+
+.quick-slider .slider-bin:focus-within {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.popup-menu-item {
+    color: $bms_popup_fg_color;
+
+    &:hover, &:focus-visible { background-color: rgba(255, 255, 255, 0.13); }
+    &:active, &:checked { background-color: rgba(255, 255, 255, 0.19); }
+    &:disabled { color: rgba(255, 255, 255, 0.5); }
+}
+
+// base.css: `.quick-toggle-menu { background: rgba(255,255,255,0.08);
+// border-color: rgba(255,255,255,0.06) }`, and the extension blurs it as a
+// surface of its own: behind the white it shows what is under the submenu,
+// blurred and dimmed to its brightness once more. What is under it is the
+// menu as it looks before GNOME's dimming, a flat colour, so here the
+// submenu is the one colour that gives the same result over the dimmed menu
+// gniri has there.
+//
+//   GNOME:  w * 255 + (1 - w) * b * (a * T + m * B)
+//   gniri:  s * S + (1 - s) * (d * a * T + m * B)
+//
+// with w the white's alpha, b the brightness, a and T the menu tint, m the
+// menu's backdrop factor, d the dimming and B the blurred wallpaper. The
+// two agree for every B when 1 - s = (1 - w) * b.
+$bms_submenu_white: 0.08;
+
+@function bms-submenu-colour() {
+    $a: alpha($bms_popup_tint);
+    $keep: (1 - $bms_submenu_white) * $bms_brightness;
+    $s: 1 - $keep;
+    $channels: ();
+    @each $t in (red($bms_popup_tint), green($bms_popup_tint), blue($bms_popup_tint)) {
+        $gnome: $bms_submenu_white * 255 + $keep * $a * $t;
+        $under: $keep * $quick_settings_dim_brightness * $a * $t;
+        $channels: append($channels, ($gnome - $under) / $s);
+    }
+    @return rgba(nth($channels, 1), nth($channels, 2), nth($channels, 3), $s);
+}
+
+.quick-toggle-menu {
+    color: $bms_popup_fg_color;
+    background-color: bms-submenu-colour();
+    border-color: $bms_popup_border_color;
+}
+
+:root {
+    --gniri-bms-menu-color: #{bms-fold($bms_popup_tint, $bms_menu_backdrop)};
+    --gniri-bms-submenu-color: #{bms-submenu-colour()};
+    --gniri-bms-popup-tint: #{$bms_popup_tint};
+    --gniri-bms-popup-border-color: #{$bms_popup_border_color};
+    --gniri-bms-popup-fg-color: #{$bms_popup_fg_color};
+}

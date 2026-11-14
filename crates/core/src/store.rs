@@ -127,6 +127,14 @@ impl<S: Clone + PartialEq + 'static> Store<S> {
         }
     }
 
+    /// Calls `callback` with the state as it is now, and again after every
+    /// change, until the subscription is dropped.
+    #[must_use = "the callback stops when the Subscription is dropped"]
+    pub fn observe(&self, callback: impl Fn(&S) + 'static) -> Subscription {
+        self.with(&callback);
+        self.subscribe(callback)
+    }
+
     /// Calls `callback` after every change, until the subscription is dropped.
     #[must_use = "the callback stops when the Subscription is dropped"]
     pub fn subscribe(&self, callback: impl Fn(&S) + 'static) -> Subscription {

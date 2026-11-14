@@ -1,0 +1,56 @@
+# The quick settings menu, as in GNOME's `quick-settings` reference capture:
+# Wi-Fi connected, Bluetooth on with nothing connected, the performance
+# power profile, dark style on.
+
+# What the real-wallpaper capture showed.
+[fixture]
+time = "2026-11-14T08:28:00"
+brightness = { level = 1.0 }
+bluetooth = { adapter = { powered = true } }
+rfkill = { available = true }
+session = { can_suspend = true }
+dark_style = { available = true, on = true }
+night_light = { available = true }
+do_not_disturb = { available = true }
+
+[fixture.power]
+profile = "performance"
+profiles = ["performance", "balanced", "power-saver"]
+battery = { percentage = 91 }
+
+# Two outputs, so the slider has its device menu button, as on the
+# reference machine.
+[fixture.audio]
+output = { volume = 0.27 }
+outputs = [
+    { name = "speakers", description = "Speakers – Built-in Audio", active = true },
+    { name = "hdmi", description = "HDMI / DisplayPort – Built-in Audio" },
+]
+
+# The reference shows the name of the network it was captured on, cut off by
+# the toggle's width. Any name that long is cut at the same place.
+[fixture.network]
+primary = { kind = "wifi", strength = 70 }
+wifi = { enabled = true, networks = [
+    { ssid = "EXAMPLE NETWORK NAME", strength = 70, secure = true, known = true, status = "connected" },
+] }
+
+# The flat-wallpaper captures were taken the evening before, on the charger.
+[variants.flat-808080.power]
+profile = "performance"
+profiles = ["performance", "balanced", "power-saver"]
+battery = { percentage = 37, charge = "charging" }
+
+[variants.flat-3584e4.power]
+profile = "performance"
+profiles = ["performance", "balanced", "power-saver"]
+battery = { percentage = 37, charge = "charging" }
+
+[[steps]]
+window = "#f6f5f4"
+
+[[steps]]
+action = { FocusWorkspaceDown = {} }
+
+[[steps]]
+gniri = ["debug", "open-menu", "quick-settings"]

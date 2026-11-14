@@ -14,6 +14,9 @@
 //!
 //! [[steps]]
 //! action = { FocusWorkspaceDown = {} }   # any niri action
+//!
+//! [[steps]]
+//! gniri = ["debug", "open-menu", "quick-settings"]   # `gniri msg ...`
 //! ```
 
 use std::collections::BTreeMap;
@@ -33,6 +36,8 @@ pub enum Step {
     Window(String),
     /// Run a niri action, written as niri's IPC writes it.
     Action(niri_ipc::Action),
+    /// Run `gniri msg` with these arguments.
+    Gniri(Vec<String>),
 }
 
 #[derive(Deserialize, Default)]
@@ -116,6 +121,10 @@ impl Scene {
             match step {
                 Step::Window(colour) => session.spawn_window(colour)?,
                 Step::Action(action) => session.action(action.clone())?,
+                Step::Gniri(arguments) => {
+                    let arguments: Vec<&str> = arguments.iter().map(String::as_str).collect();
+                    session.gniri_msg(&arguments)?;
+                }
             }
             std::thread::sleep(Duration::from_millis(100));
         }

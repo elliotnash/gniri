@@ -18,6 +18,7 @@ pub struct Config {
     pub wallpaper: Wallpaper,
     pub clock: Clock,
     pub panel: Panel,
+    pub commands: Commands,
 }
 
 /// What gniri draws behind the windows. With neither key set it draws no
@@ -87,6 +88,25 @@ impl Panel {
         match &self.outputs {
             Some(outputs) => outputs.iter().any(|name| name == output),
             None => true,
+        }
+    }
+}
+
+/// Programs gniri starts.
+#[derive(Clone, Debug, PartialEq, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct Commands {
+    /// The settings application. It is started as `<settings> <panel>` for
+    /// entries such as "Power Settings", with GNOME Settings' panel names
+    /// (`power`, `wifi`, `bluetooth`, `sound`). Empty for none: the buttons
+    /// and menu entries that open settings are then hidden.
+    pub settings: String,
+}
+
+impl Default for Commands {
+    fn default() -> Self {
+        Self {
+            settings: "gnome-control-center".to_owned(),
         }
     }
 }
@@ -203,6 +223,7 @@ mod tests {
         assert!(config.clock.format().show_date);
         assert!(config.panel.shows_on("eDP-1"));
         assert_eq!(config.wallpaper.image, None);
+        assert_eq!(config.commands.settings, "gnome-control-center");
     }
 
     #[test]
@@ -222,6 +243,9 @@ mod tests {
             [panel]
             show_battery_percentage = true
             outputs = ["eDP-1"]
+
+            [commands]
+            settings = "my-settings"
             "##,
         )
         .unwrap();
@@ -242,6 +266,7 @@ mod tests {
         assert!(config.panel.show_battery_percentage);
         assert!(config.panel.shows_on("eDP-1"));
         assert!(!config.panel.shows_on("HDMI-A-1"));
+        assert_eq!(config.commands.settings, "my-settings");
     }
 
     #[test]

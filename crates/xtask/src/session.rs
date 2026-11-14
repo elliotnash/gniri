@@ -290,6 +290,25 @@ impl Session {
     }
 
     /// Runs a command as a client of the nested compositor (for `wlrctl`).
+    /// Runs `gniri msg <arguments>` against this session's shell and
+    /// returns what it printed.
+    pub fn gniri_msg(&self, arguments: &[&str]) -> Result<String> {
+        let output = Command::new(&self.gniri)
+            .arg("msg")
+            .args(arguments)
+            .env("GNIRI_SOCKET", &self.gniri_socket)
+            .output()
+            .context("running gniri msg")?;
+        if !output.status.success() {
+            bail!(
+                "gniri msg {} failed: {}",
+                arguments.join(" "),
+                String::from_utf8_lossy(&output.stderr).trim()
+            );
+        }
+        Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+    }
+
     pub fn client_command(&self, program: &str) -> Command {
         let mut command = Command::new(program);
         command.env("WAYLAND_DISPLAY", &self.wayland_display);

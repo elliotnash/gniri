@@ -13,10 +13,40 @@ use gtk::prelude::*;
 use gtk::{gio, glib};
 use serde::{Deserialize, Serialize};
 
+use crate::menus::{Menu, Submenu};
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Request {
     /// Describe every mapped widget of every surface (`debug::dump`).
     DumpTree,
+    /// List every command the shell has sent to a service.
+    Commands,
+    /// Open a panel menu, on `output` or the first output with a panel.
+    OpenMenu {
+        menu: Menu,
+        output: Option<String>,
+    },
+    /// Open a menu inside the quick settings menu.
+    OpenSubmenu(Submenu),
+    /// Close whatever menu is open.
+    CloseMenu,
+    Volume(VolumeKey),
+    Brightness(Step),
+}
+
+/// What a volume key does.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, clap::ValueEnum)]
+pub enum VolumeKey {
+    Up,
+    Down,
+    /// Toggle mute.
+    Mute,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, clap::ValueEnum)]
+pub enum Step {
+    Up,
+    Down,
 }
 
 /// What the shell answers: the result, or why it could not be produced.

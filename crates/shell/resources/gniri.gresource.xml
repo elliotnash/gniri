@@ -3,5 +3,8 @@
   <!-- Laid out as an icon theme, so GtkIconTheme can search it. -->
   <gresource prefix="/dev/gniri/icons">
     <file preprocess="xml-stripblanks" alias="scalable/actions/screencast-stop-symbolic.svg">icons/scalable/actions/screencast-stop-symbolic.svg</file>
+    <file preprocess="xml-stripblanks" alias="scalable/actions/dark-mode-symbolic.svg">icons/scalable/actions/dark-mode-symbolic.svg</file>
+    <file preprocess="xml-stripblanks" alias="scalable/actions/ornament-check-symbolic.svg">icons/scalable/actions/ornament-check-symbolic.svg</file>
+    <file preprocess="xml-stripblanks" alias="scalable/actions/screenshooter-symbolic.svg">icons/scalable/actions/screenshooter-symbolic.svg</file>
   </gresource>
 </gresources>

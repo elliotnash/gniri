@@ -32,3 +32,9 @@
 # Outputs that get a panel, by connector name (see `niri msg outputs`).
 # Default: every output.
 # outputs = ["eDP-1"]
+
+[commands]
+# The settings application, started as `<settings> <panel>` by entries such
+# as "Power Settings" (panels: power, wifi, bluetooth, sound). Default:
+# "gnome-control-center". Set to "" to hide those entries.
+# settings = "my-settings-app"

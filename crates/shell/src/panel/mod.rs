@@ -34,7 +34,7 @@ pub fn build(services: &Rc<Services>, output: Option<&str>) -> Bar {
     centre.append(&clock::build(services, &mut subscriptions));
     right.append(&screencast::build(services, &mut subscriptions));
     right.append(&keyboard::build(services, &mut subscriptions));
-    right.append(&status::build(services, &mut subscriptions));
+    right.append(&status::build(services, output, &mut subscriptions));
 
     let bar = gtk::CenterBox::builder()
         .name("panel")
@@ -67,7 +67,7 @@ fn button(child: &impl IsA<gtk::Widget>) -> gtk::Button {
     gtk::Button::builder()
         .css_classes(["panel-button"])
         .child(child)
-        // The panel takes no keyboard focus yet; menus bring that in M2.
+        // The panel takes no keyboard focus yet.
         .focusable(false)
         .build()
 }

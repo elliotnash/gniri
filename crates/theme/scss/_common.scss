@@ -35,3 +35,19 @@ $ease_out_quad: cubic-bezier(0.25, 0.46, 0.45, 0.94);
 // rule sets `transition-duration` (st-theme-node-transition.c). This is the
 // CSS timing function for the same curve.
 $st_transition_easing: cubic-bezier(0.455, 0.03, 0.515, 0.955);
+
+// Typography. Upstream: the "Text Styles" block of _common.scss.
+@mixin title_3 { font-weight: 700; @include fontsize(15pt); }
+@mixin title_4 { font-weight: 700; @include fontsize(13pt); }
+@mixin heading { font-weight: 700; @include fontsize(11pt); }
+@mixin caption_heading { font-weight: 700; @include fontsize(9pt); }
+@mixin caption { font-weight: 400; @include fontsize(9pt); }
+
+// St lays a line of the interface font out one pixel taller than Pango does
+// under GTK (19px against 18px at 11pt; docs/DECISIONS.md, M1) and widgets
+// sized by their text inherit the difference. A label that must be as tall
+// as St's gets the pixel back as bottom padding, which also keeps its
+// glyphs where St puts them.
+@mixin st_line_height {
+    padding-bottom: 1px;
+}
