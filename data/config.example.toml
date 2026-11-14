@@ -1,0 +1,34 @@
+# gniri configuration.
+#
+# Copy to ~/.config/gniri/config.toml and uncomment what you want to change.
+# Every setting is optional; the values shown commented out are examples, and
+# the defaults are given in the text. A misspelt key is an error, not ignored.
+
+[wallpaper]
+# An image, scaled to cover each output. With neither `image` nor `color`,
+# gniri draws no wallpaper (use this if another program draws yours).
+# image = "/usr/share/backgrounds/f45/default/f45-01-night.jxl"
+
+# A flat colour, used when there is no image.
+# color = "#241f31"
+
+[clock]
+# "24h" (default) or "12h".
+# format = "12h"
+
+# Show the date before the time. Default: true.
+# show_date = false
+
+# Show the day of the week. Default: false.
+# show_weekday = true
+
+# Show seconds. Default: false.
+# show_seconds = true
+
+[panel]
+# Show the battery charge as a number beside the icon. Default: false.
+# show_battery_percentage = true
+
+# Outputs that get a panel, by connector name (see `niri msg outputs`).
+# Default: every output.
+# outputs = ["eDP-1"]
