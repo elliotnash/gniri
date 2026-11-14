@@ -10,11 +10,15 @@
 // surface differently from GNOME. Its 0.6 brightness has no niri equivalent
 // and is folded into gniri's tint colours instead (crates/theme/scss/_bms.scss).
 //
-// `passes` and `offset` (blur strength) are still niri's defaults; they are
-// set once the fit against GNOME's panel has been run (spike S5).
+// `passes` and `offset` set the strength. blur-my-shell's default is equal to
+// a Gaussian of sigma 7.5 logical pixels; these values are the closest niri
+// gets (tools/blur-fit/fit.py, fitted at output scale 1.25). niri's defaults
+// (3 and 3) are visibly stronger.
 //
 // This section is global: it also changes blur for other apps.
 blur {
+    passes 3
+    offset 1.3
     noise 0
     saturation 1
 }

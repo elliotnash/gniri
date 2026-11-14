@@ -14,7 +14,7 @@ Test setup for all spikes so far: niri 26.04 nested in the GNOME 51 session
 | S2 | Does `backdrop-filter` on a child widget give a per-widget, rounded blur region on a layer surface? | **Pass** | See below. |
 | S3 | Does the region track animation and hiding? | **Pass with a rule** | Follows layout every frame, but a surface with nothing left to draw is never repainted. See below. |
 | S4 | Is `xray false` usable for popups? | **Pass (function)** | Works; GPU cost not yet measured. See below. |
-| S5 | Do niri blur settings plus tint folding match blur-my-shell? | **Colour: pass. Strength: open** | Panel colour matches GNOME exactly on flat wallpapers. The `passes`/`offset` fit on the real wallpaper has not run yet. See below. |
+| S5 | Do niri blur settings plus tint folding match blur-my-shell? | **Pass** | Panel colour matches GNOME exactly on flat wallpapers. With `passes 3`, `offset 1.3` the panel over the real wallpaper has no pixel more than 2% from GNOME's. See below. |
 | S6 | Vulkan or GL renderer? | **Pass: keep the default** | Vulkan and GL both render the panel and send its blur region; same startup (about 220 ms to first frame), idle CPU zero for both. Vulkan used less memory (104 MB against 124 MB resident, debug build). No pin in the shell; the harness sets `GSK_RENDERER=vulkan` so runs are comparable. |
 | S7 | Does `output "winit" { scale 1.25 }` apply? | **Pass** | `niri msg -j outputs`: mode 1600x1000, logical 1280x800, scale 1.25. Screenshots are 1600x1000. |
 | S8 | Does nested niri keep working when the host does not show it? | **Fail: handled** | Behind the lock screen nested niri stalls completely. See below. Covered-but-unlocked and full-screen sizing are untested. |
@@ -23,8 +23,8 @@ Test setup for all spikes so far: niri 26.04 nested in the GNOME 51 session
 | S11 | Does `OverviewOpenedOrClosed` fire at animation start? | **Pass** | The event arrived 9 ms and 11 ms after `open-overview` / `close-overview` were sent (animations off in the test config, so this measures event delivery, not the animation itself). |
 | S12 | Stage input region behaviour | **Pass** | See below. |
 | S13 | GtkPopover fallback | Not needed | S2 passed. |
-| S14 | JXL wallpaper load and offscreen blur | **Load: pass. Blur: open** | `Gdk.Texture` loads the 5120x5120 Fedora JXL in about 160 ms. At that size it is about 105 MB uncompressed, so M1 must scale it to the output size once and drop the original. Rendering the blurred backdrop copy is not yet tested. |
-| S15 | GNOME Eval walker and screenshots | **Pass, set incomplete** | The method works, but one pass was captured behind the lock screen and must be redone. See below. |
+| S14 | JXL wallpaper load and offscreen blur | **Load: pass. Blur: open** | `Gdk.Texture` loads the 5120x5120 Fedora JXL in about 160 ms. At that size it is about 105 MB uncompressed, so M1 must scale it to the output size once and drop the original. The file has a wide-gamut ICC profile; GTK converts it as GNOME does (four sample points agree to 0.1%). The backdrop needs a Gaussian of sigma 7.5 logical px times 0.6 (S5); rendering it is not yet tested. |
+| S15 | GNOME Eval walker and screenshots | **Pass** | 12 states on three wallpapers plus actor-tree dumps, all checked by eye. See below. |
 | S16 | Clean start on a private session bus | **Pass** | Under `dbus-run-session` gniri paints its first frame in about 530 ms (220 ms on the host bus; the difference is the private bus starting xdg-desktop-portal). GTK warns that there is no accessibility bus, so the harness sets `GTK_A11Y=none`. |
 | S17 | niri hot corner with the panel in the corner | **Pass** | Moving a virtual pointer to 0,0 opens the overview with the top-layer panel covering the corner. No shell-side hot corner needed. |
 
@@ -92,7 +92,7 @@ Unmap the stage (and the banner and OSD surfaces) the moment their last
 visible child goes away, including at the end of a fade-out. Unmapping is
 clean (`attach(nil)`, verified in S12).
 
-## S5: matching blur-my-shell (colour pass, strength open)
+## S5: matching blur-my-shell (pass)
 
 Measured on GNOME's flat-wallpaper reference shots, at a panel pixel with no
 widget:
@@ -112,9 +112,36 @@ in nested niri reads (53,53,55): identical. `crates/theme/scss/_bms.scss`
 holds the folding function, and `data/niri/gniri.kdl` sets niri's blur to
 `noise 0` and `saturation 1` so colours pass through unchanged.
 
-Open: the blur strength. `tools/blur-fit/fit.py` searches niri's `passes` and
-`offset` for the closest match to GNOME's panel over the real wallpaper. It
-has not produced a result yet (the screen locked during the first attempt).
+### Strength
+
+blur-my-shell's default pipeline is its own dual-Kawase blur, calibrated in
+`effects/blur/kawase_sampling.js` to a Gaussian with
+`sigma = unscaled_radius * scale / 4`. With the default radius 30 that is
+sigma 7.5 logical px (9.375 physical px at scale 1.25). It also adds a dither
+of at most one 8-bit level, which we ignore.
+
+`tools/blur-fit/fit.py` checks this against GNOME's `search` shot, whose
+lower part is the blurred wallpaper (times 0.6) with the gears crossing it:
+
+- Gaussian fit: the error is lowest at exactly sigma 9.375 physical px
+  (RMSE 0.29%; 0.69% at sigma 6, 0.75% at sigma 14).
+- niri fit (`spikes/gjs/s5_probe.js` in nested niri, same wallpaper pixels):
+  lowest at **`passes 3`, `offset 1.3`** (RMSE 0.31%, no pixel more than 2%
+  off). `passes 2` with `offset 3` is nearly as close (0.31%) and cheaper,
+  but large offsets on few passes risk artifacts; niri's defaults (3 and 3)
+  give 1.5% and are visibly stronger.
+- End to end: gniri's panel over the real wallpaper against GNOME's panel in
+  the widget-free columns: RMSE 0.22%, no pixel more than 2% off.
+
+The panel strip itself cannot be used for the fit: the top of this wallpaper
+is a smooth gradient, so every setting scores the same there.
+
+Fitted at output scale 1.25 only. blur-my-shell scales its radius with the
+output scale; whether niri's `offset` does is untested.
+
+The user's blur-my-shell settings are all defaults except that application
+blur is on for `com.mitchellh.ghostty`. The niri equivalent is a window rule
+in the user's own config, not something gniri does.
 
 ## S8: nested niri behind the lock screen (fail, handled)
 
@@ -178,14 +205,13 @@ GNOME.
 - Output is in `tests/visual/reference/gnome-51.1/raw/`, git-ignored because
   it contains notification text, search results and the desktop. Curated
   per-component extracts get committed as each milestone needs them.
-- **State of the set.** The two flat-wallpaper passes are complete and
-  checked by eye. The real-wallpaper pass, which is also the pass that writes
-  the actor-tree dumps, ran while the screen was locked: only
-  notification-banner, run-dialog and polkit-dialog are valid in `real/` and
-  `metrics/`. The other nine states must be recaptured (unsafe mode again).
-- The locked shots and dumps were kept under `raw/lock-accidental/`. They are
-  a usable reference for the lock screen clock and the unlock prompt (M4),
-  which the plan had assumed could not be captured.
+- **State of the set.** All three passes and the dumps are complete and every
+  shot was checked by eye. (The first real-wallpaper pass ran behind the lock
+  screen and was redone on 2026-11-14.)
+- The shots and dumps from that locked run were kept under
+  `raw/lock-accidental/`. They are a usable reference for the lock screen
+  clock and the unlock prompt (M4), which the plan had assumed could not be
+  captured.
 - Stage coordinates are logical (1792x1120 at scale 1.25); screenshots are
   physical pixels.
 
