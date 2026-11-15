@@ -87,6 +87,16 @@ impl MockBus {
         }
     }
 
+    /// Stops every template at once, as when a service crashes: its names
+    /// lose their owner without a word from it.
+    pub fn stop_templates(&mut self) {
+        for mock in &mut self.mocks {
+            let _ = mock.kill();
+            let _ = mock.wait();
+        }
+        self.mocks.clear();
+    }
+
     /// A new connection for the backend under test.
     pub fn connection(&self) -> zbus::Connection {
         connect(&self.address)
