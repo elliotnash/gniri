@@ -1,6 +1,6 @@
 //! Every service's state, in one place, for widgets to subscribe to.
 
-use std::cell::{OnceCell, RefCell};
+use std::cell::{Cell, OnceCell, RefCell};
 use std::rc::Rc;
 use std::time::Duration;
 
@@ -181,7 +181,10 @@ impl<M: Model> Service<M> {
 }
 
 pub struct Services {
-    pub config: Config,
+    /// The config file's settings. They change while the shell runs
+    /// ([`Services::reload`]): read them where they are used, and
+    /// subscribe where a widget shows one.
+    pub config: Store<Config>,
     /// The current time, updated when what the clock shows would change.
     pub time: Store<LocalTime>,
     pub niri: Store<niri::State>,
@@ -222,7 +225,11 @@ pub struct Services {
     /// True under a fixture: nothing the shell does may reach the system.
     pub sandboxed: bool,
     /// The settings application, if it is configured and installed.
-    settings_program: Option<String>,
+    settings_program: RefCell<Option<String>>,
+    /// Changes Night Light's colour while it runs.
+    night_light_tuner: night_light::backend::Tuner,
+    /// Keeps `time` current; absent while a fixture has it stand still.
+    ticker: Option<Ticker>,
     layout_names: OnceCell<LayoutNames>,
     /// Keeps the notification state in step with the Do Not Disturb toggle.
     _do_not_disturb_link: gniri_core::Subscription,
@@ -251,12 +258,12 @@ impl Services {
         });
         let time = match fixed {
             Some(clock) => Store::new(clock.now(), Rc::clone(&scheduler)),
-            None => {
-                let time = Store::new(SystemClock.now(), Rc::clone(&scheduler));
-                tick(time.clone(), config.clock.show_seconds);
-                time
-            }
+            None => Store::new(SystemClock.now(), Rc::clone(&scheduler)),
         };
+        // A scene's clock stands still.
+        let ticker = fixed
+            .is_none()
+            .then(|| Ticker::start(time.clone(), config.clock.show_seconds));
 
         let niri = Store::new(niri::State::default(), Rc::clone(&scheduler));
         let socket = niri::socket_path();
@@ -266,10 +273,7 @@ impl Services {
         }
 
         let sandboxed = fixture.is_some();
-        // Under a fixture the program is never started, so it need not be
-        // installed for its buttons to show.
-        let settings_program = Some(config.commands.settings.clone())
-            .filter(|program| !program.is_empty() && (sandboxed || on_path(program)));
+        let settings_program = RefCell::new(settings_program(&config, sandboxed));
         let menus = Store::new(Menus::default(), Rc::clone(&scheduler));
         let overview = Store::new(Overview::default(), Rc::clone(&scheduler));
         let end_session = Store::new(None, Rc::clone(&scheduler));
@@ -324,7 +328,9 @@ impl Services {
                     idle: Service::fake("idle", fixture.idle, scheduler, log_ref),
                     user: fixture.user,
                     _do_not_disturb_link: link,
-                    config,
+                    config: Store::new(config, Rc::clone(scheduler)),
+                    night_light_tuner: night_light::backend::Tuner::default(),
+                    ticker,
                     time,
                     niri,
                     niri_client: socket.map(niri::Client::new),
@@ -371,18 +377,15 @@ impl Services {
                         })
                     });
                 let mpris = session_bus.add("mpris", mpris::backend::run);
-                let search = if config.search.providers {
-                    let options = search::backend::Options {
-                        disabled: config.search.disabled.clone(),
-                    };
-                    let link = session_bus.add("search", move |connection, events, commands| {
+                let search = {
+                    let options = search_options(&config);
+                    session_bus.add("search", move |connection, events, commands| {
                         search::backend::run(connection, events, commands, options)
-                    });
-                    Service::live("search", link, scheduler, log_ref)
-                } else {
-                    // Nobody to ask: only applications are found.
-                    Service::fake("search", search::State::default(), scheduler, log_ref)
+                    })
                 };
+                let search = Service::live("search", search, scheduler, log_ref);
+                let (night_light, night_light_tuner) =
+                    night_light::backend::spawn(config.night_light.temperature);
                 session_bus.start();
                 let notifications =
                     Service::live("notifications", notifications, scheduler, log_ref);
@@ -426,12 +429,8 @@ impl Services {
                         scheduler,
                         log_ref,
                     ),
-                    night_light: Service::live(
-                        "night-light",
-                        night_light::backend::spawn(config.night_light.temperature),
-                        scheduler,
-                        log_ref,
-                    ),
+                    night_light: Service::live("night-light", night_light, scheduler, log_ref),
+                    night_light_tuner,
                     do_not_disturb,
                     notifications,
                     mpris: Service::live("mpris", mpris, scheduler, log_ref),
@@ -443,7 +442,8 @@ impl Services {
                     ),
                     user: User::current(),
                     _do_not_disturb_link: link,
-                    config,
+                    config: Store::new(config, Rc::clone(scheduler)),
+                    ticker,
                     time,
                     niri,
                     niri_client: socket.map(niri::Client::new),
@@ -460,6 +460,51 @@ impl Services {
         Rc::new(services)
     }
 
+    /// Takes a changed config file's settings into use.
+    ///
+    /// What widgets show follows through [`Services::config`]; the
+    /// backends that were started with a setting are told its new value.
+    /// Under a fixture those are stand-ins, and the commands are only
+    /// logged.
+    pub fn reload(&self, config: Config) {
+        let old = self.config.get();
+        if config == old {
+            return;
+        }
+        if (&config.idle, config.lock.automatic, config.lock.delay)
+            != (&old.idle, old.lock.automatic, old.lock.delay)
+        {
+            let timers = idle::timers(&idle_settings(&config));
+            self.idle.send(idle::Command::SetTimers(timers));
+        }
+        if config.lock.on_suspend != old.lock.on_suspend {
+            self.session
+                .send(session::Command::SetLockOnSuspend(config.lock.on_suspend));
+        }
+        if config.night_light != old.night_light {
+            self.commands.push(
+                "night-light",
+                &format_args!("SetTemperature({})", config.night_light.temperature),
+            );
+            self.night_light_tuner
+                .set_temperature(config.night_light.temperature);
+        }
+        if config.search != old.search {
+            self.search
+                .send(search::Command::Configure(search_options(&config)));
+        }
+        if config.clock.show_seconds != old.clock.show_seconds
+            && let Some(ticker) = &self.ticker
+        {
+            ticker.restart(config.clock.show_seconds);
+        }
+        if config.commands != old.commands {
+            self.settings_program
+                .replace(settings_program(&config, self.sandboxed));
+        }
+        self.config.update(|current| *current = config);
+    }
+
     /// The XKB registry's short layout names, read on first use: most people
     /// have one layout and never need it.
     pub fn layout_names(&self) -> &LayoutNames {
@@ -468,14 +513,14 @@ impl Services {
 
     /// Whether there is a settings application to open.
     pub fn has_settings(&self) -> bool {
-        self.settings_program.is_some()
+        self.settings_program.borrow().is_some()
     }
 
     /// Closes any open menu and opens `panel` of the settings application
     /// (its main window for an empty `panel`).
     pub fn open_settings(&self, panel: &str) {
         self.menus.update(|menus| menus.close());
-        let Some(program) = &self.settings_program else {
+        let Some(program) = self.settings_program.borrow().clone() else {
             return;
         };
         let mut command = vec![program.as_str()];
@@ -608,6 +653,22 @@ impl Services {
     }
 }
 
+/// The settings application to start: the configured one, if it is
+/// installed. Under a fixture the program is never started, so it need not
+/// be installed for its buttons to show.
+fn settings_program(config: &Config, sandboxed: bool) -> Option<String> {
+    Some(config.commands.settings.clone())
+        .filter(|program| !program.is_empty() && (sandboxed || on_path(program)))
+}
+
+/// The `[search]` settings as the search service takes them.
+fn search_options(config: &Config) -> search::Options {
+    search::Options {
+        enabled: config.search.providers,
+        disabled: config.search.disabled.clone(),
+    }
+}
+
 /// The `[idle]` and `[lock]` settings as the idle service takes them.
 fn idle_settings(config: &Config) -> idle::Settings {
     idle::Settings {
@@ -679,11 +740,44 @@ fn on_path(program: &str) -> bool {
         .is_some_and(|paths| std::env::split_paths(&paths).any(|dir| dir.join(program).is_file()))
 }
 
-/// Updates `time` at each minute (or second) boundary.
-///
-/// The timer does not run while the machine is suspended, so after a resume
-/// the clock can be stale until the next boundary.
-pub fn tick(time: Store<LocalTime>, every_second: bool) {
+/// Keeps a clock's time current.
+pub struct Ticker {
+    time: Store<LocalTime>,
+    /// Counts restarts: a timer of an earlier one finds a newer number and
+    /// stops.
+    generation: Rc<Cell<u64>>,
+}
+
+impl Ticker {
+    /// Updates `time` at each minute boundary, or at each second's with
+    /// `every_second`: when what the clock shows would change.
+    ///
+    /// The timer does not run while the machine is suspended, so after a
+    /// resume the clock can be stale until the next boundary.
+    pub fn start(time: Store<LocalTime>, every_second: bool) -> Self {
+        let ticker = Self {
+            time,
+            generation: Rc::default(),
+        };
+        ticker.restart(every_second);
+        ticker
+    }
+
+    /// Starts over, at the other pace.
+    pub fn restart(&self, every_second: bool) {
+        let generation = self.generation.get() + 1;
+        self.generation.set(generation);
+        self.time.update(|current| *current = SystemClock.now());
+        tick(
+            self.time.clone(),
+            every_second,
+            Rc::clone(&self.generation),
+            generation,
+        );
+    }
+}
+
+fn tick(time: Store<LocalTime>, every_second: bool, current: Rc<Cell<u64>>, generation: u64) {
     let (now, microsecond) = SystemClock::read();
     let whole_seconds = if every_second {
         0
@@ -695,8 +789,11 @@ pub fn tick(time: Store<LocalTime>, every_second: bool) {
         // Land just after the boundary, never just before it.
         + Duration::from_millis(5);
     glib::timeout_add_local_once(until_boundary, move || {
+        if current.get() != generation {
+            return;
+        }
         time.update(|current| *current = SystemClock.now());
-        tick(time, every_second);
+        tick(time, every_second, current, generation);
     });
 }
 

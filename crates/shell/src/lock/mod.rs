@@ -281,7 +281,8 @@ pub fn run(cli: Cli) -> glib::ExitCode {
                     let authenticator = Arc::new(auth::Pam::password(&user.name));
                     let time =
                         Store::new(gniri_core::Clock::now(&SystemClock), Rc::clone(&scheduler));
-                    services::tick(time.clone(), false);
+                    // It runs for as long as the process does.
+                    let _ = services::Ticker::start(time.clone(), false);
                     (user, authenticator, time)
                 }
             };

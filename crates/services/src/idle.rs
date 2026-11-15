@@ -58,9 +58,12 @@ pub enum Event {
     Resumed(Timer),
 }
 
-/// Nothing can be asked of it.
 #[derive(Clone, Debug, PartialEq)]
-pub enum Command {}
+pub enum Command {
+    /// Watch for these idle times from now on instead: the user changed
+    /// the settings ([`timers`]).
+    SetTimers(Vec<(Timer, Duration)>),
+}
 
 impl Model for State {
     type Event = Event;
@@ -85,7 +88,11 @@ impl Model for State {
     }
 
     fn predict(&mut self, command: &Command) {
-        match *command {}
+        match command {
+            // The new timers start counting now, and whoever changed the
+            // settings is there.
+            Command::SetTimers(_) => self.passed.clear(),
+        }
     }
 }
 
@@ -223,5 +230,15 @@ mod tests {
         assert_eq!(state.passed, [Timer::Blank]);
         state.apply(Event::Available(false));
         assert_eq!(state, State::default());
+    }
+
+    #[test]
+    fn new_timers_start_from_nothing_passed() {
+        let mut state = State::default();
+        state.apply(Event::Available(true));
+        state.apply(Event::Idle(Timer::Dim));
+        state.predict(&Command::SetTimers(timers(&settings(60))));
+        assert!(state.available);
+        assert!(state.passed.is_empty());
     }
 }

@@ -219,7 +219,7 @@ pub fn activate_dash_item(services: &Rc<Services>, item: &DashItem) {
 /// Starts an application, or shows it if it is running, and leaves the
 /// overview.
 pub fn activate_app(services: &Rc<Services>, app: &App) {
-    let favorites = &services.config.dash.favorites;
+    let favorites = &services.config.with(|config| config.dash.favorites.clone());
     let window = services.niri.with(|niri| {
         let dash = services
             .apps

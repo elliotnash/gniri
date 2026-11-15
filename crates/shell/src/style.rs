@@ -49,3 +49,33 @@ pub fn add_rule(css: &str) {
         gtk::STYLE_PROVIDER_PRIORITY_APPLICATION + 1,
     );
 }
+
+thread_local! {
+    /// The rules [`set_rule`] has in place, by name.
+    static NAMED_RULES: std::cell::RefCell<Vec<(&'static str, gtk::CssProvider)>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// Like [`add_rule`] for a rule that changes: the rule called `name`
+/// replaces the one of that name from before. Empty `css` only takes that
+/// one away.
+pub fn set_rule(name: &'static str, css: &str) {
+    let display = gdk::Display::default().expect("GTK is initialised, so there is a display");
+    NAMED_RULES.with_borrow_mut(|rules| {
+        if let Some(index) = rules.iter().position(|(other, _)| *other == name) {
+            let (_, old) = rules.swap_remove(index);
+            gtk::style_context_remove_provider_for_display(&display, &old);
+        }
+        if css.is_empty() {
+            return;
+        }
+        let provider = gtk::CssProvider::new();
+        provider.load_from_string(css);
+        gtk::style_context_add_provider_for_display(
+            &display,
+            &provider,
+            gtk::STYLE_PROVIDER_PRIORITY_APPLICATION + 1,
+        );
+        rules.push((name, provider));
+    });
+}

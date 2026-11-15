@@ -39,11 +39,28 @@ pub fn build(
     let button = button(&container);
     button.add_css_class("clock-display");
 
-    let format = services.config.clock.format();
-    subscriptions.push(services.time.select(
-        move |time| panel_clock_text(time, &format),
-        move |text| label.set_label(text),
-    ));
+    // What it says changes with the time and with the format, which is a
+    // setting.
+    let show = {
+        let services = Rc::downgrade(services);
+        move || {
+            let Some(services) = services.upgrade() else {
+                return;
+            };
+            let format = services.config.with(|config| config.clock.format());
+            let text = services.time.with(|time| panel_clock_text(time, &format));
+            label.set_label(&text);
+        }
+    };
+    subscriptions.push(services.time.select(|time| *time, {
+        let show = show.clone();
+        move |_| show()
+    }));
+    subscriptions.push(
+        services
+            .config
+            .select(|config| config.clock.clone(), move |_| show()),
+    );
     subscriptions.push(services.notifications.state.select(
         |state| state.shows_indicator(),
         move |shown| {

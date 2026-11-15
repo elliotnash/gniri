@@ -63,7 +63,10 @@ pub fn build(services: &Rc<Services>) -> DateMenu {
     let mut subscriptions = Vec::new();
     let today = services.time.with(|time| time.date());
 
-    let calendar = Calendar::new(today, services.config.date_menu.week_start.weekday());
+    // The menu is built anew when these settings change
+    // (crates/shell/src/outputs.rs).
+    let settings = services.config.with(|config| config.date_menu.clone());
+    let calendar = Calendar::new(today, settings.week_start.weekday());
 
     // `TodayButton`: the date in words. It takes the calendar back to
     // today, so it only reacts while another day is selected.
@@ -120,7 +123,7 @@ pub fn build(services: &Rc<Services>) -> DateMenu {
         .css_classes(["datemenu-displays-box"])
         .build();
     displays.append(&events);
-    if services.config.date_menu.world_clocks && services.has_app(CLOCKS_APP) {
+    if settings.world_clocks && services.has_app(CLOCKS_APP) {
         let header = header_label(
             &["world-clocks-header", "no-world-clocks"],
             "Add World Clocks…",
@@ -132,7 +135,7 @@ pub fn build(services: &Rc<Services>) -> DateMenu {
             header.upcast_ref(),
         ));
     }
-    if services.config.date_menu.weather && services.has_app(WEATHER_APP) {
+    if settings.weather && services.has_app(WEATHER_APP) {
         let header = header_label(
             &["weather-header", "no-location"],
             "Select Weather Location…",

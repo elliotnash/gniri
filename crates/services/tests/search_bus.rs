@@ -130,7 +130,14 @@ fn serve(
     timeout: Duration,
 ) -> Follower<search::State> {
     let link: Link<search::State> = bus.run(move |connection, events, commands| {
-        backend::serve(connection, events, commands, providers, timeout)
+        backend::serve(
+            connection,
+            events,
+            commands,
+            move |_: &Options| providers.clone(),
+            Options::default(),
+            timeout,
+        )
     });
     Follower::new(link)
 }
@@ -204,6 +211,7 @@ fn providers_are_announced_in_gnomes_order() {
     installed.provider("org.example.Off", "Off", "");
     installed.provider("org.example.Later", "Later", "DefaultDisabled=true\n");
     let options = Options {
+        enabled: true,
         disabled: vec!["org.example.Off".to_owned()],
     };
 
@@ -469,4 +477,73 @@ fn a_provider_that_never_answers_is_given_up_on() {
     search.wait("the next search to start", search::State::searching);
     search.wait("its answer", |state| !state.searching());
     assert_eq!(provider(&search.state, FILES).results[0].id, "quick-0");
+}
+
+#[test]
+fn the_choice_of_providers_can_change_while_running() {
+    let Some(mut bus) = MockBus::start() else {
+        return;
+    };
+    const FILES: &str = "org.example.Files";
+    const NOTES: &str = "org.example.Notes";
+    let installed = Installed::new("configure");
+    installed.provider(FILES, "Files", "");
+    installed.provider(NOTES, "Notes", "");
+    add_provider(&mut bus, FILES, INITIAL_RESULTS);
+    add_provider(&mut bus, NOTES, INITIAL_RESULTS);
+
+    let ids = |state: &search::State| -> Vec<String> {
+        state
+            .providers
+            .iter()
+            .map(|provider| provider.id.clone())
+            .collect()
+    };
+    let root = installed.root.clone();
+    let link: Link<search::State> = bus.run(move |connection, events, commands| {
+        let load = move |options: &Options| {
+            let applications = [root.join("applications")];
+            backend::load_providers(
+                &[root.join("providers")],
+                |id| DesktopEntry::find_in(id, &applications),
+                &["niri".to_owned()],
+                options,
+            )
+        };
+        backend::serve(
+            connection,
+            events,
+            commands,
+            load,
+            Options::default(),
+            PROVIDER_TIMEOUT,
+        )
+    });
+    let mut search = Follower::new(link);
+    search.wait("both providers", |state| ids(state) == [FILES, NOTES]);
+
+    // One is left out; the other still answers.
+    search.send(Command::Configure(Options {
+        enabled: true,
+        disabled: vec![NOTES.to_owned()],
+    }));
+    search.wait("one provider", |state| ids(state) == [FILES]);
+    let command = Command::Search(terms("report"));
+    search.state.predict(&command);
+    search.send(command);
+    search.wait("its answer", |state| {
+        state
+            .providers
+            .first()
+            .is_some_and(|provider| !provider.searching && !provider.results.is_empty())
+    });
+
+    // None is asked any more, then all are again.
+    search.send(Command::Configure(Options {
+        enabled: false,
+        disabled: Vec::new(),
+    }));
+    search.wait("no provider", |state| state.providers.is_empty());
+    search.send(Command::Configure(Options::default()));
+    search.wait("both providers again", |state| ids(state) == [FILES, NOTES]);
 }

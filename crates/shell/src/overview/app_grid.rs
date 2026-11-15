@@ -319,7 +319,10 @@ impl Inner {
     /// What the grid should show now: every application that is not in
     /// the dash for good, with a dot under those that run.
     fn wanted(&self) -> Vec<Shown> {
-        let favorites = &self.services.config.dash.favorites;
+        let favorites = &self
+            .services
+            .config
+            .with(|config| config.dash.favorites.clone());
         self.services.apps.state.with(|apps| {
             let dash = self
                 .services

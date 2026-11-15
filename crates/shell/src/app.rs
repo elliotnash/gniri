@@ -70,6 +70,8 @@ struct Running {
     _ipc: Option<gio::SocketService>,
     _subscriptions: Vec<gniri_core::Subscription>,
     _polkit: Option<PolkitAgent>,
+    /// Watches the config file.
+    _config_watch: Option<Vec<gio::FileMonitor>>,
 }
 
 pub fn run(cli: Cli) -> glib::ExitCode {
@@ -213,9 +215,13 @@ pub fn quit_with(app: &adw::Application, status: u8) {
     app.quit();
 }
 
+/// The config file this process reads: `--config`, else the user's.
+fn config_path(cli: &Cli) -> Option<std::path::PathBuf> {
+    cli.config.clone().or_else(gniri_config::default_path)
+}
+
 pub fn load_config(cli: &Cli) -> Config {
-    let path = cli.config.clone().or_else(gniri_config::default_path);
-    let Some(path) = path else {
+    let Some(path) = config_path(cli) else {
         return Config::default();
     };
     Config::load(&path).unwrap_or_else(|error| {
@@ -223,6 +229,99 @@ pub fn load_config(cli: &Cli) -> Config {
         eprintln!("gniri: using the default configuration");
         Config::default()
     })
+}
+
+/// How long the config file has to stay as it is before it is read again:
+/// an editor may write it in several steps.
+const CONFIG_SETTLE: std::time::Duration = std::time::Duration::from_millis(150);
+
+/// Reads the config file again whenever it changes, and takes its
+/// settings into use while the shell runs.
+///
+/// A file with a mistake in it changes nothing: the settings stay as they
+/// were, and a notification says what is wrong.
+fn watch_config(
+    app: &adw::Application,
+    cli: &Cli,
+    services: &Rc<Services>,
+) -> Option<Vec<gio::FileMonitor>> {
+    let path = config_path(cli)?;
+    let pending: Rc<std::cell::Cell<u64>> = Rc::default();
+    let changed = {
+        let (app, services, path) = (app.clone(), Rc::clone(services), path.clone());
+        move || {
+            // Every change puts the reading off, so that it happens once,
+            // after the last.
+            let number = pending.get() + 1;
+            pending.set(number);
+            glib::timeout_add_local_once(CONFIG_SETTLE, {
+                let (app, services, path) = (app.clone(), Rc::clone(&services), path.clone());
+                let pending = Rc::clone(&pending);
+                move || {
+                    if pending.get() == number {
+                        reload_config(&app, &services, &path);
+                    }
+                }
+            });
+        }
+    };
+    let watch = |file: &std::path::Path| {
+        // A file that is replaced, or only created later, is still this
+        // file.
+        let monitor = gio::File::for_path(file)
+            .monitor_file(gio::FileMonitorFlags::WATCH_MOVES, gio::Cancellable::NONE)
+            .inspect_err(|error| eprintln!("gniri: cannot watch {}: {error}", file.display()))
+            .ok()?;
+        monitor.connect_changed({
+            let changed = changed.clone();
+            move |_, _, _, _| changed()
+        });
+        Some(monitor)
+    };
+    let mut monitors: Vec<gio::FileMonitor> = watch(&path).into_iter().collect();
+    // A config file kept elsewhere and linked into place (by a dotfile
+    // manager, say) changes where the link points to, not where it is.
+    if let Ok(target) = std::fs::canonicalize(&path)
+        && target != path
+    {
+        monitors.extend(watch(&target));
+    }
+    Some(monitors)
+}
+
+/// A config error on one line, for a notification: where it is and what it
+/// is, without the excerpt of the file a parse error comes with.
+fn error_summary(error: &str) -> String {
+    let mut lines = error.lines().map(str::trim).filter(|line| !line.is_empty());
+    let first = lines.next().unwrap_or_default();
+    match lines.next_back() {
+        Some(last) => format!("{first}: {last}"),
+        None => first.to_owned(),
+    }
+}
+
+/// The id of the notification about a mistake in the config file: a later
+/// one replaces it, and a file that is right again takes it away.
+const CONFIG_NOTIFICATION: &str = "config-error";
+
+fn reload_config(app: &adw::Application, services: &Rc<Services>, path: &std::path::Path) {
+    match Config::load(path) {
+        Ok(config) => {
+            app.withdraw_notification(CONFIG_NOTIFICATION);
+            if services.config.with(|current| *current != config) {
+                eprintln!("gniri: {} changed; settings reloaded", path.display());
+                services.reload(config);
+            }
+        }
+        Err(error) => {
+            eprintln!("gniri: {error}");
+            eprintln!("gniri: keeping the settings as they were");
+            let notification = gio::Notification::new("gniri’s settings were not changed");
+            notification.set_body(Some(&error_summary(&error.to_string())));
+            notification.set_icon(&gio::ThemedIcon::new("dialog-warning-symbolic"));
+            app.send_notification(Some(CONFIG_NOTIFICATION), &notification);
+        }
+    }
 }
 
 /// The wallpaper to draw: `--wallpaper` if given, else the config file's.
@@ -269,14 +368,18 @@ fn activate(
     if cli.no_pointer {
         crate::surfaces::layer::ignore_pointer();
     }
-    let wallpaper = wallpaper_source(cli, &config);
     // Not under a fixture: a scene starts the agent it wants to look at.
     let polkit = fixture.is_none().then(PolkitAgent::start).flatten();
     let services = Services::start(config, fixture, cli.locker_arguments());
 
     let ready = ReadyTracker::new();
-    let outputs = Outputs::start(app, &services, wallpaper, &ready);
+    let wallpaper_for = {
+        let cli = cli.clone();
+        move |config: &Config| wallpaper_source(&cli, config)
+    };
+    let outputs = Outputs::start(app, &services, wallpaper_for, &ready);
     ready.arm();
+    let config_watch = watch_config(app, cli, &services);
 
     let ipc = ipc::serve(ipc::Role::Shell, {
         let (app, services, outputs) = (app.clone(), Rc::clone(&services), Rc::clone(&outputs));
@@ -369,6 +472,7 @@ fn activate(
         _ipc: ipc,
         _subscriptions: subscriptions,
         _polkit: polkit,
+        _config_watch: config_watch,
     })
 }
 
@@ -594,4 +698,22 @@ where
         }
     })
     .await;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_config_error_fits_a_notification() {
+        let parse = "/home/someone/.config/gniri/config.toml: TOML parse error at line 2, column 1\n  |\n2 | format24 = true\n  | ^^^^^^^^\nunknown field `format24`, expected one of `format`, `show_date`\n";
+        assert_eq!(
+            error_summary(parse),
+            "/home/someone/.config/gniri/config.toml: TOML parse error at line 2, column 1: \
+             unknown field `format24`, expected one of `format`, `show_date`"
+        );
+        let invalid = "config.toml: night_light.temperature: 9000 is not between 1700 and 4700";
+        assert_eq!(error_summary(invalid), invalid);
+        assert_eq!(error_summary(""), "");
+    }
 }

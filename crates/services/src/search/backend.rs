@@ -43,13 +43,7 @@ const SORT_ORDER: [&str; 3] = [
 /// hard to imagine.
 pub const PROVIDER_TIMEOUT: Duration = Duration::from_secs(10);
 
-/// Which providers are asked.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct Options {
-    /// Desktop entry ids (without ".desktop") of providers that are never
-    /// asked.
-    pub disabled: Vec<String>,
-}
+pub use super::Options;
 
 /// A provider and where it answers.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -161,6 +155,9 @@ pub fn load_providers(
     options: &Options,
 ) -> Vec<ProviderSpec> {
     let mut providers: Vec<ProviderSpec> = Vec::new();
+    if !options.enabled {
+        return providers;
+    }
     for dir in dirs {
         let Ok(entries) = std::fs::read_dir(dir) else {
             continue;
@@ -561,21 +558,27 @@ enum Wake {
     Told,
 }
 
-/// Announces `providers` and answers the shell's commands with them, until
-/// the shell's ends of the channels close. A provider that has not answered
-/// a search after `timeout` is taken to have found nothing.
+/// Announces the providers `load` finds for `options` and answers the
+/// shell's commands with them, until the shell's ends of the channels
+/// close. A provider that has not answered a search after `timeout` is
+/// taken to have found nothing.
 pub async fn serve(
     connection: zbus::Connection,
     events: Sender<Event>,
     commands: Receiver<Command>,
-    providers: Vec<ProviderSpec>,
+    load: impl Fn(&Options) -> Vec<ProviderSpec>,
+    options: Options,
     timeout: Duration,
 ) -> zbus::Result<()> {
-    let infos = providers
-        .iter()
-        .map(|provider| provider.info.clone())
-        .collect();
-    if events.send(Event::Providers(infos)).await.is_err() {
+    let announce = |providers: &[ProviderSpec]| {
+        let infos = providers
+            .iter()
+            .map(|provider| provider.info.clone())
+            .collect();
+        events.send(Event::Providers(infos))
+    };
+    let mut providers = load(&options);
+    if announce(&providers).await.is_err() {
         return Ok(());
     }
 
@@ -620,6 +623,19 @@ pub async fn serve(
         match wake {
             Wake::Closed => return Ok(()),
             Wake::Told => {}
+            Wake::Command(Command::Configure(options)) => {
+                // What the old providers were asked is of no use; the
+                // shell searches again if something is typed.
+                asking.clear();
+                awaited.clear();
+                finished(&awaited);
+                number += 1;
+                terms.clear();
+                providers = load(&options);
+                if announce(&providers).await.is_err() {
+                    return Ok(());
+                }
+            }
             Wake::Command(Command::Search(new_terms)) => {
                 // Whatever the last search still waits for is of no use.
                 asking.clear();
@@ -712,13 +728,23 @@ pub async fn run(
     commands: Receiver<Command>,
     options: Options,
 ) -> zbus::Result<()> {
-    let providers = load_providers(
-        &provider_dirs(),
-        DesktopEntry::find,
-        &desktop_entry::current_desktops(),
-        &options,
-    );
-    serve(connection, events, commands, providers, PROVIDER_TIMEOUT).await
+    let load = |options: &Options| {
+        load_providers(
+            &provider_dirs(),
+            DesktopEntry::find,
+            &desktop_entry::current_desktops(),
+            options,
+        )
+    };
+    serve(
+        connection,
+        events,
+        commands,
+        load,
+        options,
+        PROVIDER_TIMEOUT,
+    )
+    .await
 }
 
 #[cfg(test)]
@@ -838,9 +864,16 @@ Version=2
         write(&second, "beta.ini", &key_file("org.example.Beta", ""));
 
         let options = Options {
+            enabled: true,
             disabled: vec!["org.example.Off.desktop".to_owned()],
         };
         let dirs = [first, root.join("not-there"), second];
+        // Nobody is asked when the user wants no provider asked.
+        let none = Options {
+            enabled: false,
+            disabled: Vec::new(),
+        };
+        assert!(load_providers(&dirs, find, &["niri".to_owned()], &none).is_empty());
         let providers = load_providers(&dirs, find, &["niri".to_owned()], &options);
         let ids: Vec<&str> = providers
             .iter()

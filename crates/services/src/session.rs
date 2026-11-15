@@ -46,6 +46,9 @@ pub enum Command {
     /// Ask logind to lock this session. The backend hears logind's `Lock`
     /// signal like any other screen locker would and starts the locker.
     Lock,
+    /// Lock before the machine sleeps, or stop doing so: the user changed
+    /// the setting.
+    SetLockOnSuspend(bool),
 }
 
 impl Model for State {

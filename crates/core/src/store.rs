@@ -149,10 +149,17 @@ impl<S: Clone + PartialEq + 'static> Store<S> {
         Subscription {
             cancel: Some(Box::new(move || {
                 if let Some(inner) = inner.upgrade() {
-                    inner
-                        .subscribers
-                        .borrow_mut()
-                        .retain(|(other, _)| *other != id);
+                    // Taken out of the list first and dropped after: a
+                    // callback can own subscriptions to this same store,
+                    // and dropping it then comes back here for the list.
+                    let removed = {
+                        let mut subscribers = inner.subscribers.borrow_mut();
+                        subscribers
+                            .iter()
+                            .position(|(other, _)| *other == id)
+                            .map(|index| subscribers.remove(index))
+                    };
+                    drop(removed);
                 }
             })),
         }
@@ -357,6 +364,26 @@ mod tests {
             handle.borrow_mut().take();
         });
         *victim.borrow_mut() = Some(store.subscribe(record));
+
+        store.update(|s| s.volume = 1);
+        scheduler.run_pending();
+        assert!(seen.borrow().is_empty());
+    }
+
+    #[test]
+    fn a_subscriber_may_own_another_subscription_to_the_same_store() {
+        let scheduler = ManualScheduler::new();
+        let store = Store::new(Audio::default(), scheduler.clone());
+        let (seen, record) = recorder::<Audio>();
+
+        // A widget's callback that keeps what the widget subscribed to:
+        // dropping the outer subscription drops the inner one from inside
+        // the store's own bookkeeping.
+        let inner = store.subscribe(record);
+        let outer = store.subscribe(move |_| {
+            let _kept = &inner;
+        });
+        drop(outer);
 
         store.update(|s| s.volume = 1);
         scheduler.run_pending();

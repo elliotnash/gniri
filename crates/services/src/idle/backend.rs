@@ -3,8 +3,11 @@
 //!
 //! One thread reads the compositor's events. Each timer is one notification
 //! object, which says `idled` when its time has passed without input and
-//! `resumed` at the next input.
+//! `resumed` at the next input. A second thread waits for the shell's
+//! commands and asks for other timers when the settings change; what the
+//! two share is behind a lock.
 
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use async_channel::Sender;
@@ -15,10 +18,10 @@ use wayland_protocols::ext::idle_notify::v1::client::{
     ext_idle_notifier_v1::ExtIdleNotifierV1,
 };
 
-use super::{Event, State, Timer};
+use super::{Command, Event, State, Timer};
 use crate::model::Link;
 
-struct Client {
+struct Shared {
     timers: Vec<(Timer, Duration)>,
     events: Sender<Event>,
     notifier: Option<ExtIdleNotifierV1>,
@@ -27,10 +30,10 @@ struct Client {
     notifications: Vec<ExtIdleNotificationV1>,
 }
 
-impl Client {
+impl Shared {
     /// Asks for the notifications once both the notifier and a seat are
     /// known.
-    fn subscribe(&mut self, queue: &QueueHandle<Self>) {
+    fn subscribe(&mut self, queue: &QueueHandle<Client>) {
         let (Some(notifier), Some(seat)) = (&self.notifier, &self.seat) else {
             return;
         };
@@ -47,6 +50,26 @@ impl Client {
             ));
         }
         let _ = self.events.try_send(Event::Available(true));
+    }
+
+    /// Drops the notifications there are and asks for `timers` instead.
+    fn replace(&mut self, timers: Vec<(Timer, Duration)>, queue: &QueueHandle<Client>) {
+        for notification in self.notifications.drain(..) {
+            notification.destroy();
+        }
+        self.timers = timers;
+        self.subscribe(queue);
+    }
+}
+
+/// What the event thread dispatches into.
+struct Client {
+    shared: Arc<Mutex<Shared>>,
+}
+
+impl Client {
+    fn shared(&self) -> std::sync::MutexGuard<'_, Shared> {
+        self.shared.lock().expect("no thread panics holding it")
     }
 }
 
@@ -67,13 +90,17 @@ impl Dispatch<wl_registry::WlRegistry, ()> for Client {
         };
         match interface.as_str() {
             // The first seat: input on any other is not looked at.
-            "wl_seat" if client.seat.is_none() => {
-                client.seat = Some(registry.bind(name, 1, queue, ()));
-                client.subscribe(queue);
+            "wl_seat" if client.shared().seat.is_none() => {
+                let seat = registry.bind(name, 1, queue, ());
+                let mut shared = client.shared();
+                shared.seat = Some(seat);
+                shared.subscribe(queue);
             }
             "ext_idle_notifier_v1" => {
-                client.notifier = Some(registry.bind(name, 1, queue, ()));
-                client.subscribe(queue);
+                let notifier = registry.bind(name, 1, queue, ());
+                let mut shared = client.shared();
+                shared.notifier = Some(notifier);
+                shared.subscribe(queue);
             }
             _ => {}
         }
@@ -94,7 +121,7 @@ impl Dispatch<ExtIdleNotificationV1, Timer> for Client {
             ext_idle_notification_v1::Event::Resumed => Event::Resumed(*timer),
             _ => return,
         };
-        let _ = client.events.try_send(event);
+        let _ = client.shared().events.try_send(event);
     }
 }
 
@@ -128,7 +155,7 @@ impl Dispatch<ExtIdleNotifierV1, ()> for Client {
 /// Without a Wayland display, or on a compositor without idle
 /// notifications, the state stays "not available" and nothing ever passes.
 pub fn spawn(timers: Vec<(Timer, Duration)>) -> Link<State> {
-    let (link, events, _commands) = Link::<State>::new();
+    let (link, events, commands) = Link::<State>::new();
     let connection = match Connection::connect_to_env() {
         Ok(connection) => connection,
         Err(error) => {
@@ -136,23 +163,47 @@ pub fn spawn(timers: Vec<(Timer, Duration)>) -> Link<State> {
             return link;
         }
     };
-    let reader = std::thread::Builder::new()
-        .name("idle".to_owned())
-        .spawn(move || {
-            let mut queue = connection.new_event_queue();
-            let handle = queue.handle();
+    let shared = Arc::new(Mutex::new(Shared {
+        timers,
+        events,
+        notifier: None,
+        seat: None,
+        notifications: Vec::new(),
+    }));
+    // Made here so that both threads have its handle: a notification
+    // asked for by either reports to the thread that reads.
+    let mut queue = connection.new_event_queue::<Client>();
+    let handle = queue.handle();
+
+    let reader = std::thread::Builder::new().name("idle".to_owned()).spawn({
+        let (connection, shared, handle) =
+            (connection.clone(), Arc::clone(&shared), handle.clone());
+        move || {
             connection.display().get_registry(&handle, ());
-            let mut client = Client {
-                timers,
-                events,
-                notifier: None,
-                seat: None,
-                notifications: Vec::new(),
-            };
+            let mut client = Client { shared };
             // Ends when the compositor goes away.
             while queue.blocking_dispatch(&mut client).is_ok() {}
-        });
+        }
+    });
     if let Err(error) = reader {
+        eprintln!("gniri: idle: cannot start a thread: {error}");
+        return link;
+    }
+
+    let writer = std::thread::Builder::new()
+        .name("idle-commands".to_owned())
+        .spawn(move || {
+            while let Ok(Command::SetTimers(timers)) = commands.recv_blocking() {
+                shared
+                    .lock()
+                    .expect("no thread panics holding it")
+                    .replace(timers, &handle);
+                if connection.flush().is_err() {
+                    break;
+                }
+            }
+        });
+    if let Err(error) = writer {
         eprintln!("gniri: idle: cannot start a thread: {error}");
     }
     link

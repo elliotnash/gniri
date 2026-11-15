@@ -547,7 +547,7 @@ fn panel_and_overview() -> Result<(usize, usize)> {
 type Part = fn() -> Result<(usize, usize)>;
 
 /// The parts, by the names `cargo xtask check <part>` takes.
-const PARTS: [(&str, Part); 9] = [
+const PARTS: [(&str, Part); 10] = [
     ("panel", panel_and_overview),
     ("overview", overview),
     ("quick-settings", quick_settings),
@@ -557,6 +557,7 @@ const PARTS: [(&str, Part); 9] = [
     ("lock", lock_screen),
     ("polkit", authentication_dialog),
     ("agents", agent_dialogs),
+    ("config", config_reload),
 ];
 
 /// Runs every part, or only the one called `only`.
@@ -1779,6 +1780,273 @@ fn agent_dialogs() -> Result<(usize, usize)> {
     } = checker;
     session.quit()?;
     Ok((passed, failed))
+}
+
+/// The config file changing under a running shell: the file is the
+/// check's own, and is written anew for each step. A fixture stands in for
+/// the services, so what a backend was told is read from the command log.
+fn config_reload() -> Result<(usize, usize)> {
+    const SURFACE: &str = "gniri-overview";
+    const CLOCK: &str = ".clock-display .clock";
+    const PERCENTAGE: &str = "#panelRight .power-status GtkLabel";
+    /// A pixel of the desktop with nothing of gniri's on it.
+    const DESKTOP: (u32, u32) = (800, 600);
+    /// What every step's file starts with.
+    const BASE: &str = r##"
+        [idle]
+        blank_after = 0
+        [lock]
+        automatic = false
+        on_suspend = false
+    "##;
+
+    let logs = session::visual_dir()?.join("logs");
+    let config = logs.join("check-config.toml");
+    let write_all = |text: &str| -> Result<()> {
+        // Written beside it and moved into place, as an editor saves.
+        let partial = config.with_extension("partial");
+        fs::write(&partial, text)?;
+        fs::rename(&partial, &config).context("writing the check's config file")
+    };
+    // Each step's file is the base with that step's settings after it.
+    let write = |settings: &str| write_all(&format!("{BASE}\n{settings}"));
+    const START: &str = r##"
+        [wallpaper]
+        color = "#808080"
+        [clock]
+        format = "12h"
+        [panel]
+        show_battery_percentage = true
+        [dash]
+        favorites = ["org.gnome.Nautilus", "org.gnome.Calculator"]
+        icon_size = 64
+    "##;
+    write(START)?;
+
+    let fixture = logs.join("check-config.fixture.toml");
+    fs::write(
+        &fixture,
+        r#"
+        time = "2026-11-14T08:28:00"
+        power = { battery = { percentage = 91 } }
+        idle = { available = true }
+
+        [apps]
+        installed = [
+            { id = "org.gnome.Nautilus", name = "Files", icon = "org.gnome.Nautilus" },
+            { id = "org.gnome.Calculator", name = "Calculator", icon = "org.gnome.Calculator" },
+            { id = "org.gnome.TextEditor", name = "Text Editor", icon = "org.gnome.TextEditor" },
+        ]
+        "#,
+    )?;
+    let arguments = |fixture: Option<&Path>| -> Vec<String> {
+        let mut arguments = vec!["--config".to_owned(), config.display().to_string()];
+        if let Some(fixture) = fixture {
+            arguments.extend(["--fixture".to_owned(), fixture.display().to_string()]);
+        }
+        arguments
+    };
+    let session = Session::start(&SessionOptions {
+        name: "check-config".to_owned(),
+        niri_config: None,
+        renderer: "vulkan".to_owned(),
+        gniri_args: arguments(Some(&fixture)),
+    })?;
+    let mut checker = Checker {
+        session,
+        passed: 0,
+        failed: 0,
+    };
+    let clock =
+        |session: &Session| -> Result<Option<String>> { Ok(text_of(&panel(session)?, CLOCK)) };
+    let desktop = |session: &Session| pixel(session, DESKTOP.0, DESKTOP.1);
+    let tiles = |session: &Session| count_on(session, SURFACE, "#dash", "overview-tile");
+
+    println!("config file: what shows");
+    checker.expect("the shell starts with the file's settings", |session| {
+        let panel = panel(session)?;
+        Ok(
+            clock(session)?.is_some_and(|text| text.ends_with("8:28 AM"))
+                && text_of(&panel, PERCENTAGE).as_deref() == Some("91%")
+                && near(desktop(session)?, [128, 128, 128]),
+        )
+    });
+    write(&START.replace("12h", "24h").replace(
+        "show_battery_percentage = true",
+        "show_battery_percentage = false",
+    ))?;
+    checker.expect("the clock takes a changed format at once", |session| {
+        Ok(clock(session)?.is_some_and(|text| text.ends_with("08:28")))
+    });
+    checker.expect("and the battery's number goes", |session| {
+        Ok(tree::select(&panel(session)?, PERCENTAGE).is_err())
+    });
+    write(&START.replace("#808080", "#3584e4"))?;
+    checker.expect("another wallpaper colour is drawn", |session| {
+        Ok(near(desktop(session)?, [53, 132, 228]))
+    });
+    checker.expect("with the clock back as it was", |session| {
+        Ok(clock(session)?.is_some_and(|text| text.ends_with("8:28 AM")))
+    });
+
+    write(&START.replace(
+        "show_battery_percentage = true",
+        "outputs = [\"some-other-output\"]",
+    ))?;
+    checker.expect(
+        "an output taken off the panel's list loses its panel",
+        |session| Ok(surface(session, "gniri-panel")?.is_none()),
+    );
+    checker.session.action(Action::OpenOverview {})?;
+    std::thread::sleep(std::time::Duration::from_millis(300));
+    checker.expect("and with it the dash", |session| {
+        Ok(checker_overview_open(session)? && surface(session, SURFACE)?.is_none())
+    });
+    write(START)?;
+    checker.expect("back on the list, it has both again", |session| {
+        Ok(surface(session, "gniri-panel")?.is_some() && tiles(session)? == 2)
+    });
+    write(&START.replace(
+        "\"org.gnome.Calculator\"]",
+        "\"org.gnome.Calculator\", \"org.gnome.TextEditor\"]",
+    ))?;
+    checker.expect(
+        "a third favourite joins the dash while it shows",
+        |session| Ok(tiles(session)? == 3),
+    );
+    checker.session.action(Action::CloseOverview {})?;
+
+    checker
+        .session
+        .gniri_msg(&["debug", "open-menu", "date-menu"])?;
+    checker.expect("(the date menu offers world clocks)", |session| {
+        Ok(on_stage(session, ".world-clocks-button")?.is_some())
+    });
+    write(&format!("{START}\n[date_menu]\nworld_clocks = false"))?;
+    checker.expect("a menu closes when its settings change", |session| {
+        Ok(surface(session, "gniri-stage")?.is_none())
+    });
+    checker
+        .session
+        .gniri_msg(&["debug", "open-menu", "date-menu"])?;
+    checker.expect("and opens as the new ones have it", |session| {
+        Ok(on_stage(session, ".datemenu-displays-box")?.is_some()
+            && on_stage(session, ".world-clocks-button")?.is_none())
+    });
+    checker.session.gniri_msg(&["debug", "close-menu"])?;
+
+    println!("config file: what the backends are told");
+    checker.expect("(no backend was told anything so far)", |session| {
+        Ok(commands(session)?.iter().all(|command| {
+            ["idle:", "session:", "night-light:", "search:"]
+                .iter()
+                .all(|backend| !command.starts_with(backend))
+        }))
+    });
+    write_all(
+        &format!("{BASE}\n{START}\n[night_light]\ntemperature = 3000\n[search]\nproviders = false")
+            .replace("blank_after = 0", "blank_after = 600")
+            .replace("on_suspend = false", "on_suspend = true"),
+    )?;
+    checker.expect("the idle timers are set anew", |session| {
+        sent(
+            session,
+            "idle: SetTimers([(BlankLocked, 15s), (Dim, 480s), (Blank, 600s)])",
+        )
+    });
+    checker.expect("locking before sleep is switched on", |session| {
+        sent(session, "session: SetLockOnSuspend(true)")
+    });
+    checker.expect("night light gets its new colour", |session| {
+        sent(session, "night-light: SetTemperature(3000)")
+    });
+    checker.expect("and the search providers are asked no more", |session| {
+        sent(session, "search: Configure(Options { enabled: false")
+    });
+
+    println!("config file: mistakes");
+    let before = commands(&checker.session)?.len();
+    write("[clock]\nformat = \"13h\"\n[dash]\nfavorites = []")?;
+    std::thread::sleep(std::time::Duration::from_millis(700));
+    checker.expect("a file with a mistake changes nothing", |session| {
+        Ok(
+            clock(session)?.is_some_and(|text| text.ends_with("8:28 AM"))
+                && commands(session)?.len() == before,
+        )
+    });
+    write(&START.replace("12h", "24h"))?;
+    checker.expect("and the next good one is taken", |session| {
+        Ok(clock(session)?.is_some_and(|text| text.ends_with("08:28")))
+    });
+    fs::remove_file(&config)?;
+    checker.expect(
+        "without the file the settings are the defaults",
+        |session| {
+            // No wallpaper of gniri's: niri's own backdrop shows.
+            Ok(surface(session, "gniri-wallpaper")?.is_none()
+                && tree::select(&panel(session)?, PERCENTAGE).is_err())
+        },
+    );
+    write(START)?;
+    checker.expect("and a file made later is found", |session| {
+        Ok(surface(session, "gniri-wallpaper")?.is_some()
+            && clock(session)?.is_some_and(|text| text.ends_with("8:28 AM")))
+    });
+
+    let Checker {
+        session,
+        passed,
+        failed,
+    } = checker;
+    session.quit()?;
+    let (mut passed, mut failed) = (passed, failed);
+
+    // With real services, on the nested session's own bus: gniri is the
+    // notification server there, and tells of a mistake as any program
+    // would.
+    write(START)?;
+    let session = Session::start(&SessionOptions {
+        name: "check-config-bus".to_owned(),
+        niri_config: None,
+        renderer: "vulkan".to_owned(),
+        gniri_args: arguments(None),
+    })?;
+    let mut checker = Checker {
+        session,
+        passed: 0,
+        failed: 0,
+    };
+    // The server takes a moment to claim its name.
+    std::thread::sleep(std::time::Duration::from_millis(500));
+    write("[clock]\nformat24 = true")?;
+    checker.expect("a mistake is told of in a notification", |session| {
+        let Some(banner) = surface(session, "gniri-banner")? else {
+            return Ok(false);
+        };
+        Ok(text_of(&banner["tree"], ".message-title").as_deref()
+            == Some("gniri’s settings were not changed")
+            && text_of(&banner["tree"], ".message-body")
+                .is_some_and(|body| body.contains("format24")))
+    });
+    write(START)?;
+    checker.expect("which goes when the file is right again", |session| {
+        Ok(surface(session, "gniri-banner")?.is_none())
+    });
+    let Checker {
+        session,
+        passed: bus_passed,
+        failed: bus_failed,
+    } = checker;
+    session.quit()?;
+    passed += bus_passed;
+    failed += bus_failed;
+    let _ = fs::remove_file(&config);
+    Ok((passed, failed))
+}
+
+/// Whether niri's overview is open.
+fn checker_overview_open(session: &Session) -> Result<bool> {
+    session.overview_is_open()
 }
 
 /// The overview's surface, with the `search` scene's fixture for

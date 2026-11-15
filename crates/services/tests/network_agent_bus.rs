@@ -292,10 +292,13 @@ fn requests_wait_their_turn_and_can_be_withdrawn_or_replaced() {
     let Some(mut setup) = setup() else { return };
     let home = setup.ask("home", "/profile/1");
     setup.wait_for_request("home");
+    // Each asks from a thread of its own; the pauses put them in line in
+    // this order.
     let cafe = setup.ask("cafe", "/profile/2");
-    let office = setup.ask("office", "/profile/3");
-    // The same connection asked about again: the first asking is over.
     std::thread::sleep(Duration::from_millis(200));
+    let office = setup.ask("office", "/profile/3");
+    std::thread::sleep(Duration::from_millis(200));
+    // The same connection asked about again: the first asking is over.
     let home_again = setup.ask("home", "/profile/1");
     assert_eq!(error_of(home), format!("{ERROR}.AgentCanceled"));
 

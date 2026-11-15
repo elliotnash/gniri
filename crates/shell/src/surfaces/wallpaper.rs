@@ -56,6 +56,14 @@ impl WallpaperSource {
 
 /// The style class of a cover that is one flat colour.
 const FLAT_COVER_CLASS: &str = "overview-cover-flat";
+/// The name of the style rule that paints a flat-coloured wallpaper.
+const COLOUR_RULE: &str = "wallpaper-colour";
+
+/// Takes the style of a flat-coloured wallpaper away again: the wallpaper
+/// is now a picture, or none.
+pub fn forget_colour() {
+    style::set_rule(COLOUR_RULE, "");
+}
 
 /// One output's wallpaper.
 pub struct Wallpaper {
@@ -126,11 +134,15 @@ pub fn build(
                 colour.blue() * BACKDROP_BRIGHTNESS,
                 1.0,
             );
-            style::add_rule(&format!(
-                "window.gniri-wallpaper-window {{ background-color: {colour}; }}
-                 window.gniri-backdrop-window {{ background-color: {dimmed}; }}
-                 .{FLAT_COVER_CLASS} {{ background-color: {dimmed}; }}"
-            ));
+            // One rule for every output, replaced when the colour changes.
+            style::set_rule(
+                COLOUR_RULE,
+                &format!(
+                    "window.gniri-wallpaper-window {{ background-color: {colour}; }}
+                     window.gniri-backdrop-window {{ background-color: {dimmed}; }}
+                     .{FLAT_COVER_CLASS} {{ background-color: {dimmed}; }}"
+                ),
+            );
             None
         }
         WallpaperSource::Image(path) => {

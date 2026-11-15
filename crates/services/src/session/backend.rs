@@ -233,6 +233,15 @@ pub async fn run(
                             Ok(())
                         }
                     },
+                    Command::SetLockOnSuspend(wanted) => {
+                        lock.lock_on_suspend = wanted;
+                        if wanted {
+                            lock.hold_sleep().await;
+                        } else {
+                            lock.let_sleep();
+                        }
+                        Ok(())
+                    }
                 };
                 if let Err(error) = result {
                     eprintln!("gniri: session: {command:?} failed: {error}");

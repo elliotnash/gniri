@@ -87,8 +87,30 @@ pub enum Event {
     },
 }
 
+/// Which providers are asked.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Options {
+    /// Ask providers at all.
+    pub enabled: bool,
+    /// Desktop entry ids (with or without ".desktop") of providers that
+    /// are never asked.
+    pub disabled: Vec<String>,
+}
+
+impl Default for Options {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            disabled: Vec::new(),
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Command {
+    /// The user's choice of providers changed: look again for which are
+    /// installed and asked. Whatever is being searched for is dropped.
+    Configure(Options),
     /// Search for these terms; none ends the search.
     Search(Vec<String>),
     /// Open a result, as a click on it does.
@@ -186,7 +208,8 @@ impl Model for State {
                     }
                 }
             }
-            Command::Activate { .. } | Command::LaunchSearch { .. } => {}
+            // The providers that are left are announced by the backend.
+            Command::Configure(_) | Command::Activate { .. } | Command::LaunchSearch { .. } => {}
         }
     }
 }

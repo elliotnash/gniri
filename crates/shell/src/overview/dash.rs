@@ -222,12 +222,15 @@ impl Inner {
 
     /// The dash as it should be now.
     fn dash(&self) -> apps::Dash {
-        let favorites = &self.services.config.dash.favorites;
+        let favorites = self
+            .services
+            .config
+            .with(|config| config.dash.favorites.clone());
         self.services.niri.with(|niri| {
             self.services
                 .apps
                 .state
-                .with(|apps| apps.dash(favorites, &niri.windows))
+                .with(|apps| apps.dash(&favorites, &niri.windows))
         })
     }
 
@@ -325,7 +328,7 @@ impl Inner {
     /// (`Dash.setMaxSize` and `_adjustIconSize`).
     fn set_max_size(self: &Rc<Self>, max_width: i32, max_height: i32) {
         self.sized_for.set((max_width, max_height));
-        let size = match self.services.config.dash.icon_size {
+        let size = match self.services.config.with(|config| config.dash.icon_size) {
             Some(size) => size as i32,
             None if max_width <= 0 || max_height <= 0 => return,
             None => layout::dash_icon_size(
@@ -398,8 +401,7 @@ impl Dash {
 pub fn build(services: &Rc<Services>) -> Dash {
     let icon_size = services
         .config
-        .dash
-        .icon_size
+        .with(|config| config.dash.icon_size)
         .map_or(DEFAULT_ICON_SIZE, |size| size as i32);
 
     let apps = gtk::Box::builder().css_classes(["dash-apps"]).build();

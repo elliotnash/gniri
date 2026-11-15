@@ -222,18 +222,45 @@ impl Dispatch<ZwlrGammaControlManagerV1, ()> for Client {
     }
 }
 
+/// Changes the colour temperature while the backend runs: the setting is
+/// in the config file, which can change.
+#[derive(Clone, Default)]
+pub struct Tuner {
+    /// Absent where there is no compositor to tell.
+    target: Option<(Arc<Mutex<Shared>>, Connection)>,
+}
+
+impl Tuner {
+    /// Sets the colour temperature, in kelvin, the screen has while night
+    /// light is on, and shows it at once if it is.
+    pub fn set_temperature(&self, temperature: u32) {
+        let Some((shared, connection)) = &self.target else {
+            return;
+        };
+        let mut shared = shared.lock().expect("no thread panics holding it");
+        shared.white = white_point(temperature);
+        if shared.on {
+            for output in &shared.outputs {
+                shared.apply(output);
+            }
+        }
+        drop(shared);
+        let _ = connection.flush();
+    }
+}
+
 /// Starts the backend. `temperature` is the colour temperature, in kelvin,
-/// the screen has while night light is on.
+/// the screen has while night light is on; the [`Tuner`] changes it later.
 ///
 /// Without a Wayland display, or on a compositor without gamma control,
 /// the state stays "not available" and the shell hides the toggle.
-pub fn spawn(temperature: u32) -> Link<State> {
+pub fn spawn(temperature: u32) -> (Link<State>, Tuner) {
     let (link, events, commands) = Link::<State>::new();
     let connection = match Connection::connect_to_env() {
         Ok(connection) => connection,
         Err(error) => {
             eprintln!("gniri: night light: no Wayland connection: {error}");
-            return link;
+            return (link, Tuner::default());
         }
     };
     let shared = Arc::new(Mutex::new(Shared {
@@ -242,6 +269,9 @@ pub fn spawn(temperature: u32) -> Link<State> {
         outputs: Vec::new(),
         events,
     }));
+    let tuner = Tuner {
+        target: Some((Arc::clone(&shared), connection.clone())),
+    };
 
     let reader = std::thread::Builder::new()
         .name("night-light".to_owned())
@@ -261,7 +291,7 @@ pub fn spawn(temperature: u32) -> Link<State> {
         });
     if let Err(error) = reader {
         eprintln!("gniri: night light: cannot start a thread: {error}");
-        return link;
+        return (link, Tuner::default());
     }
 
     let writer = std::thread::Builder::new()
@@ -283,5 +313,5 @@ pub fn spawn(temperature: u32) -> Link<State> {
     if let Err(error) = writer {
         eprintln!("gniri: night light: cannot start a thread: {error}");
     }
-    link
+    (link, tuner)
 }

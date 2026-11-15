@@ -89,7 +89,36 @@ pub fn build(
     system.add_css_class("power-status");
     let percentage = gtk::Label::new(None);
     system.append(&percentage);
-    let show_percentage = services.config.panel.show_battery_percentage;
+    // The number beside the icon is a setting, which can change.
+    let show_battery = {
+        let (services, percentage) = (Rc::downgrade(services), percentage.clone());
+        move || {
+            let Some(services) = services.upgrade() else {
+                return;
+            };
+            let battery = services.power.state.with(|state| {
+                state
+                    .battery
+                    .as_ref()
+                    .map(|battery| (battery.icon_name(), battery.label()))
+            });
+            match battery {
+                Some((icon, label)) => {
+                    system_icon.set_icon_name(Some(&icon));
+                    percentage.set_label(&label);
+                    percentage.set_visible(
+                        services
+                            .config
+                            .with(|config| config.panel.show_battery_percentage),
+                    );
+                }
+                None => {
+                    system_icon.set_icon_name(Some("system-shutdown-symbolic"));
+                    percentage.set_visible(false);
+                }
+            }
+        }
+    };
     subscriptions.push(services.power.state.select(
         |state| {
             state
@@ -97,17 +126,14 @@ pub fn build(
                 .as_ref()
                 .map(|battery| (battery.icon_name(), battery.label()))
         },
-        move |battery| match battery {
-            Some((icon, label)) => {
-                system_icon.set_icon_name(Some(icon));
-                percentage.set_label(label);
-                percentage.set_visible(show_percentage);
-            }
-            None => {
-                system_icon.set_icon_name(Some("system-shutdown-symbolic"));
-                percentage.set_visible(false);
-            }
+        {
+            let show_battery = show_battery.clone();
+            move |_| show_battery()
         },
+    ));
+    subscriptions.push(services.config.select(
+        |config| config.panel.show_battery_percentage,
+        move |_| show_battery(),
     ));
 
     // Indicators that only say something is on.
