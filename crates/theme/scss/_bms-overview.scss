@@ -26,17 +26,6 @@ $bms_dash_separator: rgba(255, 255, 255, 0.12);
 $bms_dash_fg: rgba(255, 255, 255, 0.9);
 $bms_dash_checked_hover: rgba(255, 255, 255, 0.25);
 
-// What stands in front of niri's workspaces while the app grid or a
-// search shows (crates/shell/src/overview/controls.rs). With a wallpaper
-// of gniri's it is that wallpaper, blurred and dimmed: the very pixels of
-// the backdrop. Without one it is whatever niri has behind its
-// workspaces, blurred by niri and dimmed as the extension dims the
-// overview.
-.overview-cover-blurred {
-    @include bms-blur;
-    background-color: rgba(0, 0, 0, 1 - $bms_brightness);
-}
-
 // The extension blurs the wallpaper behind the dash, whatever window is
 // there. niri's default blur for a layer surface does the same ("xray":
 // it samples the backdrop, not the workspaces), and the backdrop is

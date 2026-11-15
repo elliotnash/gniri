@@ -307,6 +307,7 @@ pub fn build(
             app_display: app_display.widget.clone().upcast(),
             search_results: search_results.widget.clone().upcast(),
             dash: dash.widget.clone().upcast(),
+            dash_label: dash.label().upcast(),
         },
         {
             let dash = Rc::downgrade(&dash);
@@ -314,6 +315,16 @@ pub fn build(
                 if let Some(dash) = dash.upgrade() {
                     dash.set_max_size(width, height);
                 }
+            }
+        },
+        {
+            // The controls are the label's parent, which is what its
+            // place is relative to.
+            let dash = Rc::downgrade(&dash);
+            move || {
+                let dash = dash.upgrade()?;
+                let controls = dash.label().parent()?;
+                dash.label_anchor(&controls)
             }
         },
     );

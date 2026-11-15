@@ -17,6 +17,7 @@
 //           box.dash-separator              .dash-separator
 //         box.dash-item-container         ShowAppsIcon
 //           button.show-apps                .show-apps
+//   label.dash-label                    .dash-label
 //
 // Only the geometry is here. blur-my-shell replaces every colour of the
 // dash; those are in _bms-overview.scss.
@@ -74,7 +75,7 @@ $tile_transition: 100ms;
     // running app dot: manually positioned within the dash item
     // (`offset-y: -$dash_padding`)
     .app-grid-running-dot {
-        margin-bottom: $dash_padding;
+        transform: translateY(-$dash_padding);
         // An icon's box is an even number of pixels wide and the dot is
         // five: St puts the odd pixel on the right, GTK on the left.
         margin-right: 1px;
@@ -89,7 +90,28 @@ $tile_transition: 100ms;
     }
 }
 
+// OSD Tooltip: the name of the item under the pointer. `-y-offset`, its
+// distance from the dash, is in crates/shell/src/overview/controls.rs.
+.dash-label {
+    // %tooltip
+    background-color: transparentize(black, 0.1);
+    border: 1px solid transparentize($light_1, 0.9);
+    color: $light_1;
+    border-radius: $forced_circular_radius;
+    padding: $base_padding ($base_padding * 2);
+
+    // dash.js DASH_ITEM_LABEL_SHOW_TIME and DASH_ITEM_LABEL_HIDE_TIME
+    opacity: 0;
+    transition: opacity 100ms $ease_out_quad;
+
+    &.shown {
+        opacity: 1;
+        transition-duration: 150ms;
+    }
+}
+
 :root {
+    --gniri-dash-label-offset: #{$base_margin * 2};
     --gniri-dash-padding: 0 #{$base_padding};
     --gniri-dash-background-radius: #{$dash_border_radius};
     --gniri-dash-background-padding: #{$dash_padding} #{$dash_padding - $dash_spacing};

@@ -1789,12 +1789,65 @@ fn overview() -> Result<(usize, usize)> {
         });
         checker.expect("and closes the overview", is_closed);
 
+        // The name of a dash item shows over it once the pointer has
+        // rested there.
+        checker.session.action(Action::OpenOverview {})?;
+        checker.expect("(the overview is open)", is_open);
+        let hover = |session: &Session, selector: &str| -> Result<()> {
+            session.gniri_msg(&["debug", "sync"])?;
+            let found = surface(session, SURFACE)?.ok_or_else(|| anyhow!("no overview"))?;
+            let (left, top) = surface_origin(session, &found)?;
+            let [x, y, width, height] = tree::rect(tree::select(&found["tree"], selector)?, "box")?;
+            hover_at(
+                session,
+                (left + x + width / 2.0).round() as i32,
+                (top + y + height / 2.0).round() as i32,
+                "the item",
+                || Ok(on(session, selector)?.is_some_and(|item| has_state(&item, "hover"))),
+            )
+        };
+        let label = |session: &Session| -> Result<Option<String>> {
+            Ok(on(session, ".dash-label")?
+                .and_then(|label| label["text"].as_str().map(str::to_owned)))
+        };
+        hover(&checker.session, "#dash #Calendar")?;
+        checker.expect("resting on a dash item shows its name", |session| {
+            Ok(label(session)?.as_deref() == Some("Calendar"))
+        });
+        checker.expect(
+            "over the middle of the item, a little above the dash",
+            |session| {
+                let (Some(label), Some(item), Some(dash)) = (
+                    on(session, ".dash-label")?,
+                    on(session, "#dash #Calendar")?,
+                    on(session, "#dash")?,
+                ) else {
+                    return Ok(false);
+                };
+                let (label, item, dash) = (
+                    tree::rect(&label, "box")?,
+                    tree::rect(&item, "box")?,
+                    tree::rect(&dash, "box")?,
+                );
+                let centre = |rect: [f64; 4]| rect[0] + rect[2] / 2.0;
+                Ok((centre(label) - centre(item)).abs() <= 1.0
+                    && dash[1] - (label[1] + label[3]) == 8.0)
+            },
+        );
+        hover(&checker.session, "#dash #Files")?;
+        checker.expect("the next item's name follows the pointer", |session| {
+            Ok(label(session)?.as_deref() == Some("Files"))
+        });
+        let (width, height) = output_size(&checker.session)?;
+        pointer_to(&checker.session, width / 2, height / 2)?;
+        checker.expect("and goes when the pointer leaves the dash", |session| {
+            Ok(label(session)?.is_none())
+        });
+
         // Between the entry and the dash the surface lets the pointer
         // through to niri, whose overview is underneath.
         checker.session.action(Action::OpenOverview {})?;
         checker.expect("(the overview is open)", is_open);
-        let (width, height) = output_size(&checker.session)?;
-        pointer_to(&checker.session, width / 2, height / 2)?;
         pointer(&checker.session, &["click", "left"])?;
         checker.expect(
             "a click on a window in niri's overview reaches niri, which closes it",

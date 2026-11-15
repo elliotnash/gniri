@@ -89,11 +89,11 @@ impl Wallpaper {
     }
 }
 
-/// The cover where gniri draws no wallpaper: whatever the compositor has
-/// behind its workspaces, blurred and dimmed by the theme.
+/// The cover where gniri draws no wallpaper: the flat colour GNOME's own
+/// overview has without blur-my-shell, from the theme.
 pub fn cover_without_wallpaper() -> gtk::Widget {
     gtk::Box::builder()
-        .css_classes(["overview-cover-blurred"])
+        .css_classes(["overview-cover-plain"])
         .build()
         .upcast()
 }

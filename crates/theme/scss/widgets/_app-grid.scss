@@ -57,7 +57,7 @@ $page_indicator_inactive_opacity: 0.5;
     min-width: $running_dot_size;
     border-radius: $running_dot_size;
     // `offset-y: 6px`: it hangs below the icon's box.
-    margin-bottom: -$base_padding;
+    transform: translateY($base_padding);
 }
 
 // App Grid pagination indicators

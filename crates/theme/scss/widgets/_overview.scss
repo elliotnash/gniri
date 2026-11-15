@@ -39,6 +39,16 @@ $overview_controls_time: 250ms;
     }
 }
 
+// What stands in front of niri's workspaces while the app grid or a
+// search shows (crates/shell/src/overview/controls.rs). With a wallpaper
+// of gniri's it is that wallpaper, blurred and dimmed: the very pixels of
+// the backdrop behind the workspaces. Without one there is nothing of
+// gniri's to show, and it is upstream's `#overviewGroup` colour, which
+// niri's own default backdrop is within a shade of.
+.overview-cover-plain {
+    background-color: $system_base_color;
+}
+
 :root {
     --gniri-overview-controls-time: #{$overview_controls_time};
 }

@@ -8,6 +8,7 @@
 //!   box.app-display                     AppDisplay
 //!   box#searchResults                   SearchResultsView
 //!   box#dash                            Dash
+//!   label.dash-label                    the name of a dash item
 //! ```
 //!
 //! The cover is gniri's own. GNOME shrinks the workspaces to a strip when
@@ -31,10 +32,17 @@ pub struct Parts {
     pub app_display: gtk::Widget,
     pub search_results: gtk::Widget,
     pub dash: gtk::Widget,
+    pub dash_label: gtk::Widget,
 }
+
+/// `.dash-label { -y-offset }`: how far above its item the label floats.
+const DASH_LABEL_OFFSET: i32 = 8;
 
 /// Told the width and height the dash may take.
 type DashRoom = Box<dyn Fn(i32, i32)>;
+/// Says where the dash item is that the label names: its left edge, its
+/// width and its top.
+type LabelAnchor = Box<dyn Fn() -> Option<(i32, i32, i32)>>;
 
 mod imp {
     use super::*;
@@ -47,6 +55,7 @@ mod imp {
         pub(super) above: Cell<i32>,
         /// Told how much room the dash may take, before it is measured.
         pub(super) on_dash_room: RefCell<Option<DashRoom>>,
+        pub(super) label_anchor: RefCell<Option<LabelAnchor>>,
     }
 
     #[glib::object_subclass]
@@ -65,6 +74,7 @@ mod imp {
                     parts.app_display,
                     parts.search_results,
                     parts.dash,
+                    parts.dash_label,
                 ] {
                     part.unparent();
                 }
@@ -111,6 +121,22 @@ mod imp {
 
             let above = self.above.get();
             place(&parts.cover, -above, height + above);
+
+            // `DashItemContainer.showLabel`: centred over its item, kept
+            // on the screen.
+            let label = &parts.dash_label;
+            let anchor = self.label_anchor.borrow();
+            if label.should_layout()
+                && let Some((x, item_width, top)) = anchor.as_ref().and_then(|anchor| anchor())
+            {
+                let (_, label_width, _, _) = label.measure(gtk::Orientation::Horizontal, -1);
+                let (_, label_height, _, _) =
+                    label.measure(gtk::Orientation::Vertical, label_width);
+                let x = (x + (item_width - label_width).div_euclid(2))
+                    .clamp(0, (width - label_width).max(0));
+                let y = top - label_height - DASH_LABEL_OFFSET;
+                label.size_allocate(&gtk::Allocation::new(x, y, label_width, label_height), -1);
+            }
         }
     }
 }
@@ -123,8 +149,13 @@ glib::wrapper! {
 
 impl Controls {
     /// `dash_room` is told the width and height the dash may take whenever
-    /// the surface is laid out.
-    pub fn new(parts: Parts, dash_room: impl Fn(i32, i32) + 'static) -> Self {
+    /// the surface is laid out. `label_anchor` says where the dash item is
+    /// that the label names, in this widget's coordinates.
+    pub fn new(
+        parts: Parts,
+        dash_room: impl Fn(i32, i32) + 'static,
+        label_anchor: impl Fn() -> Option<(i32, i32, i32)> + 'static,
+    ) -> Self {
         let controls: Self = glib::Object::new();
         controls.add_css_class("controls-manager");
         for part in [
@@ -133,9 +164,14 @@ impl Controls {
             &parts.app_display,
             &parts.search_results,
             &parts.dash,
+            &parts.dash_label,
         ] {
             part.set_parent(&controls);
         }
+        controls
+            .imp()
+            .label_anchor
+            .replace(Some(Box::new(label_anchor)));
         controls.imp().parts.replace(Some(parts));
         controls
             .imp()
@@ -149,5 +185,20 @@ impl Controls {
         if self.imp().above.replace(above) != above {
             self.queue_allocate();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The label's distance from the dash is a style property in St; the
+    /// theme lists it and the code uses it.
+    #[test]
+    fn the_label_floats_as_far_above_the_dash_as_the_theme_says() {
+        assert_eq!(
+            gniri_theme::token("dash-label-offset"),
+            Some(format!("{DASH_LABEL_OFFSET}px").as_str())
+        );
     }
 }

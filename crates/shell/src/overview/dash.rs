@@ -16,7 +16,11 @@
 //!         box.dash-separator
 //!       box.dash-item-container         ShowAppsIcon
 //!         button.show-apps
+//! label.dash-label                      an item's name, while pointed at
 //! ```
+//!
+//! The label is not in the dash: it floats above it, and whoever lays the
+//! overview out places it ([`Dash::label_anchor`]).
 //!
 //! An item reaches from the top of the dash to the bottom of the screen,
 //! so that it is hit by a pointer pushed against the edge; the background
@@ -26,6 +30,7 @@
 
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
+use std::time::Duration;
 
 use gniri_core::Subscription;
 use gniri_services::apps::{self, DashItem};
@@ -55,6 +60,14 @@ const DEFAULT_ICON_SIZE: i32 = 64;
 /// the icon on every side.
 const ICON_PADDING: i32 = 6;
 
+/// dash.js `DASH_ITEM_HOVER_TIMEOUT`: how long the pointer rests on an
+/// item before its name shows, and how long after leaving one the next
+/// item's name still shows at once.
+const HOVER_TIMEOUT: Duration = Duration::from_millis(300);
+/// dash.js `DASH_ITEM_LABEL_HIDE_TIME`; the theme's transition lasts as
+/// long.
+const LABEL_HIDE_TIME: Duration = Duration::from_millis(100);
+
 /// One application's item.
 struct Item {
     /// What it shows; rebuilt when this changes.
@@ -79,6 +92,16 @@ struct Inner {
     icon_size: Cell<i32>,
     /// The room there was when the icons were last sized.
     sized_for: Cell<(i32, i32)>,
+    label: gtk::Label,
+    /// The item the pointer is on, once its name shows.
+    labelled: RefCell<Option<gtk::Box>>,
+    /// Runs out when the name of the item under the pointer is to show.
+    label_timer: RefCell<Option<glib::SourceId>>,
+    /// A name showed a moment ago: the next shows without waiting
+    /// (`Dash._labelShowing`).
+    label_showing: Cell<bool>,
+    /// Counts shows and hides, so one that was overtaken does nothing.
+    label_generation: Cell<u64>,
 }
 
 pub struct Dash {
@@ -96,6 +119,107 @@ fn container(child: &impl IsA<gtk::Widget>) -> gtk::Box {
 }
 
 impl Inner {
+    /// Shows `name` above `container` while the pointer is on `button`
+    /// (`Dash._hookUpLabel` and `_syncLabel`).
+    fn hook_label(self: &Rc<Self>, container: &gtk::Box, button: &gtk::Button, name: &str) {
+        let motion = gtk::EventControllerMotion::new();
+        motion.connect_enter({
+            let (inner, container, name) =
+                (Rc::downgrade(self), container.downgrade(), name.to_owned());
+            move |_, _, _| {
+                let (Some(inner), Some(container)) = (inner.upgrade(), container.upgrade()) else {
+                    return;
+                };
+                let delay = if inner.label_showing.get() {
+                    Duration::ZERO
+                } else {
+                    HOVER_TIMEOUT
+                };
+                let name = name.clone();
+                let timer = glib::timeout_add_local_once(delay, {
+                    let inner = Rc::clone(&inner);
+                    move || {
+                        inner.label_timer.take();
+                        inner.show_label(&container, &name);
+                    }
+                });
+                if let Some(old) = inner.label_timer.replace(Some(timer)) {
+                    old.remove();
+                }
+            }
+        });
+        let leave = {
+            let inner = Rc::downgrade(self);
+            move || {
+                if let Some(inner) = inner.upgrade() {
+                    inner.hide_label();
+                }
+            }
+        };
+        motion.connect_leave({
+            let leave = leave.clone();
+            move |_| leave()
+        });
+        button.add_controller(motion);
+        // A click is an answer; the name has done its work.
+        button.connect_clicked(move |_| leave());
+    }
+
+    fn show_label(&self, container: &gtk::Box, name: &str) {
+        self.label_generation.set(self.label_generation.get() + 1);
+        self.label_showing.set(true);
+        self.labelled.replace(Some(container.clone()));
+        self.label.set_label(name);
+        self.label.set_visible(true);
+        self.label.add_css_class("shown");
+        // It may be showing already, over another item.
+        if let Some(parent) = self.label.parent() {
+            parent.queue_allocate();
+        }
+    }
+
+    fn hide_label(self: &Rc<Self>) {
+        if let Some(timer) = self.label_timer.take() {
+            timer.remove();
+        }
+        if self.labelled.borrow().is_none() {
+            return;
+        }
+        let generation = self.label_generation.get() + 1;
+        self.label_generation.set(generation);
+        self.label.remove_css_class("shown");
+        let overtaken = {
+            let inner = Rc::downgrade(self);
+            move || {
+                inner
+                    .upgrade()
+                    .filter(|inner| inner.label_generation.get() == generation)
+            }
+        };
+        // Gone once it has faded.
+        let hide = {
+            let overtaken = overtaken.clone();
+            move || {
+                if let Some(inner) = overtaken() {
+                    inner.label.set_visible(false);
+                    inner.labelled.take();
+                }
+            }
+        };
+        let animated =
+            gtk::Settings::default().is_some_and(|settings| settings.is_gtk_enable_animations());
+        if animated {
+            glib::timeout_add_local_once(LABEL_HIDE_TIME, hide);
+        } else {
+            hide();
+        }
+        glib::timeout_add_local_once(HOVER_TIMEOUT, move || {
+            if let Some(inner) = overtaken() {
+                inner.label_showing.set(false);
+            }
+        });
+    }
+
     /// The dash as it should be now.
     fn dash(&self) -> apps::Dash {
         let favorites = &self.services.config.dash.favorites;
@@ -130,11 +254,15 @@ impl Inner {
                 .zip(&wanted)
                 .all(|(item, wanted)| item.shown == shown(wanted));
         if !unchanged {
+            // The item a name shows over may be about to go.
+            self.hide_label();
             let mut old: Vec<Item> = std::mem::take(&mut items);
             for item in &old {
                 self.apps.remove(&item.container);
             }
-            self.apps.remove(&self.separator);
+            if self.separator.parent().is_some() {
+                self.apps.remove(&self.separator);
+            }
             for (index, wanted) in wanted.iter().enumerate() {
                 if index == dash.favorites.len() {
                     self.apps.append(&self.separator);
@@ -184,9 +312,11 @@ impl Inner {
                 }
             }
         });
+        let container = container(&button.button);
+        self.hook_label(&container, &button.button, &item.name);
         Item {
             shown: (item.id.clone(), item.name.clone(), item.icon.clone()),
-            container: container(&button.button),
+            container,
             button,
         }
     }
@@ -236,6 +366,25 @@ impl Dash {
         }
     }
 
+    /// The label that names the item under the pointer. It is laid out by
+    /// the overview, over the dash.
+    pub fn label(&self) -> gtk::Label {
+        self.inner.label.clone()
+    }
+
+    /// Where the item is whose name the label shows, in `relative_to`'s
+    /// coordinates: its left edge, its width and its top
+    /// (`DashItemContainer.showLabel` centres the label over these).
+    pub fn label_anchor(&self, relative_to: &impl IsA<gtk::Widget>) -> Option<(i32, i32, i32)> {
+        let labelled = self.inner.labelled.borrow();
+        let bounds = labelled.as_ref()?.compute_bounds(relative_to)?;
+        Some((
+            bounds.x().floor() as i32,
+            bounds.width().round() as i32,
+            bounds.y().floor() as i32,
+        ))
+    }
+
     /// The part that is drawn: what takes pointer input while the windows
     /// show around it.
     pub fn background(&self) -> gtk::Widget {
@@ -276,12 +425,19 @@ pub fn build(services: &Rc<Services>) -> Dash {
         move |_| services.overview.update(|overview| overview.toggle_apps())
     });
 
+    let show_apps_container = container(&show_apps.button);
+    let label = gtk::Label::builder()
+        .css_classes(["dash-label"])
+        .visible(false)
+        .can_target(false)
+        .build();
+
     let row = gtk::Box::builder()
         .css_classes(["dash-container"])
         .halign(gtk::Align::Center)
         .build();
     row.append(&apps);
-    row.append(&container(&show_apps.button));
+    row.append(&show_apps_container);
 
     let sizer = gtk::Box::builder()
         .height_request(icon_size + 2 * ICON_PADDING)
@@ -310,7 +466,13 @@ pub fn build(services: &Rc<Services>) -> Dash {
         favorites: Cell::new(0),
         icon_size: Cell::new(icon_size),
         sized_for: Cell::new((0, 0)),
+        label,
+        labelled: RefCell::new(None),
+        label_timer: RefCell::new(None),
+        label_showing: Cell::new(false),
+        label_generation: Cell::new(0),
     });
+    inner.hook_label(&show_apps_container, &inner.show_apps.button, "Show Apps");
 
     // The row follows the installed applications and the open windows.
     let refresh = {
