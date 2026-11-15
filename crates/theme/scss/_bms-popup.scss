@@ -46,7 +46,7 @@ $bms_menu_backdrop: $bms_brightness * (1 - alpha($shadow_color));
                 background-color $quick_settings_dim_time $ease_out_quad,
                 border-color $quick_settings_dim_time $ease_out_quad;
 
-    &.dimmed {
+    &.shaded {
         $dimmed_tint: rgba(
             red($bms_popup_tint) * $quick_settings_dim_brightness,
             green($bms_popup_tint) * $quick_settings_dim_brightness,

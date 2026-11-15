@@ -19,6 +19,9 @@ use crate::menus::{Menu, Submenu};
 pub enum Request {
     /// Describe every mapped widget of every surface (`debug::dump`).
     DumpTree,
+    /// Reply once everything asked for so far is on screen: every mapped
+    /// surface has drawn a frame after this request arrived.
+    Sync,
     /// List every command the shell has sent to a service.
     Commands,
     /// Open a panel menu, on `output` or the first output with a panel.
@@ -83,11 +86,14 @@ pub fn send(request: &Request) -> Result<serde_json::Value, String> {
     reply
 }
 
+/// A reply that may take a while to be ready.
+pub type Pending = std::pin::Pin<Box<dyn std::future::Future<Output = Reply>>>;
+
 /// Starts answering requests. `handle` runs on the main loop.
 ///
 /// Returns the listener, which must be kept alive, or `None` (after saying
 /// why on stderr) if the socket cannot be set up: the shell works without.
-pub fn serve(handle: impl Fn(Request) -> Reply + 'static) -> Option<gio::SocketService> {
+pub fn serve(handle: impl Fn(Request) -> Pending + 'static) -> Option<gio::SocketService> {
     let path = socket_path()?;
     // A socket file left by a shell that crashed would block the bind. If
     // nothing answers on it, it is stale.
@@ -122,7 +128,7 @@ pub fn serve(handle: impl Fn(Request) -> Reply + 'static) -> Option<gio::SocketS
             let input = gio::DataInputStream::new(&connection.input_stream());
             let reply: Reply = match input.read_line_utf8_future(glib::Priority::DEFAULT).await {
                 Ok(Some(line)) => match serde_json::from_str::<Request>(&line) {
-                    Ok(request) => handle(request),
+                    Ok(request) => handle(request).await,
                     Err(error) => Err(format!("not a request: {error}")),
                 },
                 Ok(None) => return,

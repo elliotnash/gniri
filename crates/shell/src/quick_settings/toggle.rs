@@ -30,6 +30,7 @@ pub struct Toggle {
 fn contents(title: &str) -> (gtk::Button, gtk::Image, gtk::Label) {
     let icon = gtk::Image::builder()
         .css_classes(["quick-toggle-icon"])
+        .valign(gtk::Align::Center)
         .build();
     let title = gtk::Label::builder()
         .label(title)
@@ -51,8 +52,13 @@ fn contents(title: &str) -> (gtk::Button, gtk::Image, gtk::Label) {
     titles.append(&title);
     titles.append(&subtitle);
 
+    // St centres the row, as tall as its text, in the button and the icon
+    // in the row. For one line of text both leave half a pixel over, so the
+    // icon ends up a pixel above the button's centre; centring the row here
+    // too reproduces that.
     let row = gtk::Box::builder()
         .css_classes(["quick-toggle-box"])
+        .valign(gtk::Align::Center)
         .build();
     row.append(&icon);
     row.append(&titles);
@@ -88,7 +94,12 @@ impl Toggle {
             .build();
         let arrow = gtk::Button::builder()
             .css_classes(["quick-toggle-menu-button", "icon-button"])
-            .child(&gtk::Image::from_icon_name("go-next-symbolic"))
+            .child(
+                &gtk::Image::builder()
+                    .icon_name("go-next-symbolic")
+                    .valign(gtk::Align::Center)
+                    .build(),
+            )
             .build();
 
         let root = gtk::Box::builder()

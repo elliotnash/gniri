@@ -1,0 +1,397 @@
+# The quick settings menu: gniri's widgets against GNOME Shell's actors.
+# Read by `cargo xtask diff quick-settings` (crates/xtask/src/diff.rs).
+
+surface = "gniri-stage"
+root = ".quick-settings"
+# It hangs from the right end of the panel.
+attach = "right"
+# Its shadow is compared too.
+margin = 12
+wallpaper = "/usr/share/backgrounds/f45/default/f45-01-night.jxl"
+
+[[states]]
+scene = "quick-settings"
+reference = "quick-settings"
+# The submenu's pairs are not there to compare.
+pairs = [
+    "grid", "system row", "battery button", "battery icon", "battery level",
+    "screenshot button", "screenshot icon", "settings button", "lock button",
+    "power button", "volume row", "volume icon button", "volume icon",
+    "volume slider bin", "volume slider", "volume menu button",
+    "brightness row", "brightness slider",
+    "wifi", "wifi toggle", "wifi icon", "wifi title", "wifi subtitle",
+    "wifi separator", "wifi menu button", "wifi arrow",
+    "bluetooth", "bluetooth toggle", "bluetooth title", "bluetooth menu button",
+    "power mode", "power mode title", "power mode subtitle",
+    "night light", "night light icon", "night light title",
+    "dark style", "do not disturb", "airplane mode", "airplane mode title",
+]
+
+[[states]]
+scene = "quick-settings-submenu"
+reference = "quick-settings-submenu"
+
+[[regions]]
+name = "menu"
+anchor = "stretch"
+
+# Selectors: crates/xtask/src/tree.rs. Ours start at the menu
+# (.quick-settings); GNOME's at the actor that holds the menu and its
+# submenus.
+#
+# Pairs that depend on the size of a piece of text allow one pixel, as in
+# panel.toml.
+
+[[pairs]]
+name = "grid"
+ours = ".quick-settings-grid"
+theirs = ".quick-settings-grid"
+anchor = "left"
+
+[[pairs]]
+name = "system row"
+ours = ".quick-settings-system-item"
+theirs = ".quick-settings-system-item"
+anchor = "left"
+
+[[pairs]]
+name = "battery button"
+ours = ".power-item"
+theirs = ".power-item"
+anchor = "left"
+tolerance_px = 1.1
+
+[[pairs]]
+name = "battery icon"
+ours = ".power-item .quick-toggle-icon"
+theirs = ".power-item .quick-toggle-icon ClutterActor"
+anchor = "left"
+
+[[pairs]]
+name = "battery level"
+ours = ".power-item .quick-toggle-title"
+ours_box = "text"
+theirs = ".power-item ClutterText"
+anchor = "left"
+tolerance_px = 1.1
+
+[[pairs]]
+name = "screenshot button"
+ours = ".quick-settings-system-item .icon-button:0"
+theirs = "Gjs_status_system_ScreenshotItem"
+anchor = "right"
+
+[[pairs]]
+name = "screenshot icon"
+ours = ".quick-settings-system-item .icon-button:0 GtkImage"
+theirs = "Gjs_status_system_ScreenshotItem StIcon"
+anchor = "right"
+
+[[pairs]]
+name = "settings button"
+ours = ".quick-settings-system-item .icon-button:1"
+theirs = "Gjs_status_system_SettingsItem"
+anchor = "right"
+
+[[pairs]]
+name = "lock button"
+ours = ".quick-settings-system-item .icon-button:2"
+theirs = "Gjs_status_system_LockItem"
+anchor = "right"
+
+[[pairs]]
+name = "power button"
+ours = ".quick-settings-system-item .icon-button:3"
+theirs = "Gjs_status_system_ShutdownItem"
+anchor = "right"
+
+[[pairs]]
+name = "volume row"
+ours = ".quick-slider:0"
+theirs = "Gjs_status_volume_OutputStreamSlider"
+anchor = "left"
+
+[[pairs]]
+name = "volume icon button"
+ours = ".quick-slider:0 .icon-button:0"
+theirs = "Gjs_status_volume_OutputStreamSlider .icon-button:0"
+anchor = "left"
+
+[[pairs]]
+name = "volume icon"
+ours = ".quick-slider:0 .icon-button:0 GtkImage"
+theirs = "Gjs_status_volume_OutputStreamSlider .icon-button:0 StIcon"
+anchor = "left"
+
+[[pairs]]
+name = "volume slider bin"
+ours = ".quick-slider:0 .slider-bin"
+theirs = "Gjs_status_volume_OutputStreamSlider .slider-bin"
+anchor = "left"
+
+[[pairs]]
+name = "volume slider"
+ours = ".quick-slider:0 .slider"
+theirs = "Gjs_status_volume_OutputStreamSlider .slider"
+anchor = "left"
+
+[[pairs]]
+name = "volume menu button"
+ours = ".quick-slider:0 .icon-button:1"
+theirs = "Gjs_status_volume_OutputStreamSlider .icon-button:1"
+anchor = "right"
+
+[[pairs]]
+name = "brightness row"
+ours = ".quick-slider:1"
+theirs = "Gjs_status_brightness_BrightnessItem"
+anchor = "left"
+
+[[pairs]]
+name = "brightness slider"
+ours = ".quick-slider:1 .slider"
+theirs = "Gjs_status_brightness_BrightnessItem .slider"
+anchor = "left"
+
+[[pairs]]
+name = "wifi"
+ours = ".quick-toggle-has-menu:0"
+theirs = "Gjs_status_network_NMWirelessToggle"
+anchor = "left"
+
+[[pairs]]
+name = "wifi toggle"
+ours = ".quick-toggle-has-menu:0 .quick-toggle"
+theirs = "Gjs_status_network_NMWirelessToggle .quick-toggle"
+anchor = "left"
+
+[[pairs]]
+name = "wifi icon"
+ours = ".quick-toggle-has-menu:0 .quick-toggle-icon"
+theirs = "Gjs_status_network_NMWirelessToggle .quick-toggle-icon ClutterActor"
+anchor = "left"
+
+[[pairs]]
+name = "wifi title"
+ours = ".quick-toggle-has-menu:0 .quick-toggle-title"
+ours_box = "text"
+theirs = "Gjs_status_network_NMWirelessToggle .quick-toggle-title ClutterText"
+anchor = "left"
+tolerance_px = 1.1
+
+# Both names are cut off by the toggle's width.
+[[pairs]]
+name = "wifi subtitle"
+ours = ".quick-toggle-has-menu:0 .quick-toggle-subtitle"
+theirs = "Gjs_status_network_NMWirelessToggle .quick-toggle-subtitle"
+anchor = "left"
+tolerance_px = 1.1
+
+[[pairs]]
+name = "wifi separator"
+ours = ".quick-toggle-has-menu:0 .quick-toggle-separator"
+theirs = "Gjs_status_network_NMWirelessToggle .quick-toggle-separator"
+anchor = "left"
+
+[[pairs]]
+name = "wifi menu button"
+ours = ".quick-toggle-has-menu:0 .quick-toggle-menu-button"
+theirs = "Gjs_status_network_NMWirelessToggle .quick-toggle-menu-button"
+anchor = "left"
+
+[[pairs]]
+name = "wifi arrow"
+ours = ".quick-toggle-has-menu:0 .quick-toggle-menu-button GtkImage"
+theirs = "Gjs_status_network_NMWirelessToggle .quick-toggle-menu-button StIcon"
+anchor = "left"
+
+[[pairs]]
+name = "bluetooth"
+ours = ".quick-toggle-has-menu:1"
+theirs = "Gjs_status_bluetooth_BluetoothToggle"
+anchor = "right"
+
+[[pairs]]
+name = "bluetooth toggle"
+ours = ".quick-toggle-has-menu:1 .quick-toggle"
+theirs = "Gjs_status_bluetooth_BluetoothToggle .quick-toggle"
+anchor = "right"
+
+[[pairs]]
+name = "bluetooth title"
+ours = ".quick-toggle-has-menu:1 .quick-toggle-title"
+ours_box = "text"
+theirs = "Gjs_status_bluetooth_BluetoothToggle .quick-toggle-title ClutterText"
+anchor = "right"
+tolerance_px = 1.1
+
+[[pairs]]
+name = "bluetooth menu button"
+ours = ".quick-toggle-has-menu:1 .quick-toggle-menu-button"
+theirs = "Gjs_status_bluetooth_BluetoothToggle .quick-toggle-menu-button"
+anchor = "right"
+
+[[pairs]]
+name = "power mode"
+ours = ".quick-toggle-has-menu:2"
+theirs = "Gjs_status_powerProfiles_PowerProfilesToggle"
+anchor = "left"
+
+[[pairs]]
+name = "power mode title"
+ours = ".quick-toggle-has-menu:2 .quick-toggle-title"
+ours_box = "text"
+theirs = "Gjs_status_powerProfiles_PowerProfilesToggle .quick-toggle-title ClutterText"
+anchor = "left"
+tolerance_px = 1.1
+
+[[pairs]]
+name = "power mode subtitle"
+ours = ".quick-toggle-has-menu:2 .quick-toggle-subtitle"
+ours_box = "text"
+theirs = "Gjs_status_powerProfiles_PowerProfilesToggle .quick-toggle-subtitle ClutterText"
+anchor = "left"
+tolerance_px = 1.1
+
+[[pairs]]
+name = "night light"
+ours = ".quick-toggle:4"
+theirs = "Gjs_status_nightLight_NightLightToggle"
+anchor = "right"
+
+[[pairs]]
+name = "night light icon"
+ours = ".quick-toggle:4 .quick-toggle-icon"
+theirs = "Gjs_status_nightLight_NightLightToggle .quick-toggle-icon ClutterActor"
+anchor = "right"
+
+[[pairs]]
+name = "night light title"
+ours = ".quick-toggle:4 .quick-toggle-title"
+ours_box = "text"
+theirs = "Gjs_status_nightLight_NightLightToggle ClutterText"
+anchor = "right"
+tolerance_px = 1.1
+
+[[pairs]]
+name = "dark style"
+ours = ".quick-toggle:5"
+theirs = "Gjs_status_darkMode_DarkModeToggle"
+anchor = "left"
+
+[[pairs]]
+name = "do not disturb"
+ours = ".quick-toggle:6"
+theirs = "Gjs_status_doNotDisturb_DoNotDisturbToggle"
+anchor = "right"
+
+[[pairs]]
+name = "airplane mode"
+ours = ".quick-toggle:7"
+theirs = "Gjs_status_rfkill_RfkillToggle"
+anchor = "left"
+
+[[pairs]]
+name = "airplane mode title"
+ours = ".quick-toggle:7 .quick-toggle-title"
+ours_box = "text"
+theirs = "Gjs_status_rfkill_RfkillToggle ClutterText"
+anchor = "left"
+tolerance_px = 1.1
+
+# The Power Mode submenu.
+
+[[pairs]]
+name = "submenu container"
+ours = ".quick-toggle-menu-container"
+theirs = ".quick-toggle-menu-container"
+anchor = "left"
+
+[[pairs]]
+name = "submenu"
+ours = ".quick-toggle-menu"
+theirs = ".quick-toggle-menu"
+anchor = "left"
+
+[[pairs]]
+name = "submenu header"
+ours = ".quick-toggle-menu .header"
+theirs = ".quick-toggle-menu .header"
+anchor = "left"
+
+[[pairs]]
+name = "submenu header icon"
+ours = ".quick-toggle-menu .header .icon"
+theirs = ".quick-toggle-menu .header .icon"
+anchor = "left"
+
+[[pairs]]
+name = "submenu title"
+ours = ".quick-toggle-menu .header .title"
+ours_box = "text"
+theirs = ".quick-toggle-menu .header .title ClutterText"
+anchor = "left"
+tolerance_px = 1.1
+
+[[pairs]]
+name = "submenu list"
+ours = ".quick-toggle-menu .popup-menu-section"
+theirs = ".quick-toggle-menu .popup-menu-section"
+anchor = "left"
+
+[[pairs]]
+name = "first profile"
+ours = ".quick-toggle-menu .popup-menu-section .popup-menu-item:0"
+theirs = ".quick-toggle-menu .popup-menu-section .popup-menu-item:0"
+anchor = "left"
+
+[[pairs]]
+name = "first profile icon"
+ours = ".quick-toggle-menu .popup-menu-section .popup-menu-item:0 .popup-menu-icon"
+theirs = ".quick-toggle-menu .popup-menu-section .popup-menu-item:0 .popup-menu-icon ClutterActor"
+anchor = "left"
+
+[[pairs]]
+name = "first profile label"
+ours = ".quick-toggle-menu .popup-menu-section .popup-menu-item:0 GtkLabel"
+ours_box = "text"
+theirs = ".quick-toggle-menu .popup-menu-section .popup-menu-item:0 ClutterText"
+anchor = "left"
+tolerance_px = 1.1
+
+[[pairs]]
+name = "first profile check mark"
+ours = ".quick-toggle-menu .popup-menu-section .popup-menu-item:0 .popup-menu-ornament"
+theirs = ".quick-toggle-menu .popup-menu-section .popup-menu-item:0 .popup-menu-ornament ClutterActor"
+anchor = "left"
+tolerance_px = 1.1
+
+[[pairs]]
+name = "last profile"
+ours = ".quick-toggle-menu .popup-menu-section .popup-menu-item:2"
+theirs = ".quick-toggle-menu .popup-menu-section .popup-menu-item:2"
+anchor = "left"
+
+[[pairs]]
+name = "submenu separator"
+ours = ".quick-toggle-menu .popup-separator-menu-item"
+theirs = ".quick-toggle-menu .popup-separator-menu-item"
+anchor = "left"
+
+[[pairs]]
+name = "submenu separator line"
+ours = ".quick-toggle-menu .popup-separator-menu-item-separator"
+theirs = ".quick-toggle-menu .popup-separator-menu-item-separator"
+anchor = "left"
+
+[[pairs]]
+name = "settings entry"
+ours = ".quick-toggle-menu .popup-menu-item:4"
+theirs = ".quick-toggle-menu .popup-menu-item:4"
+anchor = "left"
+
+[[pairs]]
+name = "dark style under the submenu"
+ours = ".quick-toggle:5"
+theirs = "Gjs_status_darkMode_DarkModeToggle"
+anchor = "left"

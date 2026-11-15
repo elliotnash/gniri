@@ -6,6 +6,18 @@
   1120
  ],
  "pixels_per_unit": 1.25,
+ "root_box": [
+  0,
+  0,
+  1792,
+  32
+ ],
+ "shot_box": [
+  0.0,
+  0.0,
+  1792.0,
+  32.0
+ ],
  "tree": {
   "type": "Gjs_ui_panel_Panel",
   "name": "panel",

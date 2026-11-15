@@ -17,10 +17,13 @@ const KEY_STEP: f64 = 0.1;
 /// `.slider { -barlevel-height }`
 const BAR_HEIGHT: f64 = 4.0;
 
+/// Called with the new value when the user moves the slider.
+type Changed = Box<dyn Fn(f64)>;
+
 struct Inner {
     level: Cell<Level>,
     dragging: Cell<bool>,
-    changed: RefCell<Option<Box<dyn Fn(f64)>>>,
+    changed: RefCell<Option<Changed>>,
 }
 
 #[derive(Clone)]

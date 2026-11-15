@@ -9,7 +9,6 @@ mod tree;
 
 use std::path::PathBuf;
 use std::process::ExitCode;
-use std::time::Duration;
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
@@ -107,9 +106,7 @@ fn run() -> Result<bool> {
             if overview {
                 session.action(niri_ipc::Action::OpenOverview {})?;
             }
-            // Readiness means each surface committed a frame; give niri a
-            // moment to composite it (and its blur) before capturing.
-            std::thread::sleep(Duration::from_millis(300));
+            session.settle()?;
             let path = session::visual_dir()?.join(format!("{name}.png"));
             session.screenshot(&path).context("taking the screenshot")?;
             session.quit()?;

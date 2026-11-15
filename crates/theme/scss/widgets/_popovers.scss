@@ -39,11 +39,8 @@ $popup_arrow_rise: $base_padding;
 }
 
 // menu items
-button.popup-menu-item {
-    all: unset;
-}
-
 .popup-menu-item {
+    all: unset;
     // %menuitem
     font-weight: normal;
     transition: background-color 100ms $st_transition_easing;

@@ -46,7 +46,7 @@ $quick_toggle_height: 48px; // $scalable_icon_size * 3
     .quick-settings-grid > * {
         transition: filter $quick_settings_dim_time $ease_out_quad;
 
-        &.dimmed { filter: brightness($quick_settings_dim_brightness); }
+        &.shaded { filter: brightness($quick_settings_dim_brightness); }
     }
 }
 
@@ -75,9 +75,10 @@ $quick_toggle_height: 48px; // $scalable_icon_size * 3
         @include st_line_height;
     }
 
+    // No st_line_height here: at this size Pango's line is as tall as
+    // St's, 15px.
     .quick-toggle-subtitle {
         @include caption;
-        @include st_line_height;
         font-weight: normal;
     }
 
@@ -96,7 +97,8 @@ $quick_toggle_height: 48px; // $scalable_icon_size * 3
     }
 
     .quick-toggle-menu-button {
-        padding: $scaled_padding to_em(10.5px); // $scaled_padding * 1.75
+        // Upstream: $scaled_padding * 1.75, which St rounds down to 10px.
+        padding: $scaled_padding to_em(10px);
         border-radius: 0 $forced_circular_radius $forced_circular_radius 0;
         transition: background-color 150ms $st_transition_easing;
     }

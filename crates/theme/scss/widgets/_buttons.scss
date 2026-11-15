@@ -4,13 +4,11 @@
 // blurred popup, where blur-my-shell replaces all of upstream's button
 // colours; those are in _bms-popup.scss.
 
-// Start from nothing: libadwaita styles GtkButton heavily.
-button.button,
-button.icon-button {
-    all: unset;
-}
-
 .button {
+    // Start from nothing: libadwaita styles GtkButton heavily. This must
+    // stay a bare class selector at the top of its rule: anything more
+    // specific would also unset what later rules give the button.
+    all: unset;
     // %button_common
     border-radius: $base_border_radius;
     padding: ($base_padding * .5) ($base_padding * 4);
@@ -20,6 +18,7 @@ button.icon-button {
 }
 
 .icon-button {
+    all: unset;
     border-radius: $forced_circular_radius; // is circular
     padding: $scaled_padding * 2;
     min-height: em_at_most(16px); // $scalable_icon_size

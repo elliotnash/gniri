@@ -1,0 +1,2849 @@
+{
+ "gnome_shell": "51.1",
+ "state": "quick-settings",
+ "stage": [
+  1792,
+  1120
+ ],
+ "pixels_per_unit": 1.25,
+ "root_box": [
+  1384,
+  38,
+  402,
+  396
+ ],
+ "shot_box": [
+  1372.0,
+  25.6,
+  420.0,
+  420.8
+ ],
+ "tree": {
+  "type": "StWidget",
+  "box": [
+   0,
+   0,
+   0,
+   0
+  ],
+  "opacity": 255,
+  "classes": "panel-menu",
+  "pseudo": "focus last-child",
+  "style": {
+   "fg": [
+    255,
+    255,
+    255,
+    255
+   ],
+   "font": "Adwaita Sans 14.666px",
+   "max_height": 1088
+  },
+  "inline_style": "max-height: 1088px;",
+  "children": [
+   {
+    "type": "Gjs_ui_boxpointer_BoxPointer",
+    "box": [
+     1384,
+     32,
+     402,
+     402
+    ],
+    "opacity": 255,
+    "classes": "popup-menu-boxpointer popup-menu",
+    "pseudo": "first-child",
+    "style": {
+     "fg": [
+      255,
+      255,
+      255,
+      255
+     ],
+     "font": "Adwaita Sans 14.666px",
+     "width": 220,
+     "min_width": 220
+    },
+    "effects": [
+     "ClutterBrightnessContrastEffect"
+    ],
+    "children": [
+     {
+      "type": "StDrawingArea",
+      "box": [
+       1384,
+       32,
+       402,
+       402
+      ],
+      "opacity": 255,
+      "pseudo": "insensitive first-child",
+      "style": {
+       "fg": [
+        255,
+        255,
+        255,
+        255
+       ],
+       "font": "Adwaita Sans 14.666px"
+      }
+     },
+     {
+      "type": "StBin",
+      "box": [
+       1384,
+       38,
+       402,
+       396
+      ],
+      "opacity": 255,
+      "pseudo": "insensitive last-child",
+      "style": {
+       "fg": [
+        255,
+        255,
+        255,
+        255
+       ],
+       "font": "Adwaita Sans 14.666px"
+      },
+      "children": [
+       {
+        "type": "StBoxLayout",
+        "box": [
+         1384,
+         38,
+         402,
+         396
+        ],
+        "opacity": 255,
+        "classes": "popup-menu-content quick-settings bms-popup-blurred",
+        "pseudo": "insensitive first-child last-child",
+        "style": {
+         "bg": [
+          30,
+          30,
+          33,
+          128
+         ],
+         "fg": [
+          255,
+          255,
+          255,
+          230
+         ],
+         "radius": [
+          36,
+          36,
+          36,
+          36
+         ],
+         "padding": [
+          18,
+          18,
+          18,
+          18
+         ],
+         "border_width": [
+          1,
+          1,
+          1,
+          1
+         ],
+         "font": "Adwaita Sans 14.666px",
+         "border_color": [
+          [
+           255,
+           255,
+           255,
+           15
+          ],
+          [
+           255,
+           255,
+           255,
+           15
+          ],
+          [
+           255,
+           255,
+           255,
+           15
+          ],
+          [
+           255,
+           255,
+           255,
+           15
+          ]
+         ],
+         "box_shadow": {
+          "color": [
+           0,
+           0,
+           0,
+           51
+          ],
+          "blur": 4,
+          "spread": 0,
+          "x": 0,
+          "y": 2,
+          "inset": false
+         }
+        },
+        "inline_style": "border-radius: 36px 36px 36px 36px;",
+        "children": [
+         {
+          "type": "StWidget",
+          "box": [
+           1403,
+           57,
+           364,
+           358
+          ],
+          "opacity": 255,
+          "classes": "quick-settings-grid",
+          "pseudo": "insensitive first-child last-child",
+          "style": {
+           "fg": [
+            255,
+            255,
+            255,
+            230
+           ],
+           "font": "Adwaita Sans 14.666px"
+          },
+          "children": [
+           {
+            "type": "Gjs_status_system_SystemItem",
+            "box": [
+             1403,
+             57,
+             364,
+             38
+            ],
+            "opacity": 255,
+            "classes": "quick-settings-system-item",
+            "pseudo": "insensitive first-child",
+            "style": {
+             "fg": [
+              255,
+              255,
+              255,
+              230
+             ],
+             "font": "Adwaita Sans 14.666px"
+            },
+            "children": [
+             {
+              "type": "StBoxLayout",
+              "box": [
+               1403,
+               57,
+               364,
+               38
+              ],
+              "opacity": 255,
+              "pseudo": "insensitive first-child last-child",
+              "style": {
+               "fg": [
+                255,
+                255,
+                255,
+                230
+               ],
+               "font": "Adwaita Sans 14.666px",
+               "spacing": 12
+              },
+              "children": [
+               {
+                "type": "Gjs_status_system_PowerToggle",
+                "box": [
+                 1403,
+                 57,
+                 82,
+                 38
+                ],
+                "opacity": 255,
+                "classes": "quick-toggle button power-item",
+                "pseudo": "first-child",
+                "style": {
+                 "bg": [
+                  255,
+                  255,
+                  255,
+                  25
+                 ],
+                 "fg": [
+                  255,
+                  255,
+                  255,
+                  230
+                 ],
+                 "radius": [
+                  999,
+                  999,
+                  999,
+                  999
+                 ],
+                 "font": "Adwaita Sans Bold 14.666px",
+                 "width": 0,
+                 "height": 0,
+                 "min_width": 0,
+                 "min_height": 0,
+                 "max_width": 176
+                },
+                "children": [
+                 {
+                  "type": "StBoxLayout",
+                  "box": [
+                   1403,
+                   66,
+                   82,
+                   19
+                  ],
+                  "opacity": 255,
+                  "pseudo": "insensitive first-child last-child",
+                  "style": {
+                   "fg": [
+                    255,
+                    255,
+                    255,
+                    230
+                   ],
+                   "padding": [
+                    0,
+                    12,
+                    0,
+                    15
+                   ],
+                   "font": "Adwaita Sans Bold 14.666px",
+                   "spacing": 9
+                  },
+                  "children": [
+                   {
+                    "type": "StIcon",
+                    "box": [
+                     1418,
+                     66,
+                     16,
+                     19
+                    ],
+                    "opacity": 255,
+                    "classes": "quick-toggle-icon",
+                    "pseudo": "insensitive first-child",
+                    "style": {
+                     "fg": [
+                      255,
+                      255,
+                      255,
+                      230
+                     ],
+                     "font": "Adwaita Sans Bold 14.666px"
+                    },
+                    "icon": "battery-level-90-symbolic",
+                    "icon_size": -1,
+                    "children": [
+                     {
+                      "type": "ClutterActor",
+                      "box": [
+                       1418,
+                       67,
+                       16,
+                       16
+                      ],
+                      "opacity": 255
+                     }
+                    ]
+                   },
+                   {
+                    "type": "StBoxLayout",
+                    "box": [
+                     1443,
+                     66,
+                     30,
+                     19
+                    ],
+                    "opacity": 255,
+                    "pseudo": "insensitive last-child",
+                    "style": {
+                     "fg": [
+                      255,
+                      255,
+                      255,
+                      230
+                     ],
+                     "font": "Adwaita Sans Bold 14.666px"
+                    },
+                    "children": [
+                     {
+                      "type": "StLabel",
+                      "box": [
+                       1443,
+                       66,
+                       30,
+                       19
+                      ],
+                      "opacity": 255,
+                      "classes": "quick-toggle-title",
+                      "pseudo": "insensitive first-child last-child",
+                      "style": {
+                       "fg": [
+                        255,
+                        255,
+                        255,
+                        230
+                       ],
+                       "font": "Adwaita Sans Bold 14.666px"
+                      },
+                      "text": "91%",
+                      "children": [
+                       {
+                        "type": "ClutterText",
+                        "box": [
+                         1443,
+                         66,
+                         30,
+                         19
+                        ],
+                        "opacity": 255
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               },
+               {
+                "type": "ClutterActor",
+                "box": [
+                 1497,
+                 57,
+                 70,
+                 38
+                ],
+                "opacity": 255
+               },
+               {
+                "type": "Gjs_status_system_ScreenshotItem",
+                "box": [
+                 1579,
+                 57,
+                 38,
+                 38
+                ],
+                "opacity": 255,
+                "classes": "icon-button",
+                "style": {
+                 "bg": [
+                  255,
+                  255,
+                  255,
+                  25
+                 ],
+                 "fg": [
+                  255,
+                  255,
+                  255,
+                  230
+                 ],
+                 "radius": [
+                  999,
+                  999,
+                  999,
+                  999
+                 ],
+                 "padding": [
+                  11,
+                  11,
+                  11,
+                  11
+                 ],
+                 "font": "Adwaita Sans Bold 14.666px",
+                 "height": 16,
+                 "min_height": 16
+                },
+                "children": [
+                 {
+                  "type": "StIcon",
+                  "box": [
+                   1590,
+                   68,
+                   16,
+                   16
+                  ],
+                  "opacity": 255,
+                  "pseudo": "insensitive first-child last-child",
+                  "style": {
+                   "fg": [
+                    255,
+                    255,
+                    255,
+                    230
+                   ],
+                   "font": "Adwaita Sans Bold 14.666px"
+                  },
+                  "icon": "screenshooter-symbolic",
+                  "icon_size": -1,
+                  "children": [
+                   {
+                    "type": "ClutterActor",
+                    "box": [
+                     1590,
+                     68,
+                     16,
+                     16
+                    ],
+                    "opacity": 255
+                   }
+                  ]
+                 }
+                ]
+               },
+               {
+                "type": "Gjs_status_system_SettingsItem",
+                "box": [
+                 1629,
+                 57,
+                 38,
+                 38
+                ],
+                "opacity": 255,
+                "classes": "icon-button",
+                "style": {
+                 "bg": [
+                  255,
+                  255,
+                  255,
+                  25
+                 ],
+                 "fg": [
+                  255,
+                  255,
+                  255,
+                  230
+                 ],
+                 "radius": [
+                  999,
+                  999,
+                  999,
+                  999
+                 ],
+                 "padding": [
+                  11,
+                  11,
+                  11,
+                  11
+                 ],
+                 "font": "Adwaita Sans Bold 14.666px",
+                 "height": 16,
+                 "min_height": 16
+                },
+                "children": [
+                 {
+                  "type": "StIcon",
+                  "box": [
+                   1640,
+                   68,
+                   16,
+                   16
+                  ],
+                  "opacity": 255,
+                  "pseudo": "insensitive first-child last-child",
+                  "style": {
+                   "fg": [
+                    255,
+                    255,
+                    255,
+                    230
+                   ],
+                   "font": "Adwaita Sans Bold 14.666px"
+                  },
+                  "icon": "org.gnome.Settings",
+                  "icon_size": -1,
+                  "children": [
+                   {
+                    "type": "ClutterActor",
+                    "box": [
+                     1640,
+                     68,
+                     16,
+                     16
+                    ],
+                    "opacity": 255
+                   }
+                  ]
+                 }
+                ]
+               },
+               {
+                "type": "Gjs_status_system_LockItem",
+                "box": [
+                 1679,
+                 57,
+                 38,
+                 38
+                ],
+                "opacity": 255,
+                "classes": "icon-button",
+                "style": {
+                 "bg": [
+                  255,
+                  255,
+                  255,
+                  25
+                 ],
+                 "fg": [
+                  255,
+                  255,
+                  255,
+                  230
+                 ],
+                 "radius": [
+                  999,
+                  999,
+                  999,
+                  999
+                 ],
+                 "padding": [
+                  11,
+                  11,
+                  11,
+                  11
+                 ],
+                 "font": "Adwaita Sans Bold 14.666px",
+                 "height": 16,
+                 "min_height": 16
+                },
+                "children": [
+                 {
+                  "type": "StIcon",
+                  "box": [
+                   1690,
+                   68,
+                   16,
+                   16
+                  ],
+                  "opacity": 255,
+                  "pseudo": "insensitive first-child last-child",
+                  "style": {
+                   "fg": [
+                    255,
+                    255,
+                    255,
+                    230
+                   ],
+                   "font": "Adwaita Sans Bold 14.666px"
+                  },
+                  "icon": "system-lock-screen-symbolic",
+                  "icon_size": -1,
+                  "children": [
+                   {
+                    "type": "ClutterActor",
+                    "box": [
+                     1690,
+                     68,
+                     16,
+                     16
+                    ],
+                    "opacity": 255
+                   }
+                  ]
+                 }
+                ]
+               },
+               {
+                "type": "Gjs_status_system_ShutdownItem",
+                "box": [
+                 1729,
+                 57,
+                 38,
+                 38
+                ],
+                "opacity": 255,
+                "classes": "icon-button",
+                "pseudo": "last-child",
+                "style": {
+                 "bg": [
+                  255,
+                  255,
+                  255,
+                  25
+                 ],
+                 "fg": [
+                  255,
+                  255,
+                  255,
+                  230
+                 ],
+                 "radius": [
+                  999,
+                  999,
+                  999,
+                  999
+                 ],
+                 "padding": [
+                  11,
+                  11,
+                  11,
+                  11
+                 ],
+                 "font": "Adwaita Sans Bold 14.666px",
+                 "height": 16,
+                 "min_height": 16
+                },
+                "children": [
+                 {
+                  "type": "StIcon",
+                  "box": [
+                   1740,
+                   68,
+                   16,
+                   16
+                  ],
+                  "opacity": 255,
+                  "pseudo": "insensitive first-child last-child",
+                  "style": {
+                   "fg": [
+                    255,
+                    255,
+                    255,
+                    230
+                   ],
+                   "font": "Adwaita Sans Bold 14.666px"
+                  },
+                  "icon": "system-shutdown-symbolic",
+                  "icon_size": -1,
+                  "children": [
+                   {
+                    "type": "ClutterActor",
+                    "box": [
+                     1740,
+                     68,
+                     16,
+                     16
+                    ],
+                    "opacity": 255
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           },
+           {
+            "type": "Gjs_status_volume_OutputStreamSlider",
+            "box": [
+             1403,
+             107,
+             364,
+             28
+            ],
+            "opacity": 255,
+            "classes": "quick-slider",
+            "pseudo": "insensitive",
+            "style": {
+             "fg": [
+              255,
+              255,
+              255,
+              230
+             ],
+             "font": "Adwaita Sans 14.666px"
+            },
+            "children": [
+             {
+              "type": "StBoxLayout",
+              "box": [
+               1403,
+               107,
+               364,
+               28
+              ],
+              "opacity": 255,
+              "pseudo": "insensitive first-child last-child",
+              "style": {
+               "fg": [
+                255,
+                255,
+                255,
+                230
+               ],
+               "font": "Adwaita Sans 14.666px",
+               "spacing": 6
+              },
+              "children": [
+               {
+                "type": "StButton",
+                "box": [
+                 1403,
+                 107,
+                 28,
+                 28
+                ],
+                "opacity": 255,
+                "classes": "icon-button flat",
+                "pseudo": "first-child",
+                "style": {
+                 "fg": [
+                  255,
+                  255,
+                  255,
+                  230
+                 ],
+                 "radius": [
+                  999,
+                  999,
+                  999,
+                  999
+                 ],
+                 "padding": [
+                  6,
+                  6,
+                  6,
+                  6
+                 ],
+                 "font": "Adwaita Sans Bold 14.666px",
+                 "height": 16,
+                 "min_height": 16
+                },
+                "children": [
+                 {
+                  "type": "StIcon",
+                  "box": [
+                   1409,
+                   113,
+                   16,
+                   16
+                  ],
+                  "opacity": 255,
+                  "pseudo": "insensitive first-child last-child",
+                  "style": {
+                   "fg": [
+                    255,
+                    255,
+                    255,
+                    230
+                   ],
+                   "font": "Adwaita Sans Bold 14.666px"
+                  },
+                  "icon": "audio-volume-low-symbolic",
+                  "icon_size": -1,
+                  "children": [
+                   {
+                    "type": "ClutterActor",
+                    "box": [
+                     1409,
+                     113,
+                     16,
+                     16
+                    ],
+                    "opacity": 255
+                   }
+                  ]
+                 }
+                ]
+               },
+               {
+                "type": "StBin",
+                "box": [
+                 1437,
+                 107,
+                 296,
+                 28
+                ],
+                "opacity": 255,
+                "classes": "slider-bin",
+                "style": {
+                 "fg": [
+                  255,
+                  255,
+                  255,
+                  230
+                 ],
+                 "radius": [
+                  999,
+                  999,
+                  999,
+                  999
+                 ],
+                 "padding": [
+                  6,
+                  6,
+                  6,
+                  6
+                 ],
+                 "font": "Adwaita Sans 14.666px"
+                },
+                "children": [
+                 {
+                  "type": "Gjs_ui_slider_Slider",
+                  "box": [
+                   1443,
+                   113,
+                   284,
+                   16
+                  ],
+                  "opacity": 255,
+                  "classes": "slider",
+                  "pseudo": "first-child last-child",
+                  "style": {
+                   "fg": [
+                    232,
+                    232,
+                    232,
+                    255
+                   ],
+                   "font": "Adwaita Sans 14.666px"
+                  }
+                 }
+                ]
+               },
+               {
+                "type": "StButton",
+                "box": [
+                 1739,
+                 107,
+                 28,
+                 28
+                ],
+                "opacity": 255,
+                "classes": "icon-button flat",
+                "pseudo": "last-child",
+                "style": {
+                 "fg": [
+                  255,
+                  255,
+                  255,
+                  230
+                 ],
+                 "radius": [
+                  999,
+                  999,
+                  999,
+                  999
+                 ],
+                 "padding": [
+                  6,
+                  6,
+                  6,
+                  6
+                 ],
+                 "font": "Adwaita Sans Bold 14.666px",
+                 "height": 16,
+                 "min_height": 16
+                },
+                "children": [
+                 {
+                  "type": "StIcon",
+                  "box": [
+                   1745,
+                   113,
+                   16,
+                   16
+                  ],
+                  "opacity": 255,
+                  "pseudo": "insensitive first-child last-child",
+                  "style": {
+                   "fg": [
+                    255,
+                    255,
+                    255,
+                    230
+                   ],
+                   "font": "Adwaita Sans Bold 14.666px"
+                  },
+                  "icon": "go-next-symbolic",
+                  "icon_size": -1,
+                  "children": [
+                   {
+                    "type": "ClutterActor",
+                    "box": [
+                     1745,
+                     113,
+                     16,
+                     16
+                    ],
+                    "opacity": 255
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           },
+           {
+            "type": "Gjs_status_brightness_BrightnessItem",
+            "box": [
+             1403,
+             147,
+             364,
+             28
+            ],
+            "opacity": 255,
+            "classes": "quick-slider",
+            "pseudo": "insensitive",
+            "style": {
+             "fg": [
+              255,
+              255,
+              255,
+              230
+             ],
+             "font": "Adwaita Sans 14.666px"
+            },
+            "children": [
+             {
+              "type": "StBoxLayout",
+              "box": [
+               1403,
+               147,
+               364,
+               28
+              ],
+              "opacity": 255,
+              "pseudo": "insensitive first-child last-child",
+              "style": {
+               "fg": [
+                255,
+                255,
+                255,
+                230
+               ],
+               "font": "Adwaita Sans 14.666px",
+               "spacing": 6
+              },
+              "children": [
+               {
+                "type": "StButton",
+                "box": [
+                 1403,
+                 147,
+                 28,
+                 28
+                ],
+                "opacity": 255,
+                "classes": "icon-button flat",
+                "pseudo": "first-child",
+                "style": {
+                 "fg": [
+                  255,
+                  255,
+                  255,
+                  230
+                 ],
+                 "radius": [
+                  999,
+                  999,
+                  999,
+                  999
+                 ],
+                 "padding": [
+                  6,
+                  6,
+                  6,
+                  6
+                 ],
+                 "font": "Adwaita Sans Bold 14.666px",
+                 "height": 16,
+                 "min_height": 16
+                },
+                "children": [
+                 {
+                  "type": "StIcon",
+                  "box": [
+                   1409,
+                   153,
+                   16,
+                   16
+                  ],
+                  "opacity": 255,
+                  "pseudo": "insensitive first-child last-child",
+                  "style": {
+                   "fg": [
+                    255,
+                    255,
+                    255,
+                    230
+                   ],
+                   "font": "Adwaita Sans Bold 14.666px"
+                  },
+                  "icon": "display-brightness-symbolic",
+                  "icon_size": -1,
+                  "children": [
+                   {
+                    "type": "ClutterActor",
+                    "box": [
+                     1409,
+                     153,
+                     16,
+                     16
+                    ],
+                    "opacity": 255
+                   }
+                  ]
+                 }
+                ]
+               },
+               {
+                "type": "StBin",
+                "box": [
+                 1437,
+                 147,
+                 330,
+                 28
+                ],
+                "opacity": 255,
+                "classes": "slider-bin",
+                "pseudo": "last-child",
+                "style": {
+                 "fg": [
+                  255,
+                  255,
+                  255,
+                  230
+                 ],
+                 "radius": [
+                  999,
+                  999,
+                  999,
+                  999
+                 ],
+                 "padding": [
+                  6,
+                  6,
+                  6,
+                  6
+                 ],
+                 "font": "Adwaita Sans 14.666px"
+                },
+                "children": [
+                 {
+                  "type": "Gjs_ui_slider_Slider",
+                  "box": [
+                   1443,
+                   153,
+                   318,
+                   16
+                  ],
+                  "opacity": 255,
+                  "classes": "slider",
+                  "pseudo": "first-child last-child",
+                  "style": {
+                   "fg": [
+                    232,
+                    232,
+                    232,
+                    255
+                   ],
+                   "font": "Adwaita Sans 14.666px"
+                  }
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           },
+           {
+            "type": "Gjs_status_network_NMWirelessToggle",
+            "box": [
+             1403,
+             187,
+             176,
+             48
+            ],
+            "opacity": 255,
+            "classes": "quick-toggle-has-menu",
+            "pseudo": "checked",
+            "style": {
+             "fg": [
+              255,
+              255,
+              255,
+              230
+             ],
+             "radius": [
+              999,
+              999,
+              999,
+              999
+             ],
+             "font": "Adwaita Sans 14.666px",
+             "width": 176,
+             "height": 48,
+             "min_width": 176,
+             "min_height": 48,
+             "max_width": 176
+            },
+            "children": [
+             {
+              "type": "StBoxLayout",
+              "box": [
+               1403,
+               187,
+               176,
+               48
+              ],
+              "opacity": 255,
+              "pseudo": "insensitive first-child last-child",
+              "style": {
+               "fg": [
+                255,
+                255,
+                255,
+                230
+               ],
+               "font": "Adwaita Sans 14.666px"
+              },
+              "children": [
+               {
+                "type": "Gjs_ui_quickSettings_QuickToggle",
+                "box": [
+                 1403,
+                 187,
+                 139,
+                 48
+                ],
+                "opacity": 255,
+                "classes": "quick-toggle button",
+                "pseudo": "checked first-child",
+                "style": {
+                 "bg": [
+                  53,
+                  132,
+                  228,
+                  255
+                 ],
+                 "fg": [
+                  255,
+                  255,
+                  255,
+                  255
+                 ],
+                 "radius": [
+                  999,
+                  0,
+                  0,
+                  999
+                 ],
+                 "font": "Adwaita Sans Bold 14.666px",
+                 "height": 48,
+                 "min_height": 48
+                },
+                "children": [
+                 {
+                  "type": "StBoxLayout",
+                  "box": [
+                   1403,
+                   194,
+                   139,
+                   34
+                  ],
+                  "opacity": 255,
+                  "pseudo": "insensitive first-child last-child",
+                  "style": {
+                   "fg": [
+                    255,
+                    255,
+                    255,
+                    255
+                   ],
+                   "padding": [
+                    0,
+                    9,
+                    0,
+                    15
+                   ],
+                   "font": "Adwaita Sans Bold 14.666px",
+                   "spacing": 9
+                  },
+                  "children": [
+                   {
+                    "type": "StIcon",
+                    "box": [
+                     1418,
+                     194,
+                     16,
+                     34
+                    ],
+                    "opacity": 255,
+                    "classes": "quick-toggle-icon",
+                    "pseudo": "insensitive first-child",
+                    "style": {
+                     "fg": [
+                      255,
+                      255,
+                      255,
+                      255
+                     ],
+                     "font": "Adwaita Sans Bold 14.666px"
+                    },
+                    "icon": "network-wireless-signal-good-symbolic",
+                    "icon_size": -1,
+                    "children": [
+                     {
+                      "type": "ClutterActor",
+                      "box": [
+                       1418,
+                       203,
+                       16,
+                       16
+                      ],
+                      "opacity": 255
+                     }
+                    ]
+                   },
+                   {
+                    "type": "StBoxLayout",
+                    "box": [
+                     1443,
+                     194,
+                     90,
+                     34
+                    ],
+                    "opacity": 255,
+                    "pseudo": "insensitive last-child",
+                    "style": {
+                     "fg": [
+                      255,
+                      255,
+                      255,
+                      255
+                     ],
+                     "font": "Adwaita Sans Bold 14.666px"
+                    },
+                    "children": [
+                     {
+                      "type": "StLabel",
+                      "box": [
+                       1443,
+                       194,
+                       38,
+                       19
+                      ],
+                      "opacity": 255,
+                      "classes": "quick-toggle-title",
+                      "pseudo": "insensitive first-child",
+                      "style": {
+                       "fg": [
+                        255,
+                        255,
+                        255,
+                        255
+                       ],
+                       "font": "Adwaita Sans Bold 14.666px"
+                      },
+                      "text": "Wi-Fi",
+                      "children": [
+                       {
+                        "type": "ClutterText",
+                        "box": [
+                         1443,
+                         194,
+                         38,
+                         19
+                        ],
+                        "opacity": 255
+                       }
+                      ]
+                     },
+                     {
+                      "type": "StLabel",
+                      "box": [
+                       1443,
+                       213,
+                       90,
+                       15
+                      ],
+                      "opacity": 255,
+                      "classes": "quick-toggle-subtitle",
+                      "pseudo": "insensitive last-child",
+                      "style": {
+                       "fg": [
+                        255,
+                        255,
+                        255,
+                        255
+                       ],
+                       "font": "Adwaita Sans 11.996px"
+                      },
+                      "text": "xxxxxxxxxxxxxxxxxxx",
+                      "children": [
+                       {
+                        "type": "ClutterText",
+                        "box": [
+                         1443,
+                         213,
+                         90,
+                         15
+                        ],
+                        "opacity": 255
+                       }
+                      ],
+                      "redacted": true
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               },
+               {
+                "type": "StWidget",
+                "box": [
+                 1542,
+                 187,
+                 1,
+                 48
+                ],
+                "opacity": 255,
+                "classes": "quick-toggle-separator",
+                "pseudo": "insensitive",
+                "style": {
+                 "bg": [
+                  113,
+                  168,
+                  236,
+                  255
+                 ],
+                 "fg": [
+                  255,
+                  255,
+                  255,
+                  230
+                 ],
+                 "font": "Adwaita Sans 14.666px",
+                 "width": 1,
+                 "min_width": 1,
+                 "max_width": 1
+                }
+               },
+               {
+                "type": "StButton",
+                "box": [
+                 1543,
+                 187,
+                 36,
+                 48
+                ],
+                "opacity": 255,
+                "classes": "quick-toggle-menu-button icon-button",
+                "pseudo": "checked last-child",
+                "style": {
+                 "bg": [
+                  83,
+                  150,
+                  232,
+                  255
+                 ],
+                 "fg": [
+                  255,
+                  255,
+                  255,
+                  255
+                 ],
+                 "radius": [
+                  0,
+                  999,
+                  999,
+                  0
+                 ],
+                 "padding": [
+                  6,
+                  10,
+                  6,
+                  10
+                 ],
+                 "font": "Adwaita Sans Bold 14.666px",
+                 "height": 16,
+                 "min_height": 16
+                },
+                "children": [
+                 {
+                  "type": "StIcon",
+                  "box": [
+                   1553,
+                   203,
+                   16,
+                   16
+                  ],
+                  "opacity": 255,
+                  "pseudo": "insensitive first-child last-child",
+                  "style": {
+                   "fg": [
+                    255,
+                    255,
+                    255,
+                    255
+                   ],
+                   "font": "Adwaita Sans Bold 14.666px"
+                  },
+                  "icon": "go-next-symbolic",
+                  "icon_size": -1,
+                  "children": [
+                   {
+                    "type": "ClutterActor",
+                    "box": [
+                     1553,
+                     203,
+                     16,
+                     16
+                    ],
+                    "opacity": 255
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           },
+           {
+            "type": "Gjs_status_bluetooth_BluetoothToggle",
+            "box": [
+             1591,
+             187,
+             176,
+             48
+            ],
+            "opacity": 255,
+            "classes": "quick-toggle-has-menu",
+            "pseudo": "checked",
+            "style": {
+             "fg": [
+              255,
+              255,
+              255,
+              230
+             ],
+             "radius": [
+              999,
+              999,
+              999,
+              999
+             ],
+             "font": "Adwaita Sans 14.666px",
+             "width": 176,
+             "height": 48,
+             "min_width": 176,
+             "min_height": 48,
+             "max_width": 176
+            },
+            "children": [
+             {
+              "type": "StBoxLayout",
+              "box": [
+               1591,
+               187,
+               176,
+               48
+              ],
+              "opacity": 255,
+              "pseudo": "insensitive first-child last-child",
+              "style": {
+               "fg": [
+                255,
+                255,
+                255,
+                230
+               ],
+               "font": "Adwaita Sans 14.666px"
+              },
+              "children": [
+               {
+                "type": "Gjs_ui_quickSettings_QuickToggle",
+                "box": [
+                 1591,
+                 187,
+                 139,
+                 48
+                ],
+                "opacity": 255,
+                "classes": "quick-toggle button",
+                "pseudo": "checked first-child",
+                "style": {
+                 "bg": [
+                  53,
+                  132,
+                  228,
+                  255
+                 ],
+                 "fg": [
+                  255,
+                  255,
+                  255,
+                  255
+                 ],
+                 "radius": [
+                  999,
+                  0,
+                  0,
+                  999
+                 ],
+                 "font": "Adwaita Sans Bold 14.666px",
+                 "height": 48,
+                 "min_height": 48
+                },
+                "children": [
+                 {
+                  "type": "StBoxLayout",
+                  "box": [
+                   1591,
+                   201,
+                   139,
+                   19
+                  ],
+                  "opacity": 255,
+                  "pseudo": "insensitive first-child last-child",
+                  "style": {
+                   "fg": [
+                    255,
+                    255,
+                    255,
+                    255
+                   ],
+                   "padding": [
+                    0,
+                    9,
+                    0,
+                    15
+                   ],
+                   "font": "Adwaita Sans Bold 14.666px",
+                   "spacing": 9
+                  },
+                  "children": [
+                   {
+                    "type": "StIcon",
+                    "box": [
+                     1606,
+                     201,
+                     16,
+                     19
+                    ],
+                    "opacity": 255,
+                    "classes": "quick-toggle-icon",
+                    "pseudo": "insensitive first-child",
+                    "style": {
+                     "fg": [
+                      255,
+                      255,
+                      255,
+                      255
+                     ],
+                     "font": "Adwaita Sans Bold 14.666px"
+                    },
+                    "icon": "bluetooth-active-symbolic",
+                    "icon_size": -1,
+                    "children": [
+                     {
+                      "type": "ClutterActor",
+                      "box": [
+                       1606,
+                       202,
+                       16,
+                       16
+                      ],
+                      "opacity": 255
+                     }
+                    ]
+                   },
+                   {
+                    "type": "StBoxLayout",
+                    "box": [
+                     1631,
+                     201,
+                     70,
+                     19
+                    ],
+                    "opacity": 255,
+                    "pseudo": "insensitive last-child",
+                    "style": {
+                     "fg": [
+                      255,
+                      255,
+                      255,
+                      255
+                     ],
+                     "font": "Adwaita Sans Bold 14.666px"
+                    },
+                    "children": [
+                     {
+                      "type": "StLabel",
+                      "box": [
+                       1631,
+                       201,
+                       70,
+                       19
+                      ],
+                      "opacity": 255,
+                      "classes": "quick-toggle-title",
+                      "pseudo": "insensitive first-child last-child",
+                      "style": {
+                       "fg": [
+                        255,
+                        255,
+                        255,
+                        255
+                       ],
+                       "font": "Adwaita Sans Bold 14.666px"
+                      },
+                      "text": "Bluetooth",
+                      "children": [
+                       {
+                        "type": "ClutterText",
+                        "box": [
+                         1631,
+                         201,
+                         70,
+                         19
+                        ],
+                        "opacity": 255
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               },
+               {
+                "type": "StWidget",
+                "box": [
+                 1730,
+                 187,
+                 1,
+                 48
+                ],
+                "opacity": 255,
+                "classes": "quick-toggle-separator",
+                "pseudo": "insensitive",
+                "style": {
+                 "bg": [
+                  113,
+                  168,
+                  236,
+                  255
+                 ],
+                 "fg": [
+                  255,
+                  255,
+                  255,
+                  230
+                 ],
+                 "font": "Adwaita Sans 14.666px",
+                 "width": 1,
+                 "min_width": 1,
+                 "max_width": 1
+                }
+               },
+               {
+                "type": "StButton",
+                "box": [
+                 1731,
+                 187,
+                 36,
+                 48
+                ],
+                "opacity": 255,
+                "classes": "quick-toggle-menu-button icon-button",
+                "pseudo": "checked last-child",
+                "style": {
+                 "bg": [
+                  83,
+                  150,
+                  232,
+                  255
+                 ],
+                 "fg": [
+                  255,
+                  255,
+                  255,
+                  255
+                 ],
+                 "radius": [
+                  0,
+                  999,
+                  999,
+                  0
+                 ],
+                 "padding": [
+                  6,
+                  10,
+                  6,
+                  10
+                 ],
+                 "font": "Adwaita Sans Bold 14.666px",
+                 "height": 16,
+                 "min_height": 16
+                },
+                "children": [
+                 {
+                  "type": "StIcon",
+                  "box": [
+                   1741,
+                   203,
+                   16,
+                   16
+                  ],
+                  "opacity": 255,
+                  "pseudo": "insensitive first-child last-child",
+                  "style": {
+                   "fg": [
+                    255,
+                    255,
+                    255,
+                    255
+                   ],
+                   "font": "Adwaita Sans Bold 14.666px"
+                  },
+                  "icon": "go-next-symbolic",
+                  "icon_size": -1,
+                  "children": [
+                   {
+                    "type": "ClutterActor",
+                    "box": [
+                     1741,
+                     203,
+                     16,
+                     16
+                    ],
+                    "opacity": 255
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           },
+           {
+            "type": "Gjs_status_powerProfiles_PowerProfilesToggle",
+            "box": [
+             1403,
+             247,
+             176,
+             48
+            ],
+            "opacity": 255,
+            "classes": "quick-toggle-has-menu",
+            "pseudo": "checked",
+            "style": {
+             "fg": [
+              255,
+              255,
+              255,
+              230
+             ],
+             "radius": [
+              999,
+              999,
+              999,
+              999
+             ],
+             "font": "Adwaita Sans 14.666px",
+             "width": 176,
+             "height": 48,
+             "min_width": 176,
+             "min_height": 48,
+             "max_width": 176
+            },
+            "children": [
+             {
+              "type": "StBoxLayout",
+              "box": [
+               1403,
+               247,
+               176,
+               48
+              ],
+              "opacity": 255,
+              "pseudo": "insensitive first-child last-child",
+              "style": {
+               "fg": [
+                255,
+                255,
+                255,
+                230
+               ],
+               "font": "Adwaita Sans 14.666px"
+              },
+              "children": [
+               {
+                "type": "Gjs_ui_quickSettings_QuickToggle",
+                "box": [
+                 1403,
+                 247,
+                 139,
+                 48
+                ],
+                "opacity": 255,
+                "classes": "quick-toggle button",
+                "pseudo": "first-child checked",
+                "style": {
+                 "bg": [
+                  53,
+                  132,
+                  228,
+                  255
+                 ],
+                 "fg": [
+                  255,
+                  255,
+                  255,
+                  255
+                 ],
+                 "radius": [
+                  999,
+                  0,
+                  0,
+                  999
+                 ],
+                 "font": "Adwaita Sans Bold 14.666px",
+                 "height": 48,
+                 "min_height": 48
+                },
+                "children": [
+                 {
+                  "type": "StBoxLayout",
+                  "box": [
+                   1403,
+                   254,
+                   139,
+                   34
+                  ],
+                  "opacity": 255,
+                  "pseudo": "insensitive first-child last-child",
+                  "style": {
+                   "fg": [
+                    255,
+                    255,
+                    255,
+                    255
+                   ],
+                   "padding": [
+                    0,
+                    9,
+                    0,
+                    15
+                   ],
+                   "font": "Adwaita Sans Bold 14.666px",
+                   "spacing": 9
+                  },
+                  "children": [
+                   {
+                    "type": "StIcon",
+                    "box": [
+                     1418,
+                     254,
+                     16,
+                     34
+                    ],
+                    "opacity": 255,
+                    "classes": "quick-toggle-icon",
+                    "pseudo": "insensitive first-child",
+                    "style": {
+                     "fg": [
+                      255,
+                      255,
+                      255,
+                      255
+                     ],
+                     "font": "Adwaita Sans Bold 14.666px"
+                    },
+                    "icon": "power-profile-performance-symbolic",
+                    "icon_size": -1,
+                    "children": [
+                     {
+                      "type": "ClutterActor",
+                      "box": [
+                       1418,
+                       263,
+                       16,
+                       16
+                      ],
+                      "opacity": 255
+                     }
+                    ]
+                   },
+                   {
+                    "type": "StBoxLayout",
+                    "box": [
+                     1443,
+                     254,
+                     88,
+                     34
+                    ],
+                    "opacity": 255,
+                    "pseudo": "insensitive last-child",
+                    "style": {
+                     "fg": [
+                      255,
+                      255,
+                      255,
+                      255
+                     ],
+                     "font": "Adwaita Sans Bold 14.666px"
+                    },
+                    "children": [
+                     {
+                      "type": "StLabel",
+                      "box": [
+                       1443,
+                       254,
+                       88,
+                       19
+                      ],
+                      "opacity": 255,
+                      "classes": "quick-toggle-title",
+                      "pseudo": "insensitive first-child",
+                      "style": {
+                       "fg": [
+                        255,
+                        255,
+                        255,
+                        255
+                       ],
+                       "font": "Adwaita Sans Bold 14.666px"
+                      },
+                      "text": "Power Mode",
+                      "children": [
+                       {
+                        "type": "ClutterText",
+                        "box": [
+                         1443,
+                         254,
+                         88,
+                         19
+                        ],
+                        "opacity": 255
+                       }
+                      ]
+                     },
+                     {
+                      "type": "StLabel",
+                      "box": [
+                       1443,
+                       273,
+                       72,
+                       15
+                      ],
+                      "opacity": 255,
+                      "classes": "quick-toggle-subtitle",
+                      "pseudo": "insensitive last-child",
+                      "style": {
+                       "fg": [
+                        255,
+                        255,
+                        255,
+                        255
+                       ],
+                       "font": "Adwaita Sans 11.996px"
+                      },
+                      "text": "Performance",
+                      "children": [
+                       {
+                        "type": "ClutterText",
+                        "box": [
+                         1443,
+                         273,
+                         72,
+                         15
+                        ],
+                        "opacity": 255
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               },
+               {
+                "type": "StWidget",
+                "box": [
+                 1542,
+                 247,
+                 1,
+                 48
+                ],
+                "opacity": 255,
+                "classes": "quick-toggle-separator",
+                "pseudo": "insensitive",
+                "style": {
+                 "bg": [
+                  113,
+                  168,
+                  236,
+                  255
+                 ],
+                 "fg": [
+                  255,
+                  255,
+                  255,
+                  230
+                 ],
+                 "font": "Adwaita Sans 14.666px",
+                 "width": 1,
+                 "min_width": 1,
+                 "max_width": 1
+                }
+               },
+               {
+                "type": "StButton",
+                "box": [
+                 1543,
+                 247,
+                 36,
+                 48
+                ],
+                "opacity": 255,
+                "classes": "quick-toggle-menu-button icon-button",
+                "pseudo": "last-child checked",
+                "style": {
+                 "bg": [
+                  83,
+                  150,
+                  232,
+                  255
+                 ],
+                 "fg": [
+                  255,
+                  255,
+                  255,
+                  255
+                 ],
+                 "radius": [
+                  0,
+                  999,
+                  999,
+                  0
+                 ],
+                 "padding": [
+                  6,
+                  10,
+                  6,
+                  10
+                 ],
+                 "font": "Adwaita Sans Bold 14.666px",
+                 "height": 16,
+                 "min_height": 16
+                },
+                "children": [
+                 {
+                  "type": "StIcon",
+                  "box": [
+                   1553,
+                   263,
+                   16,
+                   16
+                  ],
+                  "opacity": 255,
+                  "pseudo": "insensitive first-child last-child",
+                  "style": {
+                   "fg": [
+                    255,
+                    255,
+                    255,
+                    255
+                   ],
+                   "font": "Adwaita Sans Bold 14.666px"
+                  },
+                  "icon": "go-next-symbolic",
+                  "icon_size": -1,
+                  "children": [
+                   {
+                    "type": "ClutterActor",
+                    "box": [
+                     1553,
+                     263,
+                     16,
+                     16
+                    ],
+                    "opacity": 255
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           },
+           {
+            "type": "Gjs_status_nightLight_NightLightToggle",
+            "box": [
+             1591,
+             247,
+             176,
+             48
+            ],
+            "opacity": 255,
+            "classes": "quick-toggle button",
+            "style": {
+             "bg": [
+              255,
+              255,
+              255,
+              25
+             ],
+             "fg": [
+              255,
+              255,
+              255,
+              230
+             ],
+             "radius": [
+              999,
+              999,
+              999,
+              999
+             ],
+             "font": "Adwaita Sans Bold 14.666px",
+             "width": 176,
+             "height": 48,
+             "min_width": 176,
+             "min_height": 48,
+             "max_width": 176
+            },
+            "children": [
+             {
+              "type": "StBoxLayout",
+              "box": [
+               1591,
+               261,
+               176,
+               19
+              ],
+              "opacity": 255,
+              "pseudo": "insensitive first-child last-child",
+              "style": {
+               "fg": [
+                255,
+                255,
+                255,
+                230
+               ],
+               "padding": [
+                0,
+                12,
+                0,
+                15
+               ],
+               "font": "Adwaita Sans Bold 14.666px",
+               "spacing": 9
+              },
+              "children": [
+               {
+                "type": "StIcon",
+                "box": [
+                 1606,
+                 261,
+                 16,
+                 19
+                ],
+                "opacity": 255,
+                "classes": "quick-toggle-icon",
+                "pseudo": "insensitive first-child",
+                "style": {
+                 "fg": [
+                  255,
+                  255,
+                  255,
+                  230
+                 ],
+                 "font": "Adwaita Sans Bold 14.666px"
+                },
+                "icon": "night-light-symbolic",
+                "icon_size": -1,
+                "children": [
+                 {
+                  "type": "ClutterActor",
+                  "box": [
+                   1606,
+                   262,
+                   16,
+                   16
+                  ],
+                  "opacity": 255
+                 }
+                ]
+               },
+               {
+                "type": "StBoxLayout",
+                "box": [
+                 1631,
+                 261,
+                 78,
+                 19
+                ],
+                "opacity": 255,
+                "pseudo": "insensitive last-child",
+                "style": {
+                 "fg": [
+                  255,
+                  255,
+                  255,
+                  230
+                 ],
+                 "font": "Adwaita Sans Bold 14.666px"
+                },
+                "children": [
+                 {
+                  "type": "StLabel",
+                  "box": [
+                   1631,
+                   261,
+                   78,
+                   19
+                  ],
+                  "opacity": 255,
+                  "classes": "quick-toggle-title",
+                  "pseudo": "insensitive first-child last-child",
+                  "style": {
+                   "fg": [
+                    255,
+                    255,
+                    255,
+                    230
+                   ],
+                   "font": "Adwaita Sans Bold 14.666px"
+                  },
+                  "text": "Night Light",
+                  "children": [
+                   {
+                    "type": "ClutterText",
+                    "box": [
+                     1631,
+                     261,
+                     78,
+                     19
+                    ],
+                    "opacity": 255
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           },
+           {
+            "type": "Gjs_status_darkMode_DarkModeToggle",
+            "box": [
+             1403,
+             307,
+             176,
+             48
+            ],
+            "opacity": 255,
+            "classes": "quick-toggle button",
+            "pseudo": "checked",
+            "style": {
+             "bg": [
+              53,
+              132,
+              228,
+              255
+             ],
+             "fg": [
+              255,
+              255,
+              255,
+              255
+             ],
+             "radius": [
+              999,
+              999,
+              999,
+              999
+             ],
+             "font": "Adwaita Sans Bold 14.666px",
+             "width": 176,
+             "height": 48,
+             "min_width": 176,
+             "min_height": 48,
+             "max_width": 176
+            },
+            "children": [
+             {
+              "type": "StBoxLayout",
+              "box": [
+               1403,
+               321,
+               176,
+               19
+              ],
+              "opacity": 255,
+              "pseudo": "insensitive first-child last-child",
+              "style": {
+               "fg": [
+                255,
+                255,
+                255,
+                255
+               ],
+               "padding": [
+                0,
+                12,
+                0,
+                15
+               ],
+               "font": "Adwaita Sans Bold 14.666px",
+               "spacing": 9
+              },
+              "children": [
+               {
+                "type": "StIcon",
+                "box": [
+                 1418,
+                 321,
+                 16,
+                 19
+                ],
+                "opacity": 255,
+                "classes": "quick-toggle-icon",
+                "pseudo": "insensitive first-child",
+                "style": {
+                 "fg": [
+                  255,
+                  255,
+                  255,
+                  255
+                 ],
+                 "font": "Adwaita Sans Bold 14.666px"
+                },
+                "icon": "dark-mode-symbolic",
+                "icon_size": -1,
+                "children": [
+                 {
+                  "type": "ClutterActor",
+                  "box": [
+                   1418,
+                   322,
+                   16,
+                   16
+                  ],
+                  "opacity": 255
+                 }
+                ]
+               },
+               {
+                "type": "StBoxLayout",
+                "box": [
+                 1443,
+                 321,
+                 73,
+                 19
+                ],
+                "opacity": 255,
+                "pseudo": "insensitive last-child",
+                "style": {
+                 "fg": [
+                  255,
+                  255,
+                  255,
+                  255
+                 ],
+                 "font": "Adwaita Sans Bold 14.666px"
+                },
+                "children": [
+                 {
+                  "type": "StLabel",
+                  "box": [
+                   1443,
+                   321,
+                   73,
+                   19
+                  ],
+                  "opacity": 255,
+                  "classes": "quick-toggle-title",
+                  "pseudo": "insensitive first-child last-child",
+                  "style": {
+                   "fg": [
+                    255,
+                    255,
+                    255,
+                    255
+                   ],
+                   "font": "Adwaita Sans Bold 14.666px"
+                  },
+                  "text": "Dark Style",
+                  "children": [
+                   {
+                    "type": "ClutterText",
+                    "box": [
+                     1443,
+                     321,
+                     73,
+                     19
+                    ],
+                    "opacity": 255
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           },
+           {
+            "type": "Gjs_status_doNotDisturb_DoNotDisturbToggle",
+            "box": [
+             1591,
+             307,
+             176,
+             48
+            ],
+            "opacity": 255,
+            "classes": "quick-toggle button",
+            "style": {
+             "bg": [
+              255,
+              255,
+              255,
+              25
+             ],
+             "fg": [
+              255,
+              255,
+              255,
+              230
+             ],
+             "radius": [
+              999,
+              999,
+              999,
+              999
+             ],
+             "font": "Adwaita Sans Bold 14.666px",
+             "width": 176,
+             "height": 48,
+             "min_width": 176,
+             "min_height": 48,
+             "max_width": 176
+            },
+            "children": [
+             {
+              "type": "StBoxLayout",
+              "box": [
+               1591,
+               321,
+               176,
+               19
+              ],
+              "opacity": 255,
+              "pseudo": "insensitive first-child last-child",
+              "style": {
+               "fg": [
+                255,
+                255,
+                255,
+                230
+               ],
+               "padding": [
+                0,
+                12,
+                0,
+                15
+               ],
+               "font": "Adwaita Sans Bold 14.666px",
+               "spacing": 9
+              },
+              "children": [
+               {
+                "type": "StIcon",
+                "box": [
+                 1606,
+                 321,
+                 16,
+                 19
+                ],
+                "opacity": 255,
+                "classes": "quick-toggle-icon",
+                "pseudo": "insensitive first-child",
+                "style": {
+                 "fg": [
+                  255,
+                  255,
+                  255,
+                  230
+                 ],
+                 "font": "Adwaita Sans Bold 14.666px"
+                },
+                "icon": "notifications-disabled-symbolic",
+                "icon_size": -1,
+                "children": [
+                 {
+                  "type": "ClutterActor",
+                  "box": [
+                   1606,
+                   322,
+                   16,
+                   16
+                  ],
+                  "opacity": 255
+                 }
+                ]
+               },
+               {
+                "type": "StBoxLayout",
+                "box": [
+                 1631,
+                 321,
+                 104,
+                 19
+                ],
+                "opacity": 255,
+                "pseudo": "insensitive last-child",
+                "style": {
+                 "fg": [
+                  255,
+                  255,
+                  255,
+                  230
+                 ],
+                 "font": "Adwaita Sans Bold 14.666px"
+                },
+                "children": [
+                 {
+                  "type": "StLabel",
+                  "box": [
+                   1631,
+                   321,
+                   104,
+                   19
+                  ],
+                  "opacity": 255,
+                  "classes": "quick-toggle-title",
+                  "pseudo": "insensitive first-child last-child",
+                  "style": {
+                   "fg": [
+                    255,
+                    255,
+                    255,
+                    230
+                   ],
+                   "font": "Adwaita Sans Bold 14.666px"
+                  },
+                  "text": "Do Not Disturb",
+                  "children": [
+                   {
+                    "type": "ClutterText",
+                    "box": [
+                     1631,
+                     321,
+                     104,
+                     19
+                    ],
+                    "opacity": 255
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           },
+           {
+            "type": "Gjs_status_rfkill_RfkillToggle",
+            "box": [
+             1403,
+             367,
+             176,
+             48
+            ],
+            "opacity": 255,
+            "classes": "quick-toggle button",
+            "style": {
+             "bg": [
+              255,
+              255,
+              255,
+              25
+             ],
+             "fg": [
+              255,
+              255,
+              255,
+              230
+             ],
+             "radius": [
+              999,
+              999,
+              999,
+              999
+             ],
+             "font": "Adwaita Sans Bold 14.666px",
+             "width": 176,
+             "height": 48,
+             "min_width": 176,
+             "min_height": 48,
+             "max_width": 176
+            },
+            "children": [
+             {
+              "type": "StBoxLayout",
+              "box": [
+               1403,
+               381,
+               176,
+               19
+              ],
+              "opacity": 255,
+              "pseudo": "insensitive first-child last-child",
+              "style": {
+               "fg": [
+                255,
+                255,
+                255,
+                230
+               ],
+               "padding": [
+                0,
+                12,
+                0,
+                15
+               ],
+               "font": "Adwaita Sans Bold 14.666px",
+               "spacing": 9
+              },
+              "children": [
+               {
+                "type": "StIcon",
+                "box": [
+                 1418,
+                 381,
+                 16,
+                 19
+                ],
+                "opacity": 255,
+                "classes": "quick-toggle-icon",
+                "pseudo": "insensitive first-child",
+                "style": {
+                 "fg": [
+                  255,
+                  255,
+                  255,
+                  230
+                 ],
+                 "font": "Adwaita Sans Bold 14.666px"
+                },
+                "icon": "airplane-mode-symbolic",
+                "icon_size": -1,
+                "children": [
+                 {
+                  "type": "ClutterActor",
+                  "box": [
+                   1418,
+                   382,
+                   16,
+                   16
+                  ],
+                  "opacity": 255
+                 }
+                ]
+               },
+               {
+                "type": "StBoxLayout",
+                "box": [
+                 1443,
+                 381,
+                 104,
+                 19
+                ],
+                "opacity": 255,
+                "pseudo": "insensitive last-child",
+                "style": {
+                 "fg": [
+                  255,
+                  255,
+                  255,
+                  230
+                 ],
+                 "font": "Adwaita Sans Bold 14.666px"
+                },
+                "children": [
+                 {
+                  "type": "StLabel",
+                  "box": [
+                   1443,
+                   381,
+                   104,
+                   19
+                  ],
+                  "opacity": 255,
+                  "classes": "quick-toggle-title",
+                  "pseudo": "insensitive first-child last-child",
+                  "style": {
+                   "fg": [
+                    255,
+                    255,
+                    255,
+                    230
+                   ],
+                   "font": "Adwaita Sans Bold 14.666px"
+                  },
+                  "text": "Airplane Mode",
+                  "children": [
+                   {
+                    "type": "ClutterText",
+                    "box": [
+                     1443,
+                     381,
+                     104,
+                     19
+                    ],
+                    "opacity": 255
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           },
+           {
+            "type": "ClutterActor",
+            "box": [
+             1403,
+             57,
+             0,
+             0
+            ],
+            "opacity": 255
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "type": "ClutterActor",
+    "box": [
+     1402,
+     56,
+     364,
+     1
+    ],
+    "opacity": 255
+   }
+  ]
+ }
+}

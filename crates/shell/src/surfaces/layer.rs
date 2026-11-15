@@ -1,7 +1,40 @@
 //! Common setup for layer-shell windows.
 
-use gtk::gdk;
+use std::sync::atomic::{AtomicBool, Ordering};
+
+use gtk::prelude::*;
+use gtk::{cairo, gdk};
 use gtk4_layer_shell::{Edge, Layer, LayerShell};
+
+/// Set by `--no-pointer`: no surface takes pointer input.
+static POINTER_IGNORED: AtomicBool = AtomicBool::new(false);
+
+/// Makes every surface ignore the pointer from now on.
+///
+/// A screenshot of a nested session must not depend on where the pointer of
+/// the session around it happens to be: a widget under it would be drawn
+/// hovered.
+pub fn ignore_pointer() {
+    POINTER_IGNORED.store(true, Ordering::Relaxed);
+}
+
+pub fn pointer_ignored() -> bool {
+    POINTER_IGNORED.load(Ordering::Relaxed)
+}
+
+/// Gives `window`'s surface an empty input region, now and whenever GTK
+/// lays the surface out again.
+fn take_no_input(window: &gtk::ApplicationWindow) {
+    window.connect_map(|window| {
+        let Some(surface) = window.surface() else {
+            return;
+        };
+        surface.set_input_region(Some(&cairo::Region::create()));
+        surface.connect_layout(|surface, _, _| {
+            surface.set_input_region(Some(&cairo::Region::create()));
+        });
+    });
+}
 
 /// Which screen edges a surface is attached to.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -54,6 +87,9 @@ pub fn window(
     match zone {
         Zone::Reserve => window.auto_exclusive_zone_enable(),
         Zone::Ignore => window.set_exclusive_zone(-1),
+    }
+    if pointer_ignored() {
+        take_no_input(&window);
     }
     window
 }

@@ -166,9 +166,9 @@ pub fn build(services: &Rc<Services>) -> QuickSettings {
         let (widget, grid) = (widget.clone(), grid.clone());
         move |dimmed| {
             if *dimmed {
-                widget.add_css_class("dimmed");
+                widget.add_css_class("shaded");
             } else {
-                widget.remove_css_class("dimmed");
+                widget.remove_css_class("shaded");
             }
             grid.set_dimmed(*dimmed);
         }

@@ -12,11 +12,12 @@ use gtk::glib;
 use gtk::prelude::*;
 use gtk::subclass::prelude::*;
 
-/// GNOME Shell places an open menu one pixel left of the grid: the menus
-/// live in an overlay bound to the menu's outer box plus an offset, and the
-/// offset comes out one pixel short. Measured on GNOME Shell 51.1
-/// (tests/visual/reference: the grid is at x 1403, the menu at 1402).
-const MENU_OFFSET_X: i32 = -1;
+/// GNOME Shell places an open menu one pixel left of and above where the
+/// grid makes room for it: the menus live in an overlay bound to the menu's
+/// outer box plus an offset, and the offset leaves out the box's 1px border.
+/// Measured on GNOME Shell 51.1 (tests/visual/reference: the grid is at x
+/// 1403 and the row above the menu ends at y 295; the menu is at 1402, 294).
+const MENU_OFFSET: (i32, i32) = (-1, -1);
 
 struct Item {
     widget: gtk::Widget,
@@ -93,19 +94,21 @@ mod imp {
             let columns = self.columns.get().max(1) as i32;
             if orientation == gtk::Orientation::Horizontal {
                 // `_getMaxChildWidth`: every column is as wide as the widest
-                // item per column it spans.
-                let (min, natural) = items.iter().filter(|item| item.widget.is_visible()).fold(
-                    (0, 0),
-                    |(min, natural), item| {
-                        let span = item.span.clamp(1, columns as usize) as i32;
-                        let (item_min, item_natural, _, _) =
-                            item.widget.measure(gtk::Orientation::Horizontal, -1);
-                        (
-                            min.max((item_min + span - 1) / span),
-                            natural.max((item_natural + span - 1) / span),
-                        )
-                    },
-                );
+                // item per column it spans. St caps a toggle's natural
+                // width with `max-width`; GTK has no such property, so the
+                // minimum widths decide alone and a long label is cut
+                // short rather than widening the menu.
+                let min =
+                    items
+                        .iter()
+                        .filter(|item| item.widget.is_visible())
+                        .fold(0, |min, item| {
+                            let span = item.span.clamp(1, columns as usize) as i32;
+                            let (item_min, _, _, _) =
+                                item.widget.measure(gtk::Orientation::Horizontal, -1);
+                            min.max((item_min + span - 1) / span)
+                        });
+                let natural = min;
                 let spacing = (columns - 1) * self.column_spacing.get();
                 (columns * min + spacing, columns * natural + spacing, -1, -1)
             } else {
@@ -149,7 +152,7 @@ mod imp {
                 if let Some(menu) = Self::open_menu(&row) {
                     let (_, menu_height, _, _) = menu.measure(gtk::Orientation::Vertical, width);
                     menu.size_allocate(
-                        &gtk::Allocation::new(MENU_OFFSET_X, y, width, menu_height),
+                        &gtk::Allocation::new(MENU_OFFSET.0, y + MENU_OFFSET.1, width, menu_height),
                         -1,
                     );
                     y += menu_height;
@@ -200,12 +203,15 @@ impl QuickGrid {
     /// menu under the open submenu (`QuickSettingsMenu._setDimmed`); the
     /// submenu is a child of this grid here, so the items are dimmed one by
     /// one instead.
+    ///
+    /// The class is not called "dimmed": libadwaita has a class of that
+    /// name, which makes a widget 55% opaque.
     pub fn set_dimmed(&self, dimmed: bool) {
         for item in self.imp().items.borrow().iter() {
             if dimmed {
-                item.widget.add_css_class("dimmed");
+                item.widget.add_css_class("shaded");
             } else {
-                item.widget.remove_css_class("dimmed");
+                item.widget.remove_css_class("shaded");
             }
         }
     }

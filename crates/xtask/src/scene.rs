@@ -18,6 +18,10 @@
 //! [[steps]]
 //! gniri = ["debug", "open-menu", "quick-settings"]   # `gniri msg ...`
 //! ```
+//!
+//! A scene can start from another one: `extends = "quick-settings"` takes
+//! that scene's fixture, variants and steps, then adds its own steps and
+//! replaces the fixture keys it sets.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -43,6 +47,8 @@ pub enum Step {
 #[derive(Deserialize, Default)]
 #[serde(default, deny_unknown_fields)]
 pub struct Scene {
+    /// Name of the scene this one continues from.
+    extends: Option<String>,
     fixture: toml::Table,
     variants: BTreeMap<String, toml::Table>,
     steps: Vec<Step>,
@@ -65,7 +71,19 @@ impl Scene {
         let path = scenes_dir().join(format!("{name}.toml"));
         let text =
             fs::read_to_string(&path).with_context(|| format!("reading {}", path.display()))?;
-        toml::from_str(&text).with_context(|| format!("parsing {}", path.display()))
+        let scene: Self =
+            toml::from_str(&text).with_context(|| format!("parsing {}", path.display()))?;
+        let Some(base) = &scene.extends else {
+            return Ok(scene);
+        };
+        if base == name {
+            anyhow::bail!("scene {name} extends itself");
+        }
+        let mut merged = Self::load(base)?;
+        merged.fixture.extend(scene.fixture);
+        merged.variants.extend(scene.variants);
+        merged.steps.extend(scene.steps);
+        Ok(merged)
     }
 
     /// The fixture for `variant`: the scene's, with the variant's keys
@@ -101,14 +119,17 @@ impl Scene {
             name: run.to_owned(),
             niri_config: None,
             renderer: "vulkan".to_owned(),
-            gniri_args: gniri_args(Some(&fixture_path), Some(wallpaper)),
+            gniri_args: {
+                let mut args = gniri_args(Some(&fixture_path), Some(wallpaper));
+                // The pointer of the session around the nested one may be
+                // anywhere, and must not show as a hovered widget.
+                args.push("--no-pointer".to_owned());
+                args
+            },
         })?;
         self.play(&session)?;
 
-        // The steps are done when niri has acted; give gniri a moment to
-        // hear about it and niri a frame to composite the result. Fixtures
-        // turn animations off, so nothing is still moving after that.
-        std::thread::sleep(Duration::from_millis(300));
+        session.settle()?;
         let dump = session.dump_tree()?;
         let shot = visual.join(format!("{run}.png"));
         session.screenshot(&shot).context("taking the screenshot")?;

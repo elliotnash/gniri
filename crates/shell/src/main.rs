@@ -40,6 +40,11 @@ pub struct Cli {
     /// reproducible screenshots.
     #[arg(long, value_name = "FILE")]
     fixture: Option<PathBuf>,
+
+    /// Take no pointer input, so that a screenshot does not depend on where
+    /// the pointer is.
+    #[arg(long)]
+    no_pointer: bool,
 }
 
 #[derive(Subcommand, Debug, Clone)]
@@ -75,6 +80,8 @@ enum Message {
 enum DebugRequest {
     /// Print every mapped widget of every surface as JSON.
     DumpTree,
+    /// Return once everything asked for so far is on screen.
+    Sync,
     /// Print every command the shell has sent to a service.
     Commands,
     /// Open a panel menu.
@@ -97,6 +104,7 @@ impl Message {
             Self::Brightness { step } => ipc::Request::Brightness(step),
             Self::Debug { request } => match request {
                 DebugRequest::DumpTree => ipc::Request::DumpTree,
+                DebugRequest::Sync => ipc::Request::Sync,
                 DebugRequest::Commands => ipc::Request::Commands,
                 DebugRequest::OpenMenu { menu, output } => ipc::Request::OpenMenu { menu, output },
                 DebugRequest::OpenSubmenu { submenu } => ipc::Request::OpenSubmenu(submenu),

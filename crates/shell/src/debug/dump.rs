@@ -5,7 +5,7 @@
 
 use gtk::graphene;
 use gtk::prelude::*;
-use gtk4_layer_shell::LayerShell;
+use gtk4_layer_shell::{Edge, LayerShell};
 use serde::Serialize;
 
 #[derive(Serialize)]
@@ -24,6 +24,10 @@ pub struct Surface {
     pub height: i32,
     /// Physical pixels per logical pixel.
     pub scale: f64,
+    /// The output edges the surface is anchored to, of "top", "bottom",
+    /// "left" and "right". Opposite edges both anchored means it spans the
+    /// output between them; neither means it is centred.
+    pub anchors: Vec<&'static str>,
     pub tree: Node,
 }
 
@@ -70,6 +74,16 @@ pub fn dump(app: &impl IsA<gtk::Application>) -> Dump {
             width: window.width(),
             height: window.height(),
             scale: window.surface().map_or(1.0, |surface| surface.scale()),
+            anchors: [
+                (Edge::Top, "top"),
+                (Edge::Bottom, "bottom"),
+                (Edge::Left, "left"),
+                (Edge::Right, "right"),
+            ]
+            .into_iter()
+            .filter(|(edge, _)| window.is_anchor(*edge))
+            .map(|(_, name)| name)
+            .collect(),
             tree: node(window.upcast_ref(), window.upcast_ref()),
         })
         .collect();

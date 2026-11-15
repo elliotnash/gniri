@@ -2,6 +2,8 @@
 # Read by `cargo xtask diff panel` (crates/xtask/src/diff.rs).
 
 surface = "gniri-panel"
+# The panel spans the top edge of the screen.
+attach = "stretch"
 wallpaper = "/usr/share/backgrounds/f45/default/f45-01-night.jxl"
 
 [[states]]

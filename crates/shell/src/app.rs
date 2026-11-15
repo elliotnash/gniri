@@ -136,6 +136,9 @@ fn activate(
         settings.set_gtk_enable_animations(false);
     }
 
+    if cli.no_pointer {
+        crate::surfaces::layer::ignore_pointer();
+    }
     let wallpaper = wallpaper_source(cli, &config);
     let services = Services::start(config, fixture);
 
@@ -145,7 +148,13 @@ fn activate(
 
     let ipc = ipc::serve({
         let (app, services, outputs) = (app.clone(), Rc::clone(&services), Rc::clone(&outputs));
-        move |request| handle(&app, &services, &outputs, request)
+        move |request| -> ipc::Pending {
+            if request == ipc::Request::Sync {
+                return Box::pin(sync(app.clone()));
+            }
+            let reply = handle(&app, &services, &outputs, request);
+            Box::pin(async move { reply })
+        }
     });
 
     // Layer surfaces do not count as application windows that keep the
@@ -170,6 +179,8 @@ fn handle(
         ipc::Request::DumpTree => {
             serde_json::to_value(debug::dump::dump(app)).map_err(|error| error.to_string())
         }
+        // Answered by `sync`, which has to wait.
+        ipc::Request::Sync => Ok(Value::Null),
         ipc::Request::Commands => Ok(Value::from(services.commands.entries())),
         ipc::Request::OpenMenu { menu, output } => {
             let output = output.or_else(|| outputs.default_output());
@@ -222,4 +233,73 @@ fn handle(
             Ok(Value::Null)
         }
     }
+}
+
+/// Waits until what was asked for before now is on screen.
+///
+/// State changes reach widgets from an idle callback, and a surface that
+/// was just presented takes a round trip to the compositor before it can
+/// draw. So: let the main loop go idle, then wait for every mapped surface
+/// to finish painting one more frame, twice over to cover a surface that
+/// only became mapped during the first wait.
+async fn sync(app: adw::Application) -> ipc::Reply {
+    for _ in 0..2 {
+        let (idle, went_idle) = async_channel::bounded::<()>(1);
+        glib::idle_add_local_full(glib::Priority::LOW, move || {
+            let _ = idle.try_send(());
+            glib::ControlFlow::Break
+        });
+        let _ = went_idle.recv().await;
+
+        let (painted, all_painted) = async_channel::unbounded::<()>();
+        let mut waiting = 0;
+        for window in app.windows() {
+            if !window.is_mapped() {
+                continue;
+            }
+            let Some(clock) = window.frame_clock() else {
+                continue;
+            };
+            waiting += 1;
+            let painted = painted.clone();
+            let handler = Rc::new(std::cell::Cell::new(None));
+            let id = clock.connect_after_paint({
+                let handler = Rc::clone(&handler);
+                move |clock| {
+                    if let Some(id) = handler.take() {
+                        clock.disconnect(id);
+                        let _ = painted.try_send(());
+                    }
+                }
+            });
+            handler.set(Some(id));
+            window.queue_draw();
+        }
+        for _ in 0..waiting {
+            // A surface the compositor does not show gets no frames; do not
+            // wait for it for ever.
+            let timeout = glib::timeout_future(std::time::Duration::from_millis(500));
+            either(all_painted.recv(), timeout).await;
+        }
+    }
+    Ok(serde_json::Value::Null)
+}
+
+/// Waits for whichever of the two finishes first.
+async fn either<A, B>(first: A, second: B)
+where
+    A: std::future::Future,
+    B: std::future::Future,
+{
+    use std::pin::pin;
+    use std::task::Poll;
+    let (mut first, mut second) = (pin!(first), pin!(second));
+    std::future::poll_fn(|context| {
+        if first.as_mut().poll(context).is_ready() || second.as_mut().poll(context).is_ready() {
+            Poll::Ready(())
+        } else {
+            Poll::Pending
+        }
+    })
+    .await;
 }

@@ -76,6 +76,7 @@ fn entry_item(entry: &Entry) -> gtk::Button {
             gtk::Image::builder()
                 .icon_name(icon)
                 .css_classes(["popup-menu-icon"])
+                .valign(gtk::Align::Center)
                 .build()
                 .upcast(),
         );
@@ -92,6 +93,7 @@ fn entry_item(entry: &Entry) -> gtk::Button {
             gtk::Image::builder()
                 .icon_name(badge)
                 .css_classes(["popup-menu-badge"])
+                .valign(gtk::Align::Center)
                 .build()
                 .upcast(),
         );
@@ -100,6 +102,7 @@ fn entry_item(entry: &Entry) -> gtk::Button {
     // when not shown.
     let ornament = gtk::Image::builder()
         .css_classes(["popup-menu-ornament"])
+        .valign(gtk::Align::Center)
         .build();
     if entry.checked {
         ornament.set_icon_name(Some("ornament-check-symbolic"));

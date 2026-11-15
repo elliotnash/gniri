@@ -8,15 +8,17 @@
 //!   pixels.
 //! - **Flat** (tier 2): over a flat wallpaper, the share of pixels that
 //!   differ by more than a small fuzz, text excluded (GTK and St rasterise
-//!   glyphs differently).
+//!   glyphs differently). See [`differing`] for what counts.
 //! - **Real** (tier 3): over the real wallpaper, both sides low-passed, the
 //!   RMS error and the mean brightness.
 //!
 //! Tier 0 (theme tokens) is a plain unit test in `crates/theme`.
 //!
-//! The nested output is narrower than the reference screen, so everything is
-//! compared relative to an anchor: the left edge, the centre or the right
-//! edge of the surface.
+//! The nested output is smaller than the reference screen, so nothing is
+//! compared in screen coordinates. A component has a root (the panel, a
+//! menu, the OSD); boxes and pixels are compared relative to it, and where
+//! the root sits is compared as its distance from the screen edges it is
+//! attached to.
 
 use std::fmt::Write as _;
 use std::fs;
@@ -51,16 +53,42 @@ enum BoxKind {
     Text,
 }
 
+/// Which screen edge a component hangs from, vertically.
+#[derive(Deserialize, Clone, Copy, PartialEq, Eq, Debug, Default)]
+#[serde(rename_all = "kebab-case")]
+enum Vertical {
+    #[default]
+    Top,
+    Bottom,
+}
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Map {
     /// Layer-shell namespace of our surface.
     surface: String,
+    /// Selector of the widget that corresponds to the reference's root
+    /// actor. The surface's own root if unset.
+    root: Option<String>,
+    /// Where on the screen the component is attached: the edge its
+    /// placement is measured from, and the part of the reference wallpaper
+    /// the nested output is given.
+    #[serde(default = "attach_left")]
+    attach: Anchor,
+    #[serde(default)]
+    vertical: Vertical,
+    /// Logical pixels around the root that are compared too (its shadow).
+    #[serde(default)]
+    margin: f64,
     /// The wallpaper image the real-wallpaper reference was taken over.
     wallpaper: PathBuf,
     states: Vec<State>,
     regions: Vec<Region>,
     pairs: Vec<Pair>,
+}
+
+fn attach_left() -> Anchor {
+    Anchor::Left
 }
 
 #[derive(Deserialize)]
@@ -71,16 +99,18 @@ struct State {
     reference: String,
     /// Regions to compare in this state; all of them if unset.
     regions: Option<Vec<String>>,
+    /// Pairs to compare in this state; all of them if unset.
+    pairs: Option<Vec<String>>,
 }
 
-/// A strip of the surface, full height, compared pixel by pixel.
+/// A strip of the root, full height, compared pixel by pixel.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Region {
     name: String,
     anchor: Anchor,
-    /// Logical pixels.
-    width: f64,
+    /// Logical pixels. Unset (with `anchor = "stretch"`) for the whole root.
+    width: Option<f64>,
 }
 
 #[derive(Deserialize)]
@@ -172,61 +202,146 @@ impl PixelRect {
     }
 }
 
-/// One side of a comparison: a tree, the surface it describes and a picture
-/// whose origin is the surface's top-left corner.
+/// One side of a comparison: the root of a component, where it is on its
+/// screen, and where it is in the picture it is cropped from.
 struct Side<'a> {
+    /// The root node. Boxes in it are in `tree` coordinates.
     tree: &'a Value,
-    /// Logical size of the surface (ours) or the reference actor (theirs).
-    width: f64,
-    height: f64,
+    /// The root's box, in tree coordinates. Logical pixels, as all below.
+    root: [f64; 4],
+    /// What to add to a tree coordinate to get its place on the screen.
+    on_screen: (f64, f64),
+    /// What to add to a tree coordinate to get its place in the picture.
+    in_picture: (f64, f64),
+    /// The picture's size.
+    picture: (f64, f64),
+    screen: (f64, f64),
     /// Physical pixels per logical pixel.
     scale: f64,
-    /// Key of the text rectangle, and the selector step that finds text.
+    /// Key of the text rectangle: "text_box" in gniri's dump, "box" (of a
+    /// `ClutterText`) in GNOME's.
     text_key: &'static str,
 }
 
+/// A rectangle relative to an anchor point on the root: the root's top
+/// left, top centre or top right corner. Both sides of a comparison share
+/// these coordinates, whatever the size of their screens.
+#[derive(Clone, Copy)]
+struct Area {
+    left: f64,
+    top: f64,
+    right: f64,
+    bottom: f64,
+}
+
+impl Area {
+    fn intersect(self, other: Self) -> Self {
+        Self {
+            left: self.left.max(other.left),
+            top: self.top.max(other.top),
+            right: self.right.min(other.right),
+            bottom: self.bottom.min(other.bottom),
+        }
+    }
+}
+
 impl Side<'_> {
-    /// Left edge of a strip `width` wide at `anchor`, logical pixels.
-    fn strip_x(&self, anchor: Anchor, width: f64) -> f64 {
+    /// The x coordinate, in tree coordinates, that `anchor` measures from.
+    fn anchor_x(&self, anchor: Anchor) -> f64 {
+        let [x, _, width, _] = self.root;
         match anchor {
-            Anchor::Left | Anchor::Stretch => 0.0,
-            Anchor::Center => (self.width - width) / 2.0,
-            Anchor::Right => self.width - width,
+            Anchor::Left | Anchor::Stretch => x,
+            Anchor::Center => x + width / 2.0,
+            Anchor::Right => x + width,
         }
     }
 
-    fn region(&self, region: &Region) -> PixelRect {
+    /// The part of the picture there is, relative to `anchor`.
+    fn available(&self, anchor: Anchor) -> Area {
+        let left = -self.in_picture.0 - self.anchor_x(anchor);
+        let top = -self.in_picture.1 - self.root[1];
+        Area {
+            left,
+            top,
+            right: left + self.picture.0,
+            bottom: top + self.picture.1,
+        }
+    }
+
+    /// `area` in the picture's physical pixels.
+    fn pixels(&self, anchor: Anchor, area: &Area) -> PixelRect {
+        let x = (area.left + self.anchor_x(anchor) + self.in_picture.0) * self.scale;
+        let y = (area.top + self.root[1] + self.in_picture.1) * self.scale;
+        // The two sides reach the same half pixel by different sums; the
+        // nudge keeps a rounding error from sending them opposite ways.
+        let pixel = |value: f64| (value + 1e-6).round() as i64;
         PixelRect {
-            x: (self.strip_x(region.anchor, region.width) * self.scale).round() as i64,
-            y: 0,
-            width: (region.width * self.scale).round() as i64,
-            height: (self.height * self.scale).round() as i64,
+            x: pixel(x),
+            y: pixel(y),
+            width: pixel((area.right - area.left) * self.scale),
+            height: pixel((area.bottom - area.top) * self.scale),
         }
     }
 
-    /// Where text is drawn, in physical pixels relative to `region`.
-    fn text_masks(&self, region: &PixelRect) -> Vec<PixelRect> {
+    /// A tree-coordinate box in physical pixels relative to `crop`, grown
+    /// by one pixel for antialiasing.
+    fn mask(&self, [x, y, width, height]: [f64; 4], crop: &PixelRect) -> PixelRect {
+        PixelRect {
+            x: ((x + self.in_picture.0) * self.scale).floor() as i64 - crop.x - 1,
+            y: ((y + self.in_picture.1) * self.scale).floor() as i64 - crop.y - 1,
+            width: (width * self.scale).ceil() as i64 + 2,
+            height: (height * self.scale).ceil() as i64 + 2,
+        }
+    }
+
+    /// Where text is drawn, relative to `crop`.
+    fn text_masks(&self, crop: &PixelRect) -> Vec<PixelRect> {
         let mut masks = Vec::new();
         tree::walk(self.tree, &mut |node| {
             let is_text = match self.text_key {
                 "text_box" => node["text"].as_str().is_some_and(|text| !text.is_empty()),
                 _ => node["type"] == "ClutterText",
             };
-            if !is_text {
-                return;
-            }
-            if let Ok([x, y, width, height]) = tree::rect(node, self.text_key) {
-                // One pixel of margin for antialiasing.
-                masks.push(PixelRect {
-                    x: (x * self.scale).floor() as i64 - region.x - 1,
-                    y: (y * self.scale).floor() as i64 - region.y - 1,
-                    width: (width * self.scale).ceil() as i64 + 2,
-                    height: (height * self.scale).ceil() as i64 + 2,
-                });
+            if is_text && let Ok(rect) = tree::rect(node, self.text_key) {
+                masks.push(self.mask(rect, crop));
             }
         });
         masks
     }
+
+    /// Boxes the reference extract blacked out (private text), relative to
+    /// `crop`. They are never compared.
+    fn redacted_masks(&self, crop: &PixelRect) -> Vec<PixelRect> {
+        let mut masks = Vec::new();
+        tree::walk(self.tree, &mut |node| {
+            if node["redacted"] == true
+                && let Ok(rect) = tree::rect(node, "box")
+            {
+                masks.push(self.mask(rect, crop));
+            }
+        });
+        masks
+    }
+}
+
+/// The area a region covers, relative to its anchor: the strip, grown by
+/// the margin, and cut down to what both pictures hold.
+fn region_area(map: &Map, region: &Region, ours: &Side, theirs: &Side) -> Area {
+    let margin = map.margin;
+    let width = region.width.unwrap_or(theirs.root[2]);
+    let (left, right) = match region.anchor {
+        Anchor::Left | Anchor::Stretch => (0.0, width),
+        Anchor::Center => (-width / 2.0, width / 2.0),
+        Anchor::Right => (-width, 0.0),
+    };
+    Area {
+        left: left - margin,
+        top: -margin,
+        right: right + margin,
+        bottom: theirs.root[3] + margin,
+    }
+    .intersect(ours.available(region.anchor))
+    .intersect(theirs.available(region.anchor))
 }
 
 /// Cuts `rect` out of `source`, blacking out `masks` (relative to `rect`).
@@ -255,25 +370,19 @@ fn crop(source: &Path, rect: &PixelRect, masks: &[PixelRect], target: &Path) -> 
     magick_ok(&args.iter().map(String::as_str).collect::<Vec<_>>()).map(drop)
 }
 
-/// The number ImageMagick's `compare` prints for `metric`: the pixel count
-/// for AE, the normalised error for RMSE.
-fn compare(metric: &str, fuzz_percent: Option<f64>, a: &Path, b: &Path) -> Result<f64> {
-    let mut args = vec![
-        "compare".to_owned(),
-        "-metric".to_owned(),
-        metric.to_owned(),
-    ];
-    if let Some(fuzz) = fuzz_percent {
-        args.extend(["-fuzz".to_owned(), format!("{fuzz}%")]);
-    }
-    args.extend([
-        path_str(a)?.to_owned(),
-        path_str(b)?.to_owned(),
-        "null:".to_owned(),
-    ]);
-    let output = magick(&args.iter().map(String::as_str).collect::<Vec<_>>())?;
+/// The normalised RMS error between two images, from ImageMagick's
+/// `compare`.
+fn rmse(a: &Path, b: &Path) -> Result<f64> {
+    let output = magick(&[
+        "compare",
+        "-metric",
+        "RMSE",
+        path_str(a)?,
+        path_str(b)?,
+        "null:",
+    ])?;
     // `compare` exits 1 when the images differ and 2 on a real error; the
-    // number is on stderr either way, as "absolute (normalised)" or alone.
+    // number is on stderr either way, as "absolute (normalised)".
     if output.status.code() == Some(2) {
         bail!(
             "magick compare failed: {}",
@@ -281,14 +390,86 @@ fn compare(metric: &str, fuzz_percent: Option<f64>, a: &Path, b: &Path) -> Resul
         );
     }
     let text = String::from_utf8_lossy(&output.stderr);
-    let wanted = match (metric, text.split_once('(')) {
-        ("RMSE", Some((_, normalised))) => normalised.trim_end_matches([')', '\n', ' ']),
-        (_, Some((absolute, _))) => absolute.trim(),
-        (_, None) => text.trim(),
+    let normalised = match text.split_once('(') {
+        Some((_, normalised)) => normalised.trim_end_matches([')', '\n', ' ']),
+        None => text.trim(),
     };
-    wanted
+    normalised
         .parse()
         .with_context(|| format!("unexpected output from magick compare: {text:?}"))
+}
+
+/// Marks the pixels where two images differ, white on black, in `mask`, and
+/// returns how many there are.
+///
+/// GNOME Shell snaps every box to whole physical pixels; GTK draws a box
+/// where it falls and antialiases its edges. At a fractional scale the two
+/// therefore disagree along most edges by a blend of the colours either
+/// side, which says nothing about the look. So a pixel only counts as
+/// differing if it is outside the range of colours (per channel, widened by
+/// the fuzz) that the other image has within one pixel of that place. Both
+/// directions are checked: a thin line one image has and the other lacks
+/// still counts, as does any wrong colour over an area. An edge that is a
+/// whole pixel out of place does not; the layout tier catches that.
+fn differing(a: &Path, b: &Path, fuzz_percent: f64, mask: &Path) -> Result<f64> {
+    let fuzz = format!("{fuzz_percent}%");
+    let (a, b) = (path_str(a)?, path_str(b)?);
+    // "x minus y", black where y is at least x.
+    let minus = |x: [&'static str; 2], y: [&'static str; 2]| -> Vec<String> {
+        let side = |[image, morphology]: [&str; 2]| -> Vec<String> {
+            let mut side = vec!["(".to_owned(), image.to_owned()];
+            if !morphology.is_empty() {
+                side.extend(["-morphology", morphology, "Square:1"].map(str::to_owned));
+            }
+            side.push(")".to_owned());
+            side
+        };
+        let mut args = vec!["(".to_owned()];
+        args.extend(side(x));
+        args.extend(side(y));
+        args.extend(
+            [
+                "-compose",
+                "MinusSrc",
+                "-composite",
+                "-threshold",
+                &fuzz,
+                ")",
+            ]
+            .map(str::to_owned),
+        );
+        args
+    };
+    let mut args: Vec<String> = [
+        a, "-write", "mpr:a", "+delete", b, "-write", "mpr:b", "+delete",
+    ]
+    .map(str::to_owned)
+    .to_vec();
+    // Darker than everything near it in the other image, or brighter.
+    args.extend(minus(["mpr:b", "Erode"], ["mpr:a", ""]));
+    args.extend(minus(["mpr:a", ""], ["mpr:b", "Dilate"]));
+    args.extend(minus(["mpr:a", "Erode"], ["mpr:b", ""]));
+    args.extend(minus(["mpr:b", ""], ["mpr:a", "Dilate"]));
+    args.extend(
+        [
+            "-evaluate-sequence",
+            "Max",
+            // Any channel counts.
+            "-separate",
+            "-evaluate-sequence",
+            "Max",
+            "-write",
+            path_str(mask)?,
+            "-format",
+            "%[fx:mean*w*h]",
+            "info:",
+        ]
+        .map(str::to_owned),
+    );
+    let text = magick_ok(&args.iter().map(String::as_str).collect::<Vec<_>>())?;
+    text.trim()
+        .parse()
+        .with_context(|| format!("unexpected output from magick: {text:?}"))
 }
 
 fn mean_brightness(image: &Path) -> Result<f64> {
@@ -305,22 +486,19 @@ fn mean_brightness(image: &Path) -> Result<f64> {
         .with_context(|| format!("unexpected output from magick: {text:?}"))
 }
 
-/// Ours above theirs above where they differ, enlarged.
-fn montage(ours: &Path, theirs: &Path, fuzz_percent: f64, target: &Path) -> Result<()> {
-    let difference = target.with_extension("difference.png");
-    // Exit status 1 only says the images differ.
-    magick(&[
-        "compare",
-        "-fuzz",
-        &format!("{fuzz_percent}%"),
-        path_str(ours)?,
-        path_str(theirs)?,
-        path_str(&difference)?,
-    ])?;
+/// Ours above theirs above where they differ (`mask`, from [`differing`]),
+/// enlarged.
+fn montage(ours: &Path, theirs: &Path, mask: &Path, target: &Path) -> Result<()> {
     magick_ok(&[
         path_str(ours)?,
         path_str(theirs)?,
-        path_str(&difference)?,
+        "(",
+        path_str(mask)?,
+        "-fill",
+        "red",
+        "-opaque",
+        "white",
+        ")",
         "-background",
         "#ff00ff",
         "-splice",
@@ -332,7 +510,6 @@ fn montage(ours: &Path, theirs: &Path, fuzz_percent: f64, target: &Path) -> Resu
         "300%",
         path_str(target)?,
     ])?;
-    let _ = fs::remove_file(difference);
     Ok(())
 }
 
@@ -378,7 +555,50 @@ fn number(value: &Value, what: &str) -> Result<f64> {
         .ok_or_else(|| anyhow!("{what} is not a number: {value}"))
 }
 
-/// Tier 1: every pair's boxes, relative to the pair's anchor.
+fn failed(tier: &'static str, subject: String, error: &anyhow::Error) -> Check {
+    Check {
+        tier,
+        subject,
+        detail: error.to_string(),
+        pass: false,
+        montage: None,
+    }
+}
+
+/// Reports `differences` (name, ours minus GNOME's) against `tolerance`.
+fn layout_check(
+    subject: String,
+    differences: &[(&str, f64)],
+    tolerance: f64,
+    boxes: ([f64; 4], [f64; 4]),
+) -> Check {
+    let worst = differences
+        .iter()
+        .map(|(_, difference)| difference.abs())
+        .fold(0.0, f64::max);
+    let pass = worst <= tolerance;
+    let detail = if pass {
+        format!("within {worst:.2} px")
+    } else {
+        let mut detail = format!("ours {:?}, GNOME {:?}; off by", boxes.0, boxes.1);
+        for (name, difference) in differences {
+            if difference.abs() > tolerance {
+                let _ = write!(detail, " {name} {difference:+.2}");
+            }
+        }
+        detail
+    };
+    Check {
+        tier: "layout",
+        subject,
+        detail,
+        pass,
+        montage: None,
+    }
+}
+
+/// Tier 1: where the root is on its screen, then every pair's boxes
+/// relative to the root.
 fn check_layout(
     map: &Map,
     state: &State,
@@ -387,7 +607,48 @@ fn check_layout(
     tolerance: f64,
     checks: &mut Vec<Check>,
 ) {
-    for pair in &map.pairs {
+    // The root's distance from the edges it is attached to.
+    let placement = |side: &Side| {
+        let [x, y, width, height] = side.root;
+        let (x, y) = (x + side.on_screen.0, y + side.on_screen.1);
+        let horizontal = match map.attach {
+            Anchor::Left | Anchor::Stretch => x,
+            Anchor::Center => x + width / 2.0 - side.screen.0 / 2.0,
+            Anchor::Right => side.screen.0 - (x + width),
+        };
+        let vertical = match map.vertical {
+            Vertical::Top => y,
+            Vertical::Bottom => side.screen.1 - (y + height),
+        };
+        (horizontal, vertical)
+    };
+    let (our_place, their_place) = (placement(ours), placement(theirs));
+    let mut differences = vec![
+        ("x", our_place.0 - their_place.0),
+        ("y", our_place.1 - their_place.1),
+        ("height", ours.root[3] - theirs.root[3]),
+    ];
+    if map.attach == Anchor::Stretch {
+        // Each spans its own screen; the widths are not comparable.
+        let fill = |side: &Side| side.root[2] - side.screen.0;
+        differences.push(("fill", fill(ours) - fill(theirs)));
+    } else {
+        differences.push(("width", ours.root[2] - theirs.root[2]));
+    }
+    checks.push(layout_check(
+        format!("{}: placement", state.scene),
+        &differences,
+        tolerance,
+        (ours.root, theirs.root),
+    ));
+
+    let wanted = |pair: &&Pair| {
+        state
+            .pairs
+            .as_ref()
+            .is_none_or(|names| names.contains(&pair.name))
+    };
+    for pair in map.pairs.iter().filter(wanted) {
         let subject = format!("{}: {}", state.scene, pair.name);
         let key = match pair.ours_box {
             BoxKind::Border => "box",
@@ -403,59 +664,34 @@ fn check_layout(
         let (a, b) = match boxes {
             Ok(boxes) => boxes,
             Err(error) => {
-                checks.push(Check {
-                    tier: "layout",
-                    subject,
-                    detail: error.to_string(),
-                    pass: false,
-                    montage: None,
-                });
+                checks.push(failed("layout", subject, &error));
                 continue;
             }
         };
 
-        // Horizontal position as a distance from the anchor.
+        // Horizontal position as a distance from the pair's anchor on the
+        // root; vertical position from the root's top.
         let offset = |side: &Side, [x, _, width, _]: [f64; 4]| match pair.anchor {
-            Anchor::Left | Anchor::Stretch => x,
-            Anchor::Center => x + width / 2.0 - side.width / 2.0,
-            Anchor::Right => side.width - (x + width),
+            Anchor::Left | Anchor::Stretch => x - side.anchor_x(Anchor::Left),
+            Anchor::Center => x + width / 2.0 - side.anchor_x(Anchor::Center),
+            Anchor::Right => side.anchor_x(Anchor::Right) - (x + width),
         };
         let mut differences = vec![
             ("x", offset(ours, a) - offset(theirs, b)),
-            ("y", a[1] - b[1]),
+            ("y", (a[1] - ours.root[1]) - (b[1] - theirs.root[1])),
             ("height", a[3] - b[3]),
         ];
         if pair.anchor == Anchor::Stretch {
-            // Each spans its own surface; the widths are not comparable.
-            differences.push(("fill", (a[2] - ours.width) - (b[2] - theirs.width)));
+            differences.push(("fill", (a[2] - ours.root[2]) - (b[2] - theirs.root[2])));
         } else {
             differences.push(("width", a[2] - b[2]));
         }
-
-        let tolerance = pair.tolerance_px.unwrap_or(tolerance);
-        let worst = differences
-            .iter()
-            .map(|(_, difference)| difference.abs())
-            .fold(0.0, f64::max);
-        let pass = worst <= tolerance;
-        let detail = if pass {
-            format!("within {worst:.2} px")
-        } else {
-            let mut detail = format!("ours {a:?}, GNOME {b:?}; off by");
-            for (name, difference) in differences {
-                if difference.abs() > tolerance {
-                    let _ = write!(detail, " {name} {difference:+.2}");
-                }
-            }
-            detail
-        };
-        checks.push(Check {
-            tier: "layout",
+        checks.push(layout_check(
             subject,
-            detail,
-            pass,
-            montage: None,
-        });
+            &differences,
+            pair.tolerance_px.unwrap_or(tolerance),
+            (a, b),
+        ));
     }
 }
 
@@ -479,6 +715,100 @@ fn regions_of<'a>(map: &'a Map, state: &State) -> Vec<&'a Region> {
         .collect()
 }
 
+/// The reference side of a state: GNOME's actor tree and where its root
+/// is in the committed screenshot crops.
+struct Reference {
+    document: Value,
+    name: String,
+}
+
+impl Reference {
+    fn load(name: &str) -> Result<Self> {
+        let path = reference_dir().join("metrics").join(format!("{name}.json"));
+        let document = serde_json::from_str(
+            &fs::read_to_string(&path).with_context(|| format!("reading {}", path.display()))?,
+        )?;
+        Ok(Self {
+            document,
+            name: name.to_owned(),
+        })
+    }
+
+    fn shot(&self, wallpaper: &str) -> PathBuf {
+        reference_dir()
+            .join("shots")
+            .join(format!("{}-{wallpaper}.png", self.name))
+    }
+
+    fn side(&self) -> Result<Side<'_>> {
+        let tree = &self.document["tree"];
+        // The root actor, which the tree may start above, and the part of
+        // the screen the crops hold: the root with a margin.
+        let root = tree::rect(&self.document, "root_box")?;
+        let shot_box = tree::rect(&self.document, "shot_box")?;
+        Ok(Side {
+            tree,
+            root,
+            on_screen: (0.0, 0.0),
+            in_picture: (-shot_box[0], -shot_box[1]),
+            picture: (shot_box[2], shot_box[3]),
+            screen: (
+                number(&self.document["stage"][0], "stage width")?,
+                number(&self.document["stage"][1], "stage height")?,
+            ),
+            scale: number(&self.document["pixels_per_unit"], "pixels_per_unit")?,
+            text_key: "box",
+        })
+    }
+}
+
+/// Our side of a comparison, from one captured run.
+fn our_side<'a>(map: &Map, dump: &'a Value) -> Result<Side<'a>> {
+    // The wallpaper surface covers the output: its size is the output's.
+    let wallpaper = our_surface(dump, "gniri-wallpaper")?;
+    let screen = (
+        number(&wallpaper["width"], "output width")?,
+        number(&wallpaper["height"], "output height")?,
+    );
+    let surface = our_surface(dump, &map.surface)?;
+    let size = (
+        number(&surface["width"], "surface width")?,
+        number(&surface["height"], "surface height")?,
+    );
+    let anchored = |edge: &str| {
+        surface["anchors"]
+            .as_array()
+            .is_some_and(|anchors| anchors.iter().any(|anchor| anchor == edge))
+    };
+    // A surface anchored to one edge of a pair sits against it; anchored
+    // to both or neither it is centred (or fills the output).
+    let place =
+        |low: &str, high: &str, surface: f64, screen: f64| match (anchored(low), anchored(high)) {
+            (true, false) => 0.0,
+            (false, true) => screen - surface,
+            _ => (screen - surface) / 2.0,
+        };
+    let position = (
+        place("left", "right", size.0, screen.0),
+        place("top", "bottom", size.1, screen.1),
+    );
+    let tree = match &map.root {
+        Some(selector) => tree::select(&surface["tree"], selector)?,
+        None => &surface["tree"],
+    };
+    Ok(Side {
+        tree,
+        root: tree::rect(tree, "box")?,
+        on_screen: position,
+        // The picture is a screenshot of the whole output.
+        in_picture: position,
+        picture: screen,
+        screen,
+        scale: number(&surface["scale"], "surface scale")?,
+        text_key: "text_box",
+    })
+}
+
 fn check_state(context: &Job, state: &State, checks: &mut Vec<Check>) -> Result<()> {
     let Job {
         map,
@@ -488,84 +818,50 @@ fn check_state(context: &Job, state: &State, checks: &mut Vec<Check>) -> Result<
         report,
     } = *context;
     let scene = Scene::load(&state.scene)?;
-    let reference_path = reference_dir()
-        .join("metrics")
-        .join(format!("{}.json", state.reference));
-    let reference: Value = serde_json::from_str(
-        &fs::read_to_string(&reference_path)
-            .with_context(|| format!("reading {}", reference_path.display()))?,
-    )?;
-    let reference_shot = |wallpaper: &str| {
-        reference_dir()
-            .join("shots")
-            .join(format!("{}-{wallpaper}.png", state.reference))
-    };
-    let [_, _, their_width, their_height] = tree::rect(&reference["tree"], "box")?;
-    let theirs = Side {
-        tree: &reference["tree"],
-        width: their_width,
-        height: their_height,
-        scale: number(&reference["pixels_per_unit"], "pixels_per_unit")?,
-        text_key: "box",
-    };
+    let reference = Reference::load(&state.reference)?;
+    let theirs = reference.side()?;
     let regions = regions_of(map, state);
-
-    // What both tiers below do with one captured run.
-    let ours_of = |dump: &Value| -> Result<(f64, f64, f64)> {
-        let surface = our_surface(dump, &map.surface)?;
-        Ok((
-            number(&surface["width"], "surface width")?,
-            number(&surface["height"], "surface height")?,
-            number(&surface["scale"], "surface scale")?,
-        ))
-    };
 
     // Tier 2: flat wallpapers, one run each.
     let mut output_size = None;
     for (wallpaper, colour) in FLAT_WALLPAPERS {
         let run = format!("{component}-{}-{wallpaper}", state.scene);
         let capture = scene.capture(&run, Some(wallpaper), colour)?;
-        // The wallpaper surface covers the output: its size is the nested
-        // output's, which the real-wallpaper runs below need.
-        let backdrop = our_surface(&capture.dump, "gniri-wallpaper")?;
-        let pixels = |key: &str| -> Result<i64> {
-            let logical = number(&backdrop[key], key)?;
-            Ok((logical * number(&backdrop["scale"], "scale")?).round() as i64)
+        let ours = match our_side(map, &capture.dump) {
+            Ok(ours) => ours,
+            Err(error) => {
+                checks.push(failed(
+                    "flat",
+                    format!("{}: on {wallpaper}", state.scene),
+                    &error,
+                ));
+                continue;
+            }
         };
-        output_size = Some((pixels("width")?, pixels("height")?));
-        let (width, height, scale) = ours_of(&capture.dump)?;
-        let surface = our_surface(&capture.dump, &map.surface)?;
-        let ours = Side {
-            tree: &surface["tree"],
-            width,
-            height,
-            scale,
-            text_key: "text_box",
-        };
+        output_size = Some((
+            (ours.screen.0 * ours.scale).round() as i64,
+            (ours.screen.1 * ours.scale).round() as i64,
+        ));
         for region in &regions {
-            let (our_rect, their_rect) = (ours.region(region), theirs.region(region));
+            let area = region_area(map, region, &ours, &theirs);
+            let (our_rect, their_rect) = (
+                ours.pixels(region.anchor, &area),
+                theirs.pixels(region.anchor, &area),
+            );
             let mut masks = ours.text_masks(&our_rect);
             masks.extend(theirs.text_masks(&their_rect));
+            masks.extend(theirs.redacted_masks(&their_rect));
             let stem = format!("{}-{wallpaper}-{}", state.scene, region.name);
             let our_crop = work.join(format!("{stem}-ours.png"));
             let their_crop = work.join(format!("{stem}-gnome.png"));
             crop(&capture.shot, &our_rect, &masks, &our_crop)?;
-            crop(&reference_shot(wallpaper), &their_rect, &masks, &their_crop)?;
+            crop(&reference.shot(wallpaper), &their_rect, &masks, &their_crop)?;
 
-            let differing = compare(
-                "AE",
-                Some(thresholds.flat_fuzz_percent),
-                &our_crop,
-                &their_crop,
-            )?;
-            let share = 100.0 * differing / (our_rect.width * our_rect.height) as f64;
+            let mask = work.join(format!("{stem}-differing.png"));
+            let count = differing(&our_crop, &their_crop, thresholds.flat_fuzz_percent, &mask)?;
+            let share = 100.0 * count / (our_rect.width * our_rect.height) as f64;
             let picture = report.join(format!("{stem}.png"));
-            montage(
-                &our_crop,
-                &their_crop,
-                thresholds.flat_fuzz_percent,
-                &picture,
-            )?;
+            montage(&our_crop, &their_crop, &mask, &picture)?;
             checks.push(Check {
                 tier: "flat",
                 subject: format!("{}: {} on {wallpaper}", state.scene, region.name),
@@ -577,11 +873,11 @@ fn check_state(context: &Job, state: &State, checks: &mut Vec<Check>) -> Result<
     }
 
     // Tiers 1 and 3: the real wallpaper. The nested output shows a window of
-    // the reference screen, moved for each region so that the region lies
+    // the reference screen, placed for each region so that the region lies
     // over the same wallpaper pixels on both sides.
     let reference_size = (
-        (theirs.width * theirs.scale).round() as i64,
-        (number(&reference["stage"][1], "stage height")? * theirs.scale).round() as i64,
+        (theirs.screen.0 * theirs.scale).round() as i64,
+        (theirs.screen.1 * theirs.scale).round() as i64,
     );
     let wallpaper = reference_wallpaper(map, reference_size, work)?;
     let mut layout_done = false;
@@ -591,48 +887,62 @@ fn check_state(context: &Job, state: &State, checks: &mut Vec<Check>) -> Result<
             continue;
         };
         let run = format!("{component}-{}-real-{}", state.scene, region.name);
-        let their_rect = theirs.region(region);
-        let window_x = match region.anchor {
+        // A region that spans the root goes where the root is attached.
+        let horizontal = match region.anchor {
+            Anchor::Stretch => map.attach,
+            anchor => anchor,
+        };
+        let window_x = match horizontal {
             Anchor::Left | Anchor::Stretch => 0,
             Anchor::Center => (reference_size.0 - output_width) / 2,
             Anchor::Right => reference_size.0 - output_width,
+        };
+        let window_y = match map.vertical {
+            Vertical::Top => 0,
+            Vertical::Bottom => reference_size.1 - output_height,
         };
         let window = work.join(format!("wallpaper-{}.png", region.name));
         magick_ok(&[
             path_str(wallpaper)?,
             "-crop",
-            &format!("{output_width}x{output_height}+{window_x}+0"),
+            &format!("{output_width}x{output_height}+{window_x}+{window_y}"),
             "+repage",
             path_str(&window)?,
         ])?;
 
         let capture = scene.capture(&run, None, path_str(&window)?)?;
-        let (width, height, scale) = ours_of(&capture.dump)?;
-        let surface = our_surface(&capture.dump, &map.surface)?;
-        let ours = Side {
-            tree: &surface["tree"],
-            width,
-            height,
-            scale,
-            text_key: "text_box",
+        let ours = match our_side(map, &capture.dump) {
+            Ok(ours) => ours,
+            Err(error) => {
+                checks.push(failed(
+                    "real",
+                    format!("{}: {}", state.scene, region.name),
+                    &error,
+                ));
+                continue;
+            }
         };
         if !layout_done {
             check_layout(map, state, &ours, &theirs, thresholds.layout_px, checks);
             layout_done = true;
         }
 
+        let area = region_area(map, region, &ours, &theirs);
+        let (our_rect, their_rect) = (
+            ours.pixels(region.anchor, &area),
+            theirs.pixels(region.anchor, &area),
+        );
+        // Only what the extract blacked out is left out here.
+        let masks = theirs.redacted_masks(&their_rect);
         let stem = format!("{}-real-{}", state.scene, region.name);
         let our_crop = work.join(format!("{stem}-ours.png"));
         let their_crop = work.join(format!("{stem}-gnome.png"));
-        crop(&capture.shot, &ours.region(region), &[], &our_crop)?;
-        crop(&reference_shot("real"), &their_rect, &[], &their_crop)?;
+        crop(&capture.shot, &our_rect, &masks, &our_crop)?;
+        crop(&reference.shot("real"), &their_rect, &masks, &their_crop)?;
+        let mask = work.join(format!("{stem}-differing.png"));
+        differing(&our_crop, &their_crop, thresholds.flat_fuzz_percent, &mask)?;
         let picture = report.join(format!("{stem}.png"));
-        montage(
-            &our_crop,
-            &their_crop,
-            thresholds.flat_fuzz_percent,
-            &picture,
-        )?;
+        montage(&our_crop, &their_crop, &mask, &picture)?;
 
         // Low-pass both, so glyph and icon edges do not dominate.
         let blur = format!("0x{}", thresholds.real_lowpass_sigma);
@@ -643,7 +953,7 @@ fn check_state(context: &Job, state: &State, checks: &mut Vec<Check>) -> Result<
         for (source, target) in [(&our_crop, &our_soft), (&their_crop, &their_soft)] {
             magick_ok(&[path_str(source)?, "-blur", &blur, path_str(target)?])?;
         }
-        let rmse = 100.0 * compare("RMSE", None, &our_soft, &their_soft)?;
+        let rmse = 100.0 * rmse(&our_soft, &their_soft)?;
         let brightness =
             100.0 * (mean_brightness(&our_soft)? - mean_brightness(&their_soft)?).abs();
         checks.push(Check {
@@ -660,16 +970,10 @@ fn check_state(context: &Job, state: &State, checks: &mut Vec<Check>) -> Result<
         // No real wallpaper on this machine: lay out over a flat colour.
         let run = format!("{component}-{}-layout", state.scene);
         let capture = scene.capture(&run, None, "#808080")?;
-        let (width, height, scale) = ours_of(&capture.dump)?;
-        let surface = our_surface(&capture.dump, &map.surface)?;
-        let ours = Side {
-            tree: &surface["tree"],
-            width,
-            height,
-            scale,
-            text_key: "text_box",
-        };
-        check_layout(map, state, &ours, &theirs, thresholds.layout_px, checks);
+        match our_side(map, &capture.dump) {
+            Ok(ours) => check_layout(map, state, &ours, &theirs, thresholds.layout_px, checks),
+            Err(error) => checks.push(failed("layout", state.scene.clone(), &error)),
+        }
         checks.push(Check {
             tier: "real",
             subject: format!("{}: all regions", state.scene),

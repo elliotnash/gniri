@@ -9,6 +9,8 @@ window.gniri-layer {
 // size come from the system font setting, as in GNOME Shell.
 window.gniri-layer {
     color: $fg_color;
+    // See st-optical-size() in _drawing.scss.
+    font-variation-settings: "opsz" st-optical-size($base_font_size);
 }
 
 // The colours symbolic icons use for their "success", "warning" and "error"

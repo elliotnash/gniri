@@ -21,7 +21,7 @@ battery = { percentage = 91 }
 # Two outputs, so the slider has its device menu button, as on the
 # reference machine.
 [fixture.audio]
-output = { volume = 0.27 }
+output = { volume = 0.2545 }
 outputs = [
     { name = "speakers", description = "Speakers – Built-in Audio", active = true },
     { name = "hdmi", description = "HDMI / DisplayPort – Built-in Audio" },

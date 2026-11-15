@@ -25,10 +25,30 @@
     @return floor($em_value) / 1000 * 1em;
 }
 
-// Upstream fontsize(): a size in points as an em value at the 11pt base.
-@mixin fontsize($size, $base: 16px) {
-    $adjusted_size: ($size / 1pt) * 1.091 * 1000;
-    font-size: round($adjusted_size / ($base / 1px)) / 1000 * 1em;
+// Upstream fontsize(): a size in points as an em value.
+//
+// Upstream's em values are relative to St's 16px default and its 1.091
+// px-per-pt factor, which together make 11pt come out as 0.75em of that
+// default: the interface font's own size. GTK resolves em against the
+// inherited font size, which is the interface font (11pt), so here the same
+// sizes are simply their ratio to 11pt.
+@mixin fontsize($size) {
+    font-size: round($size / $base_font_size * 1000) / 1000 * 1em;
+    font-variation-settings: "opsz" st-optical-size($size);
+}
+
+// The optical size St's text is set at.
+//
+// Adwaita Sans is a variable font whose optical-size axis tightens the
+// letter spacing as it grows. GTK leaves the axis at its minimum, 14. Text
+// in GNOME Shell is narrower than that: fitted over twenty labels of four
+// sizes and weights in the reference captures, its widths are those of the
+// axis at about one and a half times the font's pixel size (22 for the 11pt
+// interface font). With that every label gniri has so far is within a pixel
+// of GNOME's width; at GTK's default they are up to 7px wider.
+@function st-optical-size($size) {
+    $pixels: ($size / 1pt) * 96 / 72;
+    @return round($pixels * 1.5 * 100) / 100;
 }
 
 // A box-shadow as St draws it, for GTK.

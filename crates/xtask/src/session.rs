@@ -309,6 +309,18 @@ impl Session {
         Ok(String::from_utf8_lossy(&output.stdout).into_owned())
     }
 
+    /// Waits until the session shows the result of everything done so far.
+    ///
+    /// Steps are done when niri has acted, but gniri hears about that a
+    /// moment later; then it must draw, and niri must composite what it
+    /// drew. Fixtures turn animations off, so nothing still moves after.
+    pub fn settle(&self) -> Result<()> {
+        std::thread::sleep(Duration::from_millis(100));
+        self.gniri_msg(&["debug", "sync"])?;
+        std::thread::sleep(Duration::from_millis(200));
+        Ok(())
+    }
+
     pub fn client_command(&self, program: &str) -> Command {
         let mut command = Command::new(program);
         command.env("WAYLAND_DISPLAY", &self.wayland_display);

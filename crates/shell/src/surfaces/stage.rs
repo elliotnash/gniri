@@ -56,6 +56,10 @@ impl Inner {
         let Some(surface) = self.window.surface() else {
             return;
         };
+        if layer::pointer_ignored() {
+            surface.set_input_region(Some(&cairo::Region::create()));
+            return;
+        }
         let top = (self.panel_height)();
         let region = cairo::Region::create_rectangle(&cairo::RectangleInt::new(
             0,
@@ -81,6 +85,8 @@ impl Inner {
         if widget.parent().is_none() {
             // `QuickSettings` opens under the status area: the right end
             // of the panel.
+            widget.set_hexpand(true);
+            widget.set_vexpand(true);
             widget.set_halign(gtk::Align::End);
             widget.set_valign(gtk::Align::Start);
             widget.set_margin_end(ARROW_RISE);

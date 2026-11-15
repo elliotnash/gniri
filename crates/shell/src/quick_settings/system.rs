@@ -35,12 +35,14 @@ pub fn build(services: &Rc<Services>, subscriptions: &mut Vec<Subscription>) -> 
     // `PowerToggle`: the charge level; opens the power settings.
     let battery_icon = gtk::Image::builder()
         .css_classes(["quick-toggle-icon"])
+        .valign(gtk::Align::Center)
         .build();
     let battery_label = gtk::Label::builder()
         .css_classes(["quick-toggle-title"])
         .build();
     let battery_box = gtk::Box::builder()
         .css_classes(["quick-toggle-box"])
+        .valign(gtk::Align::Center)
         .build();
     battery_box.append(&battery_icon);
     battery_box.append(&battery_label);

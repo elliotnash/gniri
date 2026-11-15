@@ -1,0 +1,7 @@
+# The quick settings menu with the Power Mode submenu open, as in GNOME's
+# `quick-settings-submenu` reference capture.
+
+extends = "quick-settings"
+
+[[steps]]
+gniri = ["debug", "open-submenu", "power-mode"]
