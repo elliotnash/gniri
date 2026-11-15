@@ -216,6 +216,113 @@ milestone.
   captured once, by accident, so there are no flat-wallpaper pixels to
   compare with. The blurred background is the overview's (see "Blur").
 
+## Overview
+
+The overview is niri's. gniri adds GNOME's search entry, dash, app grid and
+search results to it and takes none of niri's own away.
+
+- **The workspaces.** They are a column, one above the other, each with
+  its windows in a row that scrolls; GNOME has them side by side. A
+  workspace has no rounded corners, windows carry no title or close
+  button, and the neighbours of the workspace in the middle show at the
+  top and the bottom of the screen: behind the bar, and beside the dash.
+- **Size.** niri zooms out to at most three quarters; `gniri.kdl` asks for
+  0.7, which keeps the middle workspace clear of the entry and the dash
+  on screens 800 pixels high and more. GNOME's is about 0.8 and fits the
+  screen exactly.
+- **Above the app grid** GNOME shows the workspaces as a strip of small
+  pictures. niri's cannot be drawn there. The grid is where GNOME has it
+  and the strip's place stays empty.
+- **Behind the app grid and a search** GNOME has shrunk or hidden the
+  workspaces. niri's stay, so gniri draws the overview's background once
+  more in front of them. The bar is not covered: a workspace that
+  reaches behind it still shows there.
+- **Behind the search entry** a neighbouring workspace can pass. The
+  entry then shows that workspace's wallpaper, blurred, and never its
+  windows; in GNOME nothing is ever behind it.
+- **Opening and closing.** The dash slides up from the screen edge as in
+  GNOME, and the entry slides out from under the bar where GNOME fades it
+  in (see "Blur": a fading blurred widget is blurred at full strength
+  throughout). The change to the app grid and back is at once; GNOME
+  shrinks the workspaces and fades the grid in over a quarter of a
+  second. None of it follows the fingers of a touchpad swipe.
+- **Keys.** While the overview is open gniri has the keyboard, so that
+  typing searches. Escape, Enter and the arrow keys do what niri's do
+  when nothing is typed; anything else niri handles in its overview
+  without a key binding does not reach it. Keys bound in niri's config
+  work as always.
+- **More than one output.** The entry and the dash are on every output
+  that has a bar, and all show the same search. GNOME has them on the
+  primary monitor only.
+- **Language.** "Type to search", "Show Apps", "No results" and the rest
+  are English.
+
+## Dash
+
+- **Favourites** are set in the config file. Nothing can be dragged to or
+  within the dash, and an item has no menu: no "Pin to Dash", "New
+  Window" or "Quit", no list of its windows.
+- **A click** on an application that runs goes to the window of its that
+  was used last. GNOME shows all its windows when there are several, and
+  starts a new one on a middle click or with Ctrl held.
+- **Which application a window belongs to** goes by the window's
+  application id and the desktop entries' names and `StartupWMClass`.
+  GNOME also goes by the process and by what the application's own
+  sandbox says, so an oddly named window finds its icon there and can
+  show as an item of its own here, under its window's title and a plain
+  icon.
+- **The order of the running applications** that are no favourites is the
+  order their first windows opened in.
+- **Items come and go at once**; GNOME's grow in and shrink away. A
+  starting application shows no spinner on its icon, and its icon does
+  not zoom out as it starts.
+- **The name over an item** is built from GNOME's stylesheet and source;
+  the capture has none to compare with.
+
+## App grid
+
+- **Order.** By name. GNOME's can be rearranged by dragging and keeps the
+  arrangement.
+- **Folders.** There are none: what GNOME keeps in "Utilities" and
+  "System" is in the grid with everything else. No icon can be dragged.
+- **A long name** is cut short. GNOME shows all of it, on two lines,
+  while the pointer is on the icon.
+- **Turning the page** by its arrows, by scrolling, by a click on a page's
+  dot and by Page Up and Page Down. There is no touchpad or touch-screen
+  swipe, and no strip at the screen's side that shows the next page while
+  something is dragged.
+- **Applications that want a terminal** run in `xdg-terminal-exec` if it
+  is installed, else in the first of a short list of terminals that is.
+- **What is listed.** Entries with `OnlyShowIn=GNOME` are listed, since
+  gniri stands in for GNOME Shell: Settings is one. Some of those expect
+  more of GNOME than gniri provides.
+
+## Search
+
+- **Applications** are found as GLib finds them: by the words of their
+  name, their program's name, their keywords, generic name and comment,
+  best match first. GNOME then puts the applications used most first;
+  gniri keeps no count and orders equal matches by name.
+- **Not found:** GNOME's own results for "power off", "lock" and the like,
+  and its offer to search GNOME Software or the web when nothing matches.
+- **Providers.** The applications asked are those that install a search
+  provider for GNOME Shell, in GNOME's default order; which are asked is
+  in gniri's config file, not in GNOME Settings. A provider that GNOME
+  only asks once the user has turned it on there is never asked. One that
+  has not answered after ten seconds is given up on for that search.
+- **Every letter starts a search.** GNOME waits 150 ms after the first
+  for the typing to pause, and narrows a provider's previous results
+  where it can; gniri asks afresh each time, and drops the answers to
+  what was typed before.
+- **Pictures.** A result's picture is shown if the provider names an icon
+  or a file or sends pixels; one sent as an encoded image is left out.
+- **Keys.** Down from the applications goes to the first result under
+  them, wherever the selection was in the row; Tab does nothing.
+- **Clipboard.** GNOME copies some results (a character, a calculation)
+  when they are chosen. gniri leaves that to the application the result
+  opens in.
+- **While searching** the status text has no spinner beside it.
+
 ## Idle and power
 
 - **Dimming** sets the backlight to 30% at once, as

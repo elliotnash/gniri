@@ -577,6 +577,112 @@ was unlocked by `loginctl unlock-session`.
   the accidental capture over the real wallpaper; its components are
   compared by layout and by low-passed pixels.
 
+## M5: what the overview taught
+
+### Looks
+
+- **The overview needs no dimming folded in.** A menu's tint is folded
+  for niri's undimmed blur (S5). In the overview what is behind gniri's
+  widgets is the backdrop surface, which is the wallpaper blurred and
+  dimmed to 0.6 already (S14), so blur-my-shell's colours for the dash,
+  the entry and the tiles are used as it writes them. Over flat grey the
+  dash reads (53,53,55) and the entry (89,89,89), as GNOME's do.
+- **Default ("xray") blur in the overview shows what is behind the
+  windows there**: the backdrop where no workspace is, a workspace's own
+  wallpaper where one is, and never a window. The dash has it so that a
+  workspace below never shows its windows through it, which is how
+  blur-my-shell's dash looks; the entry has it for the workspace above.
+- **GNOME's layout is arithmetic, and reproducing the arithmetic
+  reproduces the layout.** Where the overview's parts go, how many icons
+  a page holds and at what spacing, and how large the dash's icons are,
+  are ports of the JavaScript's sums (`overview/layout.rs`). On the
+  reference screen's size they give every one of the thirty icons of the
+  captured app grid its captured place, to the pixel.
+- **St's `offset-y` is a translation**, and so is its port. A negative
+  margin made GTK measure the five-pixel dot as minus one pixel high.
+- **St centres by rounding down, GTK by rounding up.** A 5px dot in a
+  76px box sat a pixel right of GNOME's. The dash's dot has a pixel of
+  margin on that side.
+- **A size request counts CSS margins in.** The dash's separator, asked
+  to be as tall as an icon, came out twelve pixels short: its bottom
+  margin was taken from the request. The request is made of a box inside
+  it. The same goes for the dash's background, whose height GNOME binds
+  to an icon's with a constraint.
+- **A widget that is not visible measures as nothing**, so an arrow of
+  the app grid that had no page to turn to made the layout count with
+  an arrow zero wide. The arrows stay visible and are taken out with
+  `set_child_visible`.
+- **GNOME Shell bundles the icons of its arrows** (`carousel-arrow-*`);
+  they are bundled here too.
+
+### Structure
+
+- **One surface, not three.** The plan had a surface each for the dash,
+  the search and the app grid. The app grid has to hide niri's
+  workspaces, which means an opaque surface under the entry and the
+  dash; and nothing says in what order a compositor stacks the
+  surfaces of one layer. So there is one surface per
+  output, `gniri-overview`, on the top layer under the panel, with
+  GNOME's `ControlsManager` layout inside it. While the windows show, its
+  input region is the entry and the dash alone and niri's overview is
+  used through the rest of it (the stage's trick, S12).
+- **The cover is the backdrop's own texture.** Behind the app grid and a
+  search the surface draws the blurred wallpaper again, laid out at the
+  output's size and moved up by the panel's height, so that its pixels
+  land on the backdrop's. It is the same `GdkTexture`, not a second
+  copy. Without a wallpaper of gniri's it is a flat colour.
+- **The keyboard is the overview's while it is open** (S9), and the text
+  field inside has the focus all along: typing needs no key forwarding.
+  What GNOME does with focus (the entry lighting up when typing starts,
+  the arrow keys walking through the results) is state here: which
+  result is chosen is a number in the overview's state, and the widgets
+  show it with a style class. Escape, Enter and the arrows, which niri
+  would have handled, are sent back to it as actions when nothing is
+  typed.
+- **Which applications run is not a service.** The compositor says which
+  windows are open; the applications service says what is installed; a
+  pure function puts the two together into the dash. Under a fixture the
+  windows are real ones, of a test program that takes an application id.
+- **Applications are started by niri** (`Action::Spawn`), not by gniri:
+  under systemd each then gets a scope of its own, where a child of
+  gniri's would live and die in gniri's unit.
+- **The search provider backend never waits for one provider.** Each
+  question is a task; the loop sleeps on the commands and all the tasks
+  at once, and a new search drops the old one's tasks (the rule of M2
+  and M3, here with something to lose: a provider is a program the bus
+  may first have to start).
+- **A scene's search is answered by the scene.** Under a fixture the
+  search service is the real model, fed by a few lines that answer any
+  search with the scene's results: the same events, in the same order,
+  as from the bus.
+- **`OnlyShowIn=GNOME` is shown.** GNOME Settings says it is for GNOME
+  alone, and gniri offers it in its menus.
+- **Favourites live in gniri's config file**, by the rule that it has one
+  file of settings and writes one GSettings key. The default is GNOME's
+  list.
+
+### Harness
+
+- **Not everything can be compared on a smaller screen**, and what
+  cannot is tested as arithmetic instead (docs/TESTING.md, "What depends
+  on the size of the screen"). The one setting made for the tests'
+  sake is the dash's icon size.
+- **niri's own drawing reaches into a crop.** At the production zoom the
+  workspace's shadow fell on the dash's margin on the low nested output.
+  The test configuration zooms further out.
+- **Whose applications?** A capture of the dash and the app grid shows
+  what its user has installed. The extract blacks out every icon that is
+  not a symbolic one of the theme, and the names under them, and the
+  comparison skips those boxes; the scenes bring applications of their
+  own.
+- **Half pixels, again.** A 6px margin is seven and a half pixels at
+  scale 1.25, and the two sides rounded the crop's last row apart. Maps
+  use margins that are whole pixels.
+- **A `grep` for `niri_socket` also finds `gniri_socket`.**
+- **GTK's warnings are in the logs, not in the results.** A run that
+  passes can have printed a critical; the logs of a new part are read
+  once (`target/visual/logs/*-gniri.log`).
+
 ## Standing rules
 
 - Nested niri: never `--session`; find the instance through the `NIRI_SOCKET`

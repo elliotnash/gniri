@@ -5,18 +5,28 @@
 //! ```
 //!
 //! Services: power, network, bluetooth, brightness, audio, rfkill, mpris,
-//! session, idle.
+//! session, idle, apps, search.
 //!
 //! It only listens; it never sends a command. `session` shows what logind
 //! would let this session do and never locks: a request to lock is only
-//! printed. `idle` reports five and ten seconds without input.
+//! printed. `idle` reports five and ten seconds without input. `apps`
+//! lists the installed applications once.
+//!
+//! `search` is the exception: it searches for the words after it, which
+//! starts the applications that answer searches, as GNOME Shell's own
+//! search does.
+//!
+//! ```text
+//! cargo run -p gniri-services --example watch -- search calc
+//! ```
 
 use std::time::Duration;
 
 use gniri_services::session::locker::{Locker, Report};
 use gniri_services::{Bus, Link, Model};
 use gniri_services::{
-    audio, bluetooth, brightness, idle, logind, mpris, network, power, rfkill, session,
+    apps, audio, bluetooth, brightness, idle, logind, mpris, network, power, rfkill, search,
+    session,
 };
 
 /// A locker that locks nothing.
@@ -85,8 +95,34 @@ fn main() {
             (idle::Timer::Dim, Duration::from_secs(5)),
             (idle::Timer::Blank, Duration::from_secs(10)),
         ])),
+        "apps" => print(apps::backend::spawn()),
+        "search" => {
+            let terms: Vec<String> = std::env::args().skip(2).collect();
+            let mut bus = Bus::session();
+            let link = bus.add::<search::State, _, _>("search", |connection, events, commands| {
+                search::backend::run(
+                    connection,
+                    events,
+                    commands,
+                    search::backend::Options::default(),
+                )
+            });
+            bus.start();
+            let mut state = search::State::default();
+            let command = search::Command::Search(terms);
+            state.predict(&command);
+            let _ = link.commands.send_blocking(command);
+            while let Ok(event) = link.events.recv_blocking() {
+                println!("event: {event:?}");
+                state.apply(event);
+                if !state.searching() && !state.terms.is_empty() {
+                    println!("state: {state:#?}");
+                }
+            }
+        }
         _ => eprintln!(
-            "usage: watch power|network|bluetooth|brightness|audio|rfkill|mpris|session|idle"
+            "usage: watch power|network|bluetooth|brightness|audio|rfkill|mpris|session|idle|\
+             apps|search <words>"
         ),
     }
 }

@@ -4,7 +4,7 @@
 cargo test --workspace          # logic, theme values, backends; no display needed
 cargo xtask diff quick-settings # looks: gniri against the GNOME reference
 cargo xtask check               # behaviour: gniri driven in a live session
-cargo xtask check lock          # one part of it (see `cargo xtask check --help`)
+cargo xtask check overview      # one part of it (see `cargo xtask check --help`)
 cargo xtask report              # diff every component, write an HTML page
 ```
 
@@ -40,13 +40,19 @@ skips each of these with a note when its tools are not installed:
   polkit and a shell script for its helper
   (`crates/services/tests/polkit_bus.rs`).
 
+- **Search providers**: a bare python-dbusmock object standing in for an
+  application that answers searches, with its key file and desktop entry
+  in a directory of the test's own
+  (`crates/services/tests/search_bus.rs`).
+
 One test asks the system's real PAM, with a wrong password, and so only
 runs on request: `cargo test -p gniri-services -- --ignored real_pam`.
 
 To see what a backend reports from the real system, without changing
 anything: `cargo run -p gniri-services --example watch -- power` (or
 `network`, `bluetooth`, `brightness`, `audio`, `rfkill`, `mpris`,
-`session`, `idle`).
+`session`, `idle`, `apps`). `-- search calc` asks the installed search
+providers for "calc", which starts them, as GNOME Shell's search does.
 
 ## What is compared
 
@@ -84,6 +90,39 @@ the nested window must not show up as a hovered button.
 serves notifications on the nested session's own bus and `notify-send` is
 run as any application would run it. That session reads the state of the
 real system (battery, network) but changes nothing.
+
+### What depends on the size of the screen
+
+GNOME decides some things by the height of the screen: how large the
+dash's icons are, how many icons a page of the app grid holds and at what
+size, how far apart the overview's parts are. The nested output is lower
+than the reference screen, so there GNOME's own rules give another
+answer than the capture shows: 48px icons in the dash, 64px in the grid.
+
+Those rules are plain arithmetic (`crates/shell/src/overview/layout.rs`)
+and are tested as such, against the boxes of GNOME's own actors: every
+icon of the captured app grid is where the arithmetic puts it
+(`metrics/app-grid.json`, which is only measured and has no pictures).
+What does not depend on the screen is compared as everything else is:
+
+- the dash, with its icon size pinned in the test configuration to the
+  64px the capture has;
+- an application's tile, among the search results, where GNOME never
+  makes it smaller;
+- the page dots and the arrow of the app grid, and the lists of search
+  results. A map says `placement = false` for these: their distance from
+  the screen edges is not compared, and for the real-wallpaper tier the
+  nested output is given the wallpaper that lies behind GNOME's.
+
+The applications in these scenes are the scenes' own, and so is what a
+search finds: under a fixture no desktop entry is read and nothing is
+asked over D-Bus. The reference has the user's applications blacked out,
+icons and names: an extract says `apps`, and the comparison skips those
+boxes while still comparing where they are. A scene opens a window of an
+application with `window = { color = "…", app-id = "…" }`.
+
+The test session uses a smaller overview zoom than `data/niri/gniri.kdl`
+sets (`tests/visual/niri/test.kdl` says why).
 
 Some scenes have no GNOME capture to compare with and exist to be looked
 at: `cargo xtask shot look --scene date-menu-media --wallpaper '#808080'`
@@ -125,9 +164,11 @@ name and picture are blacked out of the committed references.
    widget, which widget is which actor, and which regions to compare. See
    `quick-settings.toml`; selectors are described in
    `crates/xtask/src/tree.rs`.
-   A surface that the compositor places below the panel (a banner) says
-   so with `below = "gniri-panel"`: a widget dump cannot tell where its
-   surface was put.
+   A surface that the compositor places below the panel (a banner, the
+   overview) says so with `below = "gniri-panel"`: a widget dump cannot
+   tell where its surface was put. A component whose parts are not all
+   inside its root names a widget above it as `tree`, where the pairs'
+   selectors then start (the dash's items are beside its background).
 4. `cargo xtask diff <name>`, then open the pictures under
    `target/visual/report/<name>/`: ours on top, GNOME in the middle,
    differing pixels marked at the bottom.
@@ -146,6 +187,10 @@ gniri msg power-off              # the end-session dialog
 gniri msg debug close-dialog
 gniri msg debug idle dim         # as if nobody had touched anything for that long
 gniri msg debug idle dim --resumed
+gniri msg apps                   # the overview, on the app grid
+gniri msg debug show-apps --off  # back to the windows
+gniri msg debug search calc      # as if typed into the overview
+gniri msg debug page 1           # the app grid's second page
 ```
 
 `debug notify` delivers a notification as if an application had sent it.
@@ -191,4 +236,15 @@ Then, in the session:
   password, the right one, Escape.
 - The power menu: "Restart…" and "Power Off…" ask first and count down;
   Cancel and Escape stop them. "Log Out…" ends the session.
+- The overview, by the hot corner, the touchpad's four-finger swipe and
+  your own bind: the entry and the dash come with it and go with it; a
+  window can still be clicked and dragged between them.
+- Type a few letters there: your applications, and under them what Files,
+  Settings, Calculator and the others find. Enter starts the first; the
+  new window has the focus.
+- A click on a dash icon whose application runs goes to its window, on
+  whatever workspace; on one that does not, starts it.
+- Super+A: every application, in pages; scrolling and the arrows turn
+  them. On a second monitor the same shows, and the keyboard is with the
+  output that has the focus.
 - `journalctl --user -b | grep gniri` afterwards: nothing unexpected.

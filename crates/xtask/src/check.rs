@@ -18,6 +18,10 @@ use crate::tree;
 
 const WALLPAPER: &str = "#808080";
 const WINDOW: &str = "#f6f5f4";
+/// A pixel of the bar with nothing of the bar's on it, and in the overview
+/// well clear of the workspace niri shows behind the bar and of its
+/// shadow.
+const BAR: (u32, u32) = (200, 20);
 
 struct Checker {
     session: Session,
@@ -448,7 +452,7 @@ fn panel_and_overview() -> Result<(usize, usize)> {
     checker.session.action(Action::FocusWorkspaceDown {})?;
     checker.expect("the bar is tinted on the desktop", |session| {
         // 70% of rgb(21,21,24) over the grey wallpaper (docs/DECISIONS.md, S5).
-        Ok(near(pixel(session, 300, 20)?, [53, 53, 55]))
+        Ok(near(pixel(session, BAR.0, BAR.1)?, [53, 53, 55]))
     });
     checker.session.action(Action::OpenOverview {})?;
     checker.expect(
@@ -457,11 +461,11 @@ fn panel_and_overview() -> Result<(usize, usize)> {
     );
     checker.expect(
         "and clears the bar, showing the dimmed backdrop",
-        |session| Ok(near(pixel(session, 300, 20)?, [77, 77, 77])),
+        |session| Ok(near(pixel(session, BAR.0, BAR.1)?, [77, 77, 77])),
     );
     checker.session.action(Action::CloseOverview {})?;
     checker.expect("closing it restores the bar", |session| {
-        Ok(!panel_shows_overview(session)? && near(pixel(session, 300, 20)?, [53, 53, 55]))
+        Ok(!panel_shows_overview(session)? && near(pixel(session, BAR.0, BAR.1)?, [53, 53, 55]))
     });
 
     println!("fullscreen");
@@ -470,13 +474,13 @@ fn panel_and_overview() -> Result<(usize, usize)> {
         .session
         .action(Action::FullscreenWindow { id: None })?;
     checker.expect("a fullscreen window covers the panel", |session| {
-        Ok(near(pixel(session, 300, 20)?, [0xf6, 0xf5, 0xf4]))
+        Ok(near(pixel(session, BAR.0, BAR.1)?, [0xf6, 0xf5, 0xf4]))
     });
     checker
         .session
         .action(Action::FullscreenWindow { id: None })?;
     checker.expect("and the panel is back afterwards", |session| {
-        Ok(near(pixel(session, 300, 20)?, [53, 53, 55]))
+        Ok(near(pixel(session, BAR.0, BAR.1)?, [53, 53, 55]))
     });
 
     println!("pointer");
@@ -1366,7 +1370,7 @@ fn lock_screen() -> Result<(usize, usize)> {
 
     println!("lock screen");
     checker.expect("(the desktop shows before)", |session| {
-        Ok(near(pixel(session, 300, 20)?, [53, 53, 55]))
+        Ok(near(pixel(session, BAR.0, BAR.1)?, [53, 53, 55]))
     });
     checker.session.spawn_helper("lock")?;
     checker.expect("the locker says when the compositor has locked", |_| {
@@ -1418,7 +1422,7 @@ fn lock_screen() -> Result<(usize, usize)> {
         Ok(!session.helper_runs("lock"))
     });
     checker.expect("and the desktop is back", |session| {
-        Ok(near(pixel(session, 300, 20)?, [53, 53, 55]))
+        Ok(near(pixel(session, BAR.0, BAR.1)?, [53, 53, 55]))
     });
 
     // The lock is the compositor's, not the locker's.
@@ -1431,7 +1435,7 @@ fn lock_screen() -> Result<(usize, usize)> {
     first.wait()?;
     checker.expect(
         "leaves the session locked: niri still shows nothing",
-        |session| Ok(!session.helper_runs("lock") && pixel(session, 300, 20).is_err()),
+        |session| Ok(!session.helper_runs("lock") && pixel(session, BAR.0, BAR.1).is_err()),
     );
     let mut second = checker.session.start_helper("lock")?;
     checker.expect("another lock screen takes over", |session| {
@@ -1443,7 +1447,7 @@ fn lock_screen() -> Result<(usize, usize)> {
     type_text(&checker.session, "sesame")?;
     key(&checker.session, "Return")?;
     checker.expect("and unlocks with the password", |session| {
-        Ok(!session.helper_runs("lock") && near(pixel(session, 300, 20)?, [53, 53, 55]))
+        Ok(!session.helper_runs("lock") && near(pixel(session, BAR.0, BAR.1)?, [53, 53, 55]))
     });
     let status = second.wait()?;
     checker.expect("ending with the status that says \"unlocked\"", |_| {
