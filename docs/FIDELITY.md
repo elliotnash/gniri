@@ -54,10 +54,8 @@ milestone.
   widget cannot be scaled (the compositor would blur the wrong region), so
   gniri's only fade and slide.
 - **Submenus** open and close at once; GNOME's unfold over 200 ms.
-- **Power button.** "Restart…" and "Power Off…" are missing until the dialog
-  that asks first exists (M4). "Log Out…" asks through niri's own dialog.
-  The lock button asks logind to lock the session, which does nothing until
-  a screen locker listens (gniri's own arrives with M4).
+- **Power button.** "Log Out…" ends the session by asking niri to quit.
+  "Switch User…" is not there. See "Dialogs" for the dialog that asks first.
 - **Settings.** Entries such as "Power Settings" start GNOME Settings
   (`gnome-control-center`, configurable). Much of it expects
   gnome-settings-daemon and will not work under niri.
@@ -104,8 +102,8 @@ milestone.
   slides and fades, without the overshoot.
 - **Banner timing.** A banner stays four seconds, as in GNOME, but GNOME
   starts counting only once the user is active, and holds a banner longer
-  while the pointer moves towards it. gniri does neither (it learns about
-  idleness with M4). A banner that appears under the pointer opens at once;
+  while the pointer moves towards it. gniri does neither. A banner that
+  appears under the pointer opens at once;
   GNOME waits for the pointer to leave and come back.
 - **Fullscreen.** GNOME holds back all but critical banners while a
   fullscreen window is shown. niri does not say when one is, so gniri shows
@@ -154,7 +152,88 @@ milestone.
 - Only the volume and brightness keys show it. GNOME also uses it for
   things gniri does not have yet (display switching, tablets).
 
+## Dialogs
+
+- **Border.** A dialog's one-pixel border is the one edge where the
+  difference between St's pixel snapping and GTK's antialiasing shows in
+  the pixel comparison: it is brighter against its surroundings than any
+  other edge (tests/visual/map/polkit-dialog.toml).
+- **One output.** The dialog opens on the output with the focus, and only
+  that output is dimmed. GNOME dims every monitor.
+- **Opening.** The blur behind the dialog and its shade does not fade in
+  with them (see "Blur").
+- **End-session dialog: not compared.** GNOME's was not captured. It is
+  built from the same parts as the authentication dialog, which is
+  compared, and from GNOME's source.
+- **End-session dialog: contents.** GNOME lists the applications that
+  would lose work and the other users who are logged in, offers to install
+  pending updates, warns about a low battery before updating and offers
+  the boot menu while Alt is held. gniri's dialog has the question, the
+  countdown and the two buttons.
+- **Who acts.** In GNOME gnome-session ends the session, giving
+  applications time to object. gniri asks logind to restart or power off,
+  and ends the session by having niri quit; applications are not asked.
+
+## Authentication (polkit)
+
+- **One user.** As in GNOME, the dialog asks for one user's password: the
+  user's own if polkit accepts it, else root's.
+- **While locked.** GNOME holds a request back until the screen is
+  unlocked. gniri's dialog opens at once and is under the lock screen
+  until then, which comes to the same.
+- **The helper.** Passwords are checked by polkit's own helper. gniri
+  starts the setuid helper, or uses the socket systemd offers for it where
+  the distribution enables that; the second way has not been tried on a
+  system that has it.
+
+## Lock screen
+
+- **No panel.** GNOME's lock screen keeps the right end of the panel
+  (network, sound, battery, with a reduced quick settings menu). gniri's
+  shows the clock and the prompt alone: the volume and brightness keys
+  still work, but nothing shows the battery.
+- **No notifications.** GNOME lists who sent notifications while locked,
+  at the bottom of the screen. gniri's lock screen does not, and no banner
+  shows over it. They are in the date menu after unlocking.
+- **Changing between clock and prompt.** They cross-fade. GNOME also
+  shrinks one away upwards as the other grows in from below, follows a
+  swipe on a touch screen, and reacts to scrolling.
+- **Locking and unlocking** happen at once. GNOME fades the screen out
+  before an idle lock and slides the shield away after unlocking.
+- **Every output asks.** Each output has the clock and, after a key press
+  or click there, its own prompt. GNOME has the prompt on one monitor.
+- **Fingerprint.** A finger is waited for while a prompt shows, through
+  PAM, and what the fingerprint module says is shown under the entry as it
+  comes. GNOME has its own wording and a menu of the ways to unlock.
+  Smart cards, web login and the other GDM mechanisms are not supported.
+- **Messages.** A wrong password gets GNOME's sentence; anything else is
+  PAM's own text. The hint under the clock always says "Click or press a
+  key".
+- **Not there:** "Switch User…", the on-screen keyboard, the
+  screen-time-limit shield, media controls.
+- **Language.** The clock and the texts are English.
+- **Compared over the real wallpaper only.** GNOME's lock screen was
+  captured once, by accident, so there are no flat-wallpaper pixels to
+  compare with. The blurred background is the overview's (see "Blur").
+
+## Idle and power
+
+- **Dimming** sets the backlight to 30% at once, as
+  gnome-settings-daemon's default does over a short fade, and only where
+  there is a backlight gniri can set.
+- **No automatic suspend.** GNOME suspends an idle laptop after 15
+  minutes on battery. gniri turns the screens off and locks; logind
+  suspends on a closed lid.
+- **What holds idleness off.** niri counts the idle time and honours the
+  Wayland idle-inhibit protocol (video players, Firefox). Programs that
+  only ask over D-Bus (`org.freedesktop.ScreenSaver`, GNOME's session
+  manager) are not heard.
+- **Settings** are in gniri's config file (`[idle]`, `[lock]`), not in
+  GNOME Settings.
+
 ## Compositor-owned
 
 - **Hiding the panel.** niri draws fullscreen windows above the top layer,
   which hides the panel as GNOME does, but without GNOME's slide animation.
+- **Power button and lid.** niri and logind handle them. GNOME's own
+  handling (asking, suspending, ignoring) is not reproduced.

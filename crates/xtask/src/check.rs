@@ -1400,6 +1400,35 @@ fn lock_screen() -> Result<(usize, usize)> {
         Ok(near(pixel(session, 300, 20)?, [53, 53, 55]))
     });
 
+    // The lock is the compositor's, not the locker's.
+    println!("a lock screen that dies");
+    let mut first = checker.session.start_helper("lock")?;
+    checker.expect("(locked again)", |session| {
+        Ok(on_lock(session, CLOCK)?.is_some())
+    });
+    first.kill()?;
+    first.wait()?;
+    checker.expect(
+        "leaves the session locked: niri still shows nothing",
+        |session| Ok(!session.helper_runs("lock") && pixel(session, 300, 20).is_err()),
+    );
+    let mut second = checker.session.start_helper("lock")?;
+    checker.expect("another lock screen takes over", |session| {
+        Ok(on_lock(session, CLOCK)?.is_some())
+    });
+    key_until(&checker.session, "Return", |session| {
+        Ok(on_lock(session, PROMPT)?.is_some())
+    })?;
+    type_text(&checker.session, "sesame")?;
+    key(&checker.session, "Return")?;
+    checker.expect("and unlocks with the password", |session| {
+        Ok(!session.helper_runs("lock") && near(pixel(session, 300, 20)?, [53, 53, 55]))
+    });
+    let status = second.wait()?;
+    checker.expect("ending with the status that says \"unlocked\"", |_| {
+        Ok(status.code() == Some(0))
+    });
+
     let Checker {
         session,
         passed,

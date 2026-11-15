@@ -342,6 +342,43 @@ impl Session {
         Ok(())
     }
 
+    /// Starts `gniri <subcommand>` as a child of this process, a client of
+    /// the nested compositor with the options the shell has, and waits
+    /// until it answers. Unlike [`Session::spawn_helper`] this also works
+    /// while the session is locked, when niri starts nothing, and the
+    /// caller can kill what it started.
+    pub fn start_helper(&self, subcommand: &str) -> Result<Child> {
+        let log = visual_dir()?
+            .join("logs")
+            .join(format!("{}-{subcommand}.log", self.name));
+        let socket = self.helper_socket(subcommand);
+        let _ = fs::remove_file(&socket);
+        let output = File::create(&log)?;
+        let child = Command::new(&self.gniri)
+            .args(&self.gniri_args)
+            .arg(subcommand)
+            .env("WAYLAND_DISPLAY", &self.wayland_display)
+            .env("NIRI_SOCKET", &self.niri_socket)
+            .env("GNIRI_INSTANCE", "test")
+            .env("GSK_RENDERER", "vulkan")
+            .env("GTK_A11Y", "none")
+            .env("GSETTINGS_BACKEND", "memory")
+            .stdin(Stdio::null())
+            .stdout(output.try_clone()?)
+            .stderr(output)
+            .spawn()
+            .with_context(|| format!("starting gniri {subcommand}"))?;
+        wait_until(&format!("gniri {subcommand} to start"), || {
+            Ok(Self::ask(&socket, "Sync").is_ok())
+        })
+        .with_context(|| format!("see {}", log.display()))?;
+        let mut helpers = self.helpers.borrow_mut();
+        if !helpers.iter().any(|helper| helper == subcommand) {
+            helpers.push(subcommand.to_owned());
+        }
+        Ok(child)
+    }
+
     /// Whether a helper process started with [`Session::spawn_helper`]
     /// still answers.
     pub fn helper_runs(&self, subcommand: &str) -> bool {

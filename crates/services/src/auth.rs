@@ -209,4 +209,19 @@ mod tests {
             );
         }
     }
+
+    /// Asks the real PAM, which takes a couple of seconds and writes a
+    /// failed attempt to the system's log, so only on request:
+    /// `cargo test -p gniri-services -- --ignored real_pam`.
+    #[test]
+    #[ignore = "asks the system's PAM"]
+    fn real_pam_turns_a_wrong_password_down() {
+        let user = crate::user::User::current().name;
+        let said = std::sync::Mutex::new(Vec::new());
+        let outcome = Pam::password(&user).check("not this user's password", &|message| {
+            said.lock().unwrap().push(message);
+        });
+        // Denied, not unavailable: the service exists and could check.
+        assert_eq!(outcome, Outcome::Denied, "PAM said: {said:?}");
+    }
 }

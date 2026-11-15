@@ -86,16 +86,6 @@ $end_session_dialog_width: em_at_most(352px);
 
 .end-session-dialog {
     min-width: $end_session_dialog_width;
-
-    // special style for session warnings
-    .end-session-dialog-battery-warning {
-        @include st_line_height;
-        color: $warning_color;
-        background-color: transparentize($warning_color, 0.9);
-        padding: $base_padding * 1.5;
-        border-radius: $base_border_radius;
-        margin: $base_margin 0;
-    }
 }
 
 /* Message Dialog */

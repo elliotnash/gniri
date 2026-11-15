@@ -4,6 +4,7 @@
 cargo test --workspace          # logic, theme values, backends; no display needed
 cargo xtask diff quick-settings # looks: gniri against the GNOME reference
 cargo xtask check               # behaviour: gniri driven in a live session
+cargo xtask check lock          # one part of it (see `cargo xtask check --help`)
 cargo xtask report              # diff every component, write an HTML page
 ```
 
@@ -32,10 +33,20 @@ skips each of these with a note when its tools are not installed:
   (`crates/services/tests/notifications_bus.rs`). Needs only `dbus-daemon`.
 - **Media players**: a bare python-dbusmock object standing in for a player
   (`crates/services/tests/mpris_bus.rs`).
+- **The session**: python-dbusmock's logind and a stand-in for the screen
+  locker (`crates/services/tests/session_bus.rs`): locking on request,
+  sleep waiting for the lock, a locker that dies.
+- **The polkit agent**: a bare python-dbusmock object standing in for
+  polkit and a shell script for its helper
+  (`crates/services/tests/polkit_bus.rs`).
+
+One test asks the system's real PAM, with a wrong password, and so only
+runs on request: `cargo test -p gniri-services -- --ignored real_pam`.
 
 To see what a backend reports from the real system, without changing
 anything: `cargo run -p gniri-services --example watch -- power` (or
-`network`, `bluetooth`, `brightness`, `audio`, `rfkill`, `mpris`).
+`network`, `bluetooth`, `brightness`, `audio`, `rfkill`, `mpris`,
+`session`, `idle`).
 
 ## What is compared
 
@@ -77,7 +88,28 @@ real system (battery, network) but changes nothing.
 Some scenes have no GNOME capture to compare with and exist to be looked
 at: `cargo xtask shot look --scene date-menu-media --wallpaper '#808080'`
 (a media player's card), `date-menu-group` (an opened group),
-`date-menu-empty`, `quick-settings-busy`.
+`date-menu-empty`, `quick-settings-busy`, `end-session` (the dialog that
+asks before powering off).
+
+### The lock screen and the dialogs
+
+The lock screen and the polkit agent are processes of their own. A scene
+starts one with a `spawn` step, with the scene's fixture; the process then
+answers `dump-tree` and `sync` on a socket of its own, and the harness
+reads its widgets along with the shell's. A scene's lock screen takes the
+scene's password and never asks PAM; a scene's agent shows the scene's
+request and never talks to polkit. Only a debug build accepts a fixture
+for the lock screen.
+
+niri takes no screenshot of a locked session. So the scenes that are
+compared with GNOME (`lock`, `lock-prompt`) show a preview: the same
+widgets on an ordinary surface, nothing locked. `cargo xtask check lock`
+locks the nested session for real and goes by the widget dump and a
+virtual keyboard: a wrong password, the right one, the desktop back.
+
+GNOME's own lock screen was only captured over the real wallpaper, so
+`lock-clock` and `lock-prompt` have no flat-wallpaper tier. The user's
+name and picture are blacked out of the committed references.
 
 ## Adding a component
 
@@ -110,6 +142,10 @@ gniri msg debug open-submenu wifi
 gniri msg debug open-menu date-menu
 gniri msg debug notify --app Chat --action reply=Reply "A message" "Its text"
 gniri msg debug open-group debug:Chat   # a group of the date menu's list
+gniri msg power-off              # the end-session dialog
+gniri msg debug close-dialog
+gniri msg debug idle dim         # as if nobody had touched anything for that long
+gniri msg debug idle dim --resumed
 ```
 
 `debug notify` delivers a notification as if an application had sent it.
@@ -120,3 +156,39 @@ runs there.
 the `gniri_socket` path in `target/visual/logs/nest.ready`, `gniri msg`
 reaches that shell. Without `--scene` the nested shell uses the real
 services: what you click there happens.
+
+## The real session
+
+What no nested session can show, and so what is checked by hand after
+logging in to niri with gniri as the shell: locking with the real password
+and a fingerprint, suspend and lid close, the idle chain on the real
+backlight, `pkexec`, restart, power off and log out.
+
+Before the first try, know the way back in. The lock is the compositor's:
+if the lock screen ever fails to take a password, or dies, the session
+stays locked.
+
+1. Switch to another terminal (Ctrl+Alt+F3) and log in.
+2. `loginctl unlock-session <id>` (`loginctl list-sessions` shows the id)
+   tells a running lock screen to unlock.
+3. If no lock screen runs (the screen is blank), start one for the locked
+   session and unlock it there, or on its prompt:
+   `WAYLAND_DISPLAY=wayland-1 gniri lock`.
+4. As a last resort `loginctl terminate-session <id>` ends the session.
+
+Then, in the session:
+
+- `gniri msg lock` (or Super+Alt+L): the clock, a key, the password. A
+  wrong one is refused after PAM's delay. With a finger enrolled, the
+  reader unlocks while the prompt shows.
+- `loginctl lock-session` from a terminal locks the same way.
+- Close the lid or `systemctl suspend`: on waking, the lock screen is
+  there before the desktop ever shows.
+- Leave the machine: the screen dims after four minutes, turns off and
+  locks after five (`[idle]` and `[lock]` in the config file shorten this
+  for a test), and a locked screen turns off after 15 seconds.
+- `pkexec true` in a terminal: the authentication dialog, a wrong
+  password, the right one, Escape.
+- The power menu: "Restart…" and "Power Off…" ask first and count down;
+  Cancel and Escape stop them. "Log Out…" ends the session.
+- `journalctl --user -b | grep gniri` afterwards: nothing unexpected.

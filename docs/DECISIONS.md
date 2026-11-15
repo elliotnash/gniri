@@ -471,6 +471,112 @@ These hold for every widget port that follows.
   looked at, not measured; it is listed in docs/FIDELITY.md until a capture
   exists.
 
+## M4: what the lock screen, the dialogs and the agent taught
+
+Two things were tried live that the plan had left open. Nested niri locks:
+`ext-session-lock` works in a nested session, and a virtual keyboard's
+keys reach the lock surface. And the real path holds outside fixtures: a locker started
+by hand in a nested session checked passwords through the system's PAM and
+was unlocked by `loginctl unlock-session`.
+
+### Looks
+
+- **St's `st-mix` is not CSS `color-mix`.** St mixes two colours channel
+  by channel and the result is opaque. `color-mix` weighs a translucent
+  colour by its alpha and carries the alpha over. blur-my-shell's focus
+  ring mixes the accent with `rgba(255,255,255,0.9)`: in GNOME that reads
+  (133,181,238) at alpha 0.8, the literal translation to GTK read darker
+  and fainter. The theme now gives the white as opaque.
+- **A dialog's shade is a formula.** GNOME's lightbox leaves the screen
+  half as bright in the middle and 30% of that in the corners, linearly in
+  the distance from the centre: a radial gradient of black from alpha 0.5
+  to 0.85. blur-my-shell blurs the screen under it and dims that to 0.6,
+  which folds into the gradient (0.7 to 0.91). The dialog on top is the
+  popup tint over the shaded screen, dimmed once more and by the 3% of
+  its own shadow. Over flat grey in the middle of the screen GNOME reads
+  (25,25,27), and so does gniri.
+- **The pixel St adds to a line is not there at every size.** A line of
+  11pt or 9pt text is a pixel taller in St than in Pango; at 15pt bold and
+  at 20pt the two agree. `st_line_height` is for the small sizes only.
+- **GTK CSS has no `overflow`.** Clipping a child to rounded corners is
+  the widget's `overflow` property.
+- **A picture brings its own size.** A `GtkPicture` child made the avatar
+  as large as the image file wanted, and an expanding one stretched the
+  box above it ("`vexpand` travels up", again). The avatar is now what St
+  makes it: a box with the picture as its CSS background.
+- **GNOME's unlock prompt is a pixel left of centre.** Its layout centres
+  a 457px column (the width of the notification list) and the 440px prompt
+  inside that, rounding down twice. The same nesting reproduces it.
+
+### Structure
+
+- **The locker is a process, and the session backend its keeper.**
+  `gniri lock` prints `locked` once the compositor has confirmed and its
+  exit status says how it ended; the backend starts it on logind's `Lock`
+  signal, releases its sleep inhibitor on `locked`, and starts a new one if
+  it dies, since a session whose locker died stays locked with nothing
+  shown. For the same reason the systemd unit has `KillMode=process`:
+  restarting gniri must not take the lock screen with it.
+- **Leaving the lock.** The only ways out are PAM saying yes, and logind's
+  `Unlock` signal. After `unlock` the locker waits for the compositor to
+  have heard it (`gdk_display_sync`) before it exits: a locker that
+  vanishes first leaves the session locked.
+- **logind's `session/auto` is for calls only.** Signals come from the
+  session's real object, and a process started by the systemd user manager
+  is in no session. The session is looked up once: by `XDG_SESSION_ID`,
+  by process, then as the user's graphical session.
+- **Password and fingerprint need two PAM services.** A login stack set
+  up for fingerprints (Fedora's `with-fingerprint`) waits for the reader
+  before it looks at a password. GDM runs two conversations side by side
+  for that reason, and so does the lock screen. Until `data/pam/` is
+  installed it uses the distribution's `password-auth` and
+  `fingerprint-auth` where they exist, then `login`.
+- **Still no `unsafe`.** `nonstick` wraps PAM and `gtk4-session-lock` the
+  session lock.
+- **The layer-shell library must not be asked about a lock surface.**
+  `gtk_layer_is_layer_window` answers yes for a session-lock window, and
+  `gtk_layer_get_namespace` then reads what is not there and crashes.
+  Lock windows carry a style class and the widget dump goes by that.
+- **Dialogs have a surface of their own**, not the stage the plan put them
+  on. A dialog covers the panel and takes every click, where the stage
+  leaves the panel free; and the polkit dialog lives in another process.
+- **The polkit agent's proxies are written by hand** too (`zbus_polkit`
+  was not needed), and the helper's protocol is lines of text: its lines
+  are escaped as GLib's `g_strescape` does, answers go back as typed.
+  Registering was tried against the real polkit from a nested session: it
+  answered that the session already has an agent (GNOME's), so the call is
+  understood.
+- **A nested session idles on its own clock.** niri counts input to the
+  nested window, not to the machine. A nested gniri with real services
+  would dim the real backlight and ask logind to lock the real session
+  while its user works beside it, so the test configuration turns the
+  idle chain off.
+- **A scene's lock screen never asks PAM**, and only a debug build takes a
+  scene: `gniri lock --fixture` in a release build is refused.
+
+### Harness
+
+- **niri does nothing over IPC for a locked session**: no screenshot, no
+  spawn. Pictures of the lock screen come from a preview (the same widgets
+  on an ordinary surface); behaviour is checked under the real lock, by
+  the widget dump and a virtual keyboard.
+- **Helper processes answer for themselves.** `gniri lock` and
+  `gniri polkit` serve `dump-tree` and `sync` on sockets of their own, in
+  a scene only; a scene step starts one and the harness merges the dumps.
+- **A mask must reach the pixel a box ends in.** A box that starts three
+  quarters into a pixel reaches a pixel further than its size says. The
+  redaction mask missed it, and the scene's avatar showed as a line of
+  differing pixels.
+- **A key sent to a surface that was just mapped can arrive too early**:
+  the compositor moves the keyboard focus a moment later. The checks
+  press again, a few times at most, until it shows.
+- **Test scripts are code.** A shell `read` without `-r` takes a trailing
+  backslash for a line continuation and waits: the stand-in helper hung
+  the test that sends it one.
+- **No flat capture, no flat tier.** GNOME's lock screen exists only in
+  the accidental capture over the real wallpaper; its components are
+  compared by layout and by low-passed pixels.
+
 ## Standing rules
 
 - Nested niri: never `--session`; find the instance through the `NIRI_SOCKET`
