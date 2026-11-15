@@ -4,16 +4,19 @@ A desktop shell for the [niri](https://github.com/YaLTeR/niri) compositor that
 looks like GNOME Shell 51 with the blur-my-shell extension, built with GTK 4
 and libadwaita in Rust.
 
-**Status: early.** Two milestones are done:
+**Status: early.** Three milestones are done:
 
 - the wallpaper, the blurred overview backdrop and the top bar (workspace
   dots, clock, status icons, keyboard layout, screen-sharing indicator);
 - the quick settings menu with its submenus, the volume and brightness
   display, and the services behind them: sound, Wi-Fi and wired networks,
   Bluetooth, battery and power mode, brightness, airplane mode, dark style
-  and night light.
+  and night light;
+- notifications (gniri is the notification server: banners, do not
+  disturb), and the date menu with the calendar, the notification list and
+  media player controls.
 
-No date menu, notifications, lock screen or dialogs yet.
+No lock screen, dialogs or overview dressing yet.
 
 ## Build
 
@@ -46,6 +49,10 @@ start.
 gniri talks to the system directly: PipeWire or PulseAudio for sound,
 NetworkManager, BlueZ, UPower, a power-profiles daemon and logind. Whatever
 is missing is left out of the menu. It needs no gnome-settings-daemon.
+
+gniri serves `org.freedesktop.Notifications` itself. Stop any other
+notification daemon (mako, dunst, swaync): whichever starts first has the
+name, and if that is not gniri it says so on stderr and shows none.
 
 Settings go in `~/.config/gniri/config.toml`; `data/config.example.toml`
 lists all of them. Without a `[wallpaper]` setting gniri draws no wallpaper.

@@ -403,6 +403,74 @@ These hold for every widget port that follows.
 - **The reference holds private text.** The Wi-Fi name is blacked out of the
   committed pictures and never compared.
 
+## M3: what notifications and the date menu taught
+
+### Looks
+
+- **Translucent cards cannot be painted over one another.** The cards
+  under the first of a group of notifications show only as slivers below
+  it. St (with blur-my-shell) masks them; simply drawing the first card on
+  top would let the others shine through it. `GniriMessageGroup` cuts the
+  shape of the card above out of each card below (`push_mask`, inverted
+  alpha). The reference pixels confirm it: the top card is the same colour
+  over the stack as beside it.
+- **A label asks for the width of its text.** A long notification title
+  would widen the whole menu. Labels that must take the width they are
+  given are ellipsised with `max-width-chars` 1; the theme's `min-width`
+  on their container then decides alone.
+- **`vexpand` travels up.** An expanding picture inside a message made the
+  message itself expand, and the list stretched one card over all its
+  spare room. The picture is now its own frame: a `GtkImage` with a
+  minimum size, which centres what it shows.
+- **A widget's box includes its CSS transform.** A banner starts a little
+  above its place and slides down, so for a moment its boxes are 29px up.
+  Nothing may be read from them then: the banner's input region comes from
+  the surface's size instead, and a check waits for `debug sync` before it
+  aims a click.
+- **The rules of M1 and M2 held.** With `to_em`, `em_at_most`, the line
+  height pixel and the optical size, the date menu and the banner were
+  within a pixel of GNOME everywhere on the first run.
+
+### Structure
+
+- **The notification backend keeps a copy of the shell's state** and runs
+  the same events and commands through the same pure functions. That copy
+  answers what the protocol asks: whether a `replaces_id` still exists,
+  and which notifications a change removed, so their senders get
+  `NotificationClosed`. The logic exists once.
+- **The loop that drains signals never waits for a reply** (see M2). The
+  notification server asks for a caller's process id in the method call
+  itself; the media player backend is two halves, one that only moves
+  signals and commands into a queue and one that works the queue off.
+- **Desktop entries are read by hand.** gio 0.22 no longer has
+  `DesktopAppInfo` (it moved to a crate of its own), and the services crate
+  has no GLib. Name, icon and command are three keys of a text file.
+- **One bus runner for both buses** (`Bus::system()`, `Bus::session()`).
+- **Which group of notifications is open is menu state**, beside which
+  submenu is: Escape, a click elsewhere and the debug interface all reach
+  it the same way.
+- **The backend stamps notifications with a clock it is handed**, since
+  only the shell (GLib) knows the local time and the state must not depend
+  on when a test runs.
+- **Do Not Disturb lives in memory.** GNOME keeps it in GSettings; the one
+  GSettings key gniri writes stays the colour scheme.
+- **A banner's surface is anchored to the top and respects the panel's
+  exclusive zone**, so the compositor puts it under the panel, wherever
+  that ends. The stage covers the output and adds the panel's height
+  itself, because it must also catch clicks beside the menu.
+
+### Harness
+
+- **Nobody looked at text that was never drawn.** The notifications under
+  the first of a group are in the actor dump with all their text. The
+  extract tool replaces the text of fully transparent actors.
+- **A banner's check must outlast the banner.** Waiting for one to leave
+  takes longer than the three seconds a check normally waits.
+- **No capture, no comparison.** GNOME was captured with no media player
+  running. The media card is ported from the stylesheet and the source and
+  looked at, not measured; it is listed in docs/FIDELITY.md until a capture
+  exists.
+
 ## Standing rules
 
 - Nested niri: never `--session`; find the instance through the `NIRI_SOCKET`

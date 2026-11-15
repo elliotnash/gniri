@@ -1,0 +1,24 @@
+# The date menu with a media player's card above the notifications, and a
+# notification that has a picture and buttons. GNOME was not captured with a
+# player running; the scene is for looking at.
+
+extends = "date-menu"
+
+[[fixture.mpris.players]]
+bus_name = "org.mpris.MediaPlayer2.example"
+name = "Music"
+icon = { name = "org.gnome.Music" }
+status = "playing"
+title = "A Song With a Rather Long Title That Does Not Fit"
+artists = ["An Artist", "Another Artist"]
+can_play = true
+can_go_next = true
+can_go_previous = false
+
+[[steps]]
+gniri = [
+    "debug", "notify", "--app", "Chat", "--icon", "chat-symbolic",
+    "--image", "avatar-default-symbolic", "--action", "reply=Reply",
+    "--action", "mute=Mute", "A message",
+    "With a body that is long enough to need more than the one line a closed message has room for, so that it can be opened.",
+]

@@ -27,10 +27,15 @@ skips each of these with a note when its tools are not installed:
 - **Sound**: a private PipeWire with null devices
   (`crates/services/tests/audio_server.rs`); your own sound server is not
   touched.
+- **Notifications**: gniri's own server on a private bus, talked to with
+  `notify-send` and with plain bus calls
+  (`crates/services/tests/notifications_bus.rs`). Needs only `dbus-daemon`.
+- **Media players**: a bare python-dbusmock object standing in for a player
+  (`crates/services/tests/mpris_bus.rs`).
 
 To see what a backend reports from the real system, without changing
 anything: `cargo run -p gniri-services --example watch -- power` (or
-`network`, `bluetooth`, `brightness`, `audio`, `rfkill`).
+`network`, `bluetooth`, `brightness`, `audio`, `rfkill`, `mpris`).
 
 ## What is compared
 
@@ -64,6 +69,16 @@ A wrong colour, a missing line or an edge two pixels out still counts.
 Screenshot runs start gniri with `--no-pointer`: your pointer passing over
 the nested window must not show up as a hovered button.
 
+`cargo xtask check` ends with a session that has no fixture, in which gniri
+serves notifications on the nested session's own bus and `notify-send` is
+run as any application would run it. That session reads the state of the
+real system (battery, network) but changes nothing.
+
+Some scenes have no GNOME capture to compare with and exist to be looked
+at: `cargo xtask shot look --scene date-menu-media --wallpaper '#808080'`
+(a media player's card), `date-menu-group` (an opened group),
+`date-menu-empty`, `quick-settings-busy`.
+
 ## Adding a component
 
 1. Add it to `EXTRACTS` in `tools/gnome-ref/extract.py`, run the script,
@@ -78,6 +93,9 @@ the nested window must not show up as a hovered button.
    widget, which widget is which actor, and which regions to compare. See
    `quick-settings.toml`; selectors are described in
    `crates/xtask/src/tree.rs`.
+   A surface that the compositor places below the panel (a banner) says
+   so with `below = "gniri-panel"`: a widget dump cannot tell where its
+   surface was put.
 4. `cargo xtask diff <name>`, then open the pictures under
    `target/visual/report/<name>/`: ours on top, GNOME in the middle,
    differing pixels marked at the bottom.
@@ -89,7 +107,14 @@ cargo xtask nest --scene quick-settings --wallpaper '#808080'   # until Ctrl-C
 gniri msg debug dump-tree        # every mapped widget
 gniri msg debug commands         # what the shell asked its services for
 gniri msg debug open-submenu wifi
+gniri msg debug open-menu date-menu
+gniri msg debug notify --app Chat --action reply=Reply "A message" "Its text"
+gniri msg debug open-group debug:Chat   # a group of the date menu's list
 ```
+
+`debug notify` delivers a notification as if an application had sent it.
+Under a fixture that is the only way to get one: no notification server
+runs there.
 
 `nest` prints the sockets of the nested session. With `GNIRI_SOCKET` set to
 the `gniri_socket` path in `target/visual/logs/nest.ready`, `gniri msg`

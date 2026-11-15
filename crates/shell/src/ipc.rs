@@ -31,6 +31,8 @@ pub enum Request {
     },
     /// Open a menu inside the quick settings menu.
     OpenSubmenu(Submenu),
+    /// Open the group of one application's notifications in the date menu.
+    OpenGroup(String),
     /// Close whatever menu is open.
     CloseMenu,
     Volume(VolumeKey),

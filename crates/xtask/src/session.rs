@@ -438,13 +438,22 @@ fn kill_group(process: &mut Child) {
 }
 
 /// Polls `done` until it returns true, for at most three seconds.
-pub fn wait_until(what: &str, mut done: impl FnMut() -> Result<bool>) -> Result<()> {
+pub fn wait_until(what: &str, done: impl FnMut() -> Result<bool>) -> Result<()> {
+    wait_until_within(what, Duration::from_secs(3), done)
+}
+
+/// Polls `done` until it holds, for at most `limit`.
+pub fn wait_until_within(
+    what: &str,
+    limit: Duration,
+    mut done: impl FnMut() -> Result<bool>,
+) -> Result<()> {
     let started = Instant::now();
     loop {
         if done()? {
             return Ok(());
         }
-        if started.elapsed() > Duration::from_secs(3) {
+        if started.elapsed() > limit {
             bail!("timed out waiting for {what}");
         }
         std::thread::sleep(Duration::from_millis(25));

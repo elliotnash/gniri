@@ -23,7 +23,7 @@
 //       button.message-expand-button.icon-button
 //       button.message-close-button.icon-button
 //     box.message-box                              .message-box
-//       box.message-icon > image                     .message-icon
+//       image.message-icon                           .message-icon
 //       box.message-content
 //         label.message-title
 //         label.message-body                         .message-body
@@ -211,14 +211,14 @@ $message_animation_time: 100ms;
             min-height: $base_icon_size * 3;
 
             // icon size and color
-            image { -gtk-icon-size: $base_icon_size * 3; } // 48px
+            -gtk-icon-size: $base_icon_size * 3; // 48px
 
             // a small symbolic icon on a circle background
             &.message-themed-icon {
                 border-radius: $forced_circular_radius;
                 background-color: transparentize($fg_color, .93);
-
-                image { -gtk-icon-size: $scalable_icon_size; }
+                -gtk-icon-size: $scalable_icon_size;
+                -gtk-icon-style: symbolic;
             }
         }
 
@@ -275,12 +275,15 @@ $message_animation_time: 100ms;
     }
 }
 
-.media-message {
+// Upstream marks these `!important`; here the selector is made as specific
+// as the rules above that it has to win over.
+.message.media-message .message-box {
     // album-art
     .message-icon {
         border-radius: $base_border_radius;
 
-        &.message-themed-icon image {
+        &.message-themed-icon {
+            border-radius: $base_border_radius;
             -gtk-icon-size: $large_icon_size; // 32px
         }
     }

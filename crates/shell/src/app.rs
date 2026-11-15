@@ -12,6 +12,7 @@ use crate::Cli;
 use crate::debug;
 use crate::ipc;
 use crate::keys;
+use crate::menus::Menu;
 use crate::outputs::Outputs;
 use crate::ready::ReadyTracker;
 use crate::services::Services;
@@ -208,6 +209,18 @@ fn handle(
             services
                 .menus
                 .update(|menus| menus.set_submenu(Some(submenu)));
+            Ok(Value::Null)
+        }
+        ipc::Request::OpenGroup(source) => {
+            if !services.menus.with(|menus| {
+                menus
+                    .open
+                    .as_ref()
+                    .is_some_and(|open| open.menu == Menu::DateMenu)
+            }) {
+                return Err("the date menu is not open".to_owned());
+            }
+            services.menus.update(|menus| menus.set_group(Some(source)));
             Ok(Value::Null)
         }
         ipc::Request::CloseMenu => {

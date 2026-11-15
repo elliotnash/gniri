@@ -1,0 +1,7 @@
+# The date menu with a group of notifications opened. GNOME was not
+# captured in this state; the scene is for looking at.
+
+extends = "date-menu"
+
+[[steps]]
+gniri = ["debug", "open-group", "system"]

@@ -8,6 +8,7 @@ time = "2026-11-14T08:28:00"
 power = { profile = "performance", battery = { percentage = 91 } }
 audio = { output = { volume = 0.3 } }
 network = { primary = { kind = "wifi", strength = 70 } }
+do_not_disturb = { available = true }
 
 # Everything in the list has been seen, as it had been in GNOME.
 [[fixture.notifications.sources]]

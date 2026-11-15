@@ -40,8 +40,6 @@ struct Inner {
     groups: RefCell<HashMap<String, Group>>,
     /// By bus name.
     players: RefCell<HashMap<String, MediaCard>>,
-    /// Key of the source whose group is open.
-    expanded: RefCell<Option<String>>,
     /// Corner radius of a card in the list.
     radius: f32,
 }
@@ -169,17 +167,17 @@ impl Inner {
             .is_some_and(|group| group.widget.is_stacked())
     }
 
-    /// `MessageView._setExpandedGroup`
+    /// `MessageView._setExpandedGroup`. Which group is open is part of the
+    /// menu's state, so that Escape and the debug interface reach it.
     fn set_expanded(&self, key: Option<String>) {
-        if *self.expanded.borrow() == key {
-            return;
-        }
-        self.expanded.replace(key);
-        self.apply_expanded();
+        self.services.menus.update(|menus| menus.set_group(key));
     }
 
     fn apply_expanded(&self) {
-        let expanded = self.expanded.borrow().clone();
+        let expanded = self
+            .services
+            .menus
+            .with(|menus| menus.group().map(str::to_owned));
         for (key, group) in self.groups.borrow().iter() {
             let open = expanded.as_deref() == Some(key.as_str());
             if !open {
@@ -272,13 +270,16 @@ impl Inner {
         }
 
         // A group that is gone, or down to one card, is no longer open.
-        let still_open = self.expanded.borrow().as_ref().is_some_and(|key| {
+        let open = services
+            .menus
+            .with(|menus| menus.group().map(str::to_owned));
+        let still_there = open.as_ref().is_some_and(|key| {
             sources
                 .iter()
                 .any(|source| source.key == *key && source.notifications.len() > 1)
         });
-        if !still_open {
-            self.expanded.replace(None);
+        if open.is_some() && !still_there {
+            self.set_expanded(None);
         }
         self.apply_expanded();
 
@@ -371,7 +372,6 @@ impl MessageList {
             clear,
             groups: RefCell::default(),
             players: RefCell::default(),
-            expanded: RefCell::default(),
             radius,
         });
 
@@ -398,6 +398,16 @@ impl MessageList {
                 let sync = sync(&inner);
                 move |_| sync()
             }),
+            services
+                .menus
+                .select(|menus| menus.group().map(str::to_owned), {
+                    let inner = Rc::downgrade(&inner);
+                    move |_| {
+                        if let Some(inner) = inner.upgrade() {
+                            inner.apply_expanded();
+                        }
+                    }
+                }),
         ];
 
         Self {
@@ -407,20 +417,16 @@ impl MessageList {
         }
     }
 
-    /// Closes the open group, if one is. Returns whether there was one.
-    /// `MessageView.collapse`
-    pub fn collapse(&self) -> bool {
-        let open = self.inner.expanded.borrow().is_some();
-        self.inner.set_expanded(None);
-        open
-    }
-
     /// The open group, if one is.
     pub fn expanded_group(&self) -> Option<gtk::Widget> {
-        let expanded = self.inner.expanded.borrow();
+        let expanded = self
+            .inner
+            .services
+            .menus
+            .with(|menus| menus.group().map(str::to_owned))?;
         let groups = self.inner.groups.borrow();
         groups
-            .get(expanded.as_deref()?)
+            .get(&expanded)
             .map(|group| group.widget.clone().upcast())
     }
 }

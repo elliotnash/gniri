@@ -13,7 +13,7 @@ use niri_ipc::Action;
 use serde_json::Value;
 
 use crate::scene::{self, Scene};
-use crate::session::{self, Session, SessionOptions, wait_until};
+use crate::session::{self, Session, SessionOptions, wait_until_within};
 use crate::tree;
 
 const WALLPAPER: &str = "#808080";
@@ -27,9 +27,20 @@ struct Checker {
 
 impl Checker {
     /// Records one check: polls `done` and reports what it was waiting for.
-    fn expect(&mut self, what: &str, mut done: impl FnMut(&Session) -> Result<bool>) {
+    fn expect(&mut self, what: &str, done: impl FnMut(&Session) -> Result<bool>) {
+        self.expect_within(what, std::time::Duration::from_secs(3), done);
+    }
+
+    /// The same for something that takes its time, such as a banner
+    /// leaving by itself.
+    fn expect_within(
+        &mut self,
+        what: &str,
+        limit: std::time::Duration,
+        mut done: impl FnMut(&Session) -> Result<bool>,
+    ) {
         let session = &self.session;
-        match wait_until(what, || done(session)) {
+        match wait_until_within(what, limit, || done(session)) {
             Ok(()) => {
                 println!("  ok   {what}");
                 self.passed += 1;
@@ -149,23 +160,81 @@ fn surface(session: &Session, namespace: &str) -> Result<Option<Value>> {
 }
 
 /// Clicks the middle of the widget `selector` picks on the stage.
+fn click(session: &Session, selector: &str) -> Result<()> {
+    click_on(session, "gniri-stage", selector)
+}
+
+/// Where a surface's top left corner is on the output. The stage covers
+/// the output; a banner is centred under the panel.
+fn surface_origin(session: &Session, surface: &Value) -> Result<(f64, f64)> {
+    if surface["namespace"] != "gniri-banner" {
+        return Ok((0.0, 0.0));
+    }
+    let (output_width, _) = output_size(session)?;
+    let width = surface["width"]
+        .as_f64()
+        .ok_or_else(|| anyhow!("the surface has no width"))?;
+    let panel = self::surface(session, "gniri-panel")?
+        .and_then(|panel| panel["height"].as_f64())
+        .unwrap_or(0.0);
+    Ok(((f64::from(output_width) - width) / 2.0, panel))
+}
+
+/// Clicks the middle of the widget `selector` picks on the surface called
+/// `namespace`.
 ///
 /// The click waits until the widget shows the pointer over it: each
 /// `wlrctl` call is a client of its own, whose requests the compositor may
-/// handle a moment later, and the menu may only just have been mapped.
-fn click(session: &Session, selector: &str) -> Result<()> {
-    let stage = surface(session, "gniri-stage")?.ok_or_else(|| anyhow!("no menu is open"))?;
-    let [x, y, width, height] = tree::rect(tree::select(&stage["tree"], selector)?, "box")?;
-    pointer_to(
+/// handle a moment later, and the surface may only just have been mapped.
+fn click_on(session: &Session, namespace: &str, selector: &str) -> Result<()> {
+    // A banner or a menu that was just asked for slides into place; where
+    // its widgets are is only settled once it has been drawn there.
+    session.gniri_msg(&["debug", "sync"])?;
+    let found = surface(session, namespace)?.ok_or_else(|| anyhow!("{namespace} is not mapped"))?;
+    let (left, top) = surface_origin(session, &found)?;
+    let [x, y, width, height] = tree::rect(tree::select(&found["tree"], selector)?, "box")?;
+    hover_at(
         session,
-        (x + width / 2.0).round() as i32,
-        (y + height / 2.0).round() as i32,
+        (left + x + width / 2.0).round() as i32,
+        (top + y + height / 2.0).round() as i32,
+        "the widget",
+        || {
+            Ok(on_surface(session, namespace, selector)?
+                .is_some_and(|widget| has_state(&widget, "hover")))
+        },
     )?;
-    wait_until("the pointer to reach the widget", || {
-        nudge(session)?;
-        Ok(on_stage(session, selector)?.is_some_and(|widget| has_state(&widget, "hover")))
-    })?;
     pointer(session, &["click", "left"])
+}
+
+/// Moves the pointer to a place and waits until `hovered` says the widget
+/// there has it. The compositor may apply the two moves that take the
+/// pointer there in the wrong order, which leaves it somewhere else; then
+/// they are made again.
+fn hover_at(
+    session: &Session,
+    x: i32,
+    y: i32,
+    what: &str,
+    mut hovered: impl FnMut() -> Result<bool>,
+) -> Result<()> {
+    let mut attempts = 0;
+    loop {
+        attempts += 1;
+        pointer_to(session, x, y)?;
+        let reached = wait_until_within(
+            &format!("the pointer to reach {what}"),
+            std::time::Duration::from_secs(1),
+            || {
+                nudge(session)?;
+                hovered()
+            },
+        );
+        match reached {
+            Ok(()) => return Ok(()),
+            Err(error) if attempts == 3 => return Err(error),
+            Err(_) => {}
+        }
+    }
 }
 
 /// Moves the pointer a pixel and back. A surface that is mapped under a
@@ -180,25 +249,57 @@ fn click_status_button(session: &Session) -> Result<()> {
     const BUTTON: &str = "#panelRight .panel-button:0";
     let panel = panel(session)?;
     let [x, y, width, height] = tree::rect(tree::select(&panel, BUTTON)?, "box")?;
-    pointer_to(
+    hover_at(
         session,
         (x + width / 2.0).round() as i32,
         (y + height / 2.0).round() as i32,
+        "the status button",
+        || {
+            let panel = self::panel(session)?;
+            Ok(has_state(tree::select(&panel, BUTTON)?, "hover"))
+        },
     )?;
-    wait_until("the pointer to reach the status button", || {
-        nudge(session)?;
-        let panel = self::panel(session)?;
-        Ok(has_state(tree::select(&panel, BUTTON)?, "hover"))
-    })?;
     pointer(session, &["click", "left"])
 }
 
 /// A node on the stage, if a menu is open and has it.
 fn on_stage(session: &Session, selector: &str) -> Result<Option<Value>> {
-    let Some(stage) = surface(session, "gniri-stage")? else {
+    on_surface(session, "gniri-stage", selector)
+}
+
+/// A node on the surface called `namespace`, if it is mapped and has it.
+fn on_surface(session: &Session, namespace: &str, selector: &str) -> Result<Option<Value>> {
+    let Some(surface) = surface(session, namespace)? else {
         return Ok(None);
     };
-    Ok(tree::select(&stage["tree"], selector).ok().cloned())
+    Ok(tree::select(&surface["tree"], selector).ok().cloned())
+}
+
+/// How many nodes of the stage carry `class`.
+fn count_on_stage(session: &Session, class: &str) -> Result<usize> {
+    let Some(stage) = surface(session, "gniri-stage")? else {
+        return Ok(0);
+    };
+    let mut count = 0;
+    tree::walk(&stage["tree"], &mut |node| {
+        if tree::classes(node).contains(&class) {
+            count += 1;
+        }
+    });
+    Ok(count)
+}
+
+/// Presses and releases one key in the nested session.
+fn key(session: &Session, name: &str) -> Result<()> {
+    let status = session
+        .client_command("wtype")
+        .args(["-k", name])
+        .status()
+        .context("running wtype")?;
+    if !status.success() {
+        bail!("wtype failed");
+    }
+    Ok(())
 }
 
 /// Every command the shell has sent to a service so far.
@@ -350,8 +451,13 @@ pub fn run() -> Result<bool> {
     } = checker;
     session.quit()?;
 
-    let (menu_passed, menu_failed) = quick_settings()?;
-    let (passed, failed) = (passed + menu_passed, failed + menu_failed);
+    let mut passed = passed;
+    let mut failed = failed;
+    for part in [quick_settings, notifications, notifications_over_the_bus] {
+        let (part_passed, part_failed) = part()?;
+        passed += part_passed;
+        failed += part_failed;
+    }
     println!("{passed} of {} checks passed", passed + failed);
     Ok(failed == 0)
 }
@@ -543,6 +649,425 @@ fn quick_settings() -> Result<(usize, usize)> {
     } else {
         println!("  skip wlrctl is not installed");
     }
+
+    let Checker {
+        session,
+        passed,
+        failed,
+    } = checker;
+    session.quit()?;
+    Ok((passed, failed))
+}
+
+/// Longer than a banner stays up by itself.
+const BANNER_TIME: std::time::Duration = std::time::Duration::from_secs(7);
+
+/// Banners and the date menu, in a session whose notifications are the
+/// `date-menu` scene's: nothing here needs a notification server, and what
+/// a click asked for can be read back from the command log.
+fn notifications() -> Result<(usize, usize)> {
+    const BANNER: &str = "gniri-banner";
+    const CLOCK: &str = "#panelCenter .panel-button";
+
+    let fixture = Scene::load("date-menu")?.write_fixture("check-notifications", None)?;
+    let session = Session::start(&SessionOptions {
+        name: "check-notifications".to_owned(),
+        niri_config: None,
+        renderer: "vulkan".to_owned(),
+        gniri_args: scene::gniri_args(Some(&fixture), Some(WALLPAPER)),
+    })?;
+    let mut checker = Checker {
+        session,
+        passed: 0,
+        failed: 0,
+    };
+    let notify = |session: &Session, arguments: &[&str]| -> Result<String> {
+        let mut all = vec!["debug", "notify"];
+        all.extend(arguments);
+        Ok(session.gniri_msg(&all)?.trim().to_owned())
+    };
+    let banner_title = |session: &Session| -> Result<Option<String>> {
+        Ok(surface(session, BANNER)?.and_then(|banner| text_of(&banner["tree"], ".message-title")))
+    };
+    let no_banner = |session: &Session| Ok(surface(session, BANNER)?.is_none());
+    let menu_is_open = |session: &Session| Ok(on_stage(session, ".datemenu-popover")?.is_some());
+    let menu_is_closed = |session: &Session| Ok(surface(session, "gniri-stage")?.is_none());
+    let group_titles = |session: &Session| -> Result<Vec<String>> {
+        let Some(stage) = surface(session, "gniri-stage")? else {
+            return Ok(Vec::new());
+        };
+        let mut titles = Vec::new();
+        tree::walk(&stage["tree"], &mut |node| {
+            if tree::classes(node).contains(&"message-notification-group")
+                && let Some(title) = text_of(node, ".message:0 .message-title")
+            {
+                titles.push(title);
+            }
+        });
+        Ok(titles)
+    };
+
+    println!("notification banners");
+    notify(&checker.session, &["--app", "Tester", "Hello", "World"])?;
+    checker.expect("a notification gets a banner under the panel", |session| {
+        Ok(banner_title(session)?.as_deref() == Some("Hello")
+            && sent(session, "notifications: ShowNextBanner")?)
+    });
+    notify(
+        &checker.session,
+        &["--app", "Tester", "Second", "Waits its turn"],
+    )?;
+    checker.expect("a second one waits for the first to leave", |session| {
+        Ok(banner_title(session)?.as_deref() == Some("Hello"))
+    });
+    checker.expect_within(
+        "the banner leaves by itself and the next one follows",
+        BANNER_TIME,
+        |session| {
+            Ok(banner_title(session)?.as_deref() == Some("Second")
+                && sent(session, "notifications: BannerHidden")?)
+        },
+    );
+    checker.expect_within("and then none is left", BANNER_TIME, no_banner);
+
+    let transient = notify(&checker.session, &["--transient", "Volume", "Passing"])?;
+    checker.expect("a transient notification has its banner too", |session| {
+        Ok(banner_title(session)?.as_deref() == Some("Volume"))
+    });
+    checker.expect_within("(its banner leaves)", BANNER_TIME, no_banner);
+
+    let critical = notify(
+        &checker.session,
+        &[
+            "--urgency",
+            "critical",
+            "--action",
+            "fix=Fix It",
+            "Battery",
+            "Nearly empty",
+        ],
+    )?;
+    checker.expect(
+        "a critical one shows in full, with its buttons",
+        |session| Ok(on_surface(session, BANNER, ".notification-button")?.is_some()),
+    );
+    // Longer than a banner's four seconds.
+    std::thread::sleep(std::time::Duration::from_millis(4600));
+    checker.expect("and stays until it is dealt with", |session| {
+        Ok(banner_title(session)?.as_deref() == Some("Battery"))
+    });
+    if on_path("wlrctl") {
+        click_on(&checker.session, BANNER, ".notification-button")?;
+        checker.expect("clicking its button tells the application", |session| {
+            sent(
+                session,
+                &format!("notifications: InvokeAction {{ id: {critical}, key: \"fix\""),
+            )
+        });
+        checker.expect("and takes the banner down", no_banner);
+
+        notify(
+            &checker.session,
+            &["--urgency", "critical", "Disk", "Nearly full"],
+        )?;
+        checker.expect("(another critical banner)", |session| {
+            Ok(banner_title(session)?.as_deref() == Some("Disk"))
+        });
+        click_on(&checker.session, BANNER, ".message-close-button")?;
+        checker.expect("its close button dismisses it", |session| {
+            Ok(sent(session, "notifications: Dismiss(")? && surface(session, BANNER)?.is_none())
+        });
+    } else {
+        println!("  skip wlrctl is not installed");
+        checker
+            .session
+            .gniri_msg(&["debug", "open-menu", "date-menu"])?;
+        checker.session.gniri_msg(&["debug", "close-menu"])?;
+    }
+
+    println!("date menu");
+    checker
+        .session
+        .gniri_msg(&["debug", "open-menu", "date-menu"])?;
+    checker.expect("opening it maps the stage", menu_is_open);
+    checker.expect("and shows the clock pressed", |session| {
+        let panel = panel(session)?;
+        Ok(has_state(tree::select(&panel, CLOCK)?, "checked"))
+    });
+    checker.expect("the list has what arrived, newest first", |session| {
+        let titles = group_titles(session)?;
+        Ok(titles.first().map(String::as_str) == Some("Second")
+            && titles.iter().any(|title| title == "Reference notification"))
+    });
+    checker.expect("less the transient one", |session| {
+        Ok(
+            !group_titles(session)?.iter().any(|title| title == "Volume")
+                && sent(session, "notifications: BannerHidden")?
+                && !transient.is_empty(),
+        )
+    });
+    notify(&checker.session, &["--app", "Tester", "Quiet", "No banner"])?;
+    checker.expect(
+        "with the menu open a notification only joins the list",
+        |session| {
+            Ok(group_titles(session)?.iter().any(|title| title == "Quiet")
+                && surface(session, BANNER)?.is_none())
+        },
+    );
+    checker.expect(
+        "today is selected and the today button has nothing to do",
+        |session| {
+            let today = on_stage(session, ".calendar-today")?;
+            let button = on_stage(session, ".datemenu-today-button")?;
+            Ok(
+                today.is_some_and(|day| text_of(&day, "GtkLabel").as_deref() == Some("14"))
+                    && button.is_some_and(|button| has_state(&button, "insensitive")),
+            )
+        },
+    );
+
+    if on_path("wlrctl") {
+        const SYSTEM: &str = "#system";
+        click(
+            &checker.session,
+            &format!("{SYSTEM} .message:0 .message-title"),
+        )?;
+        checker.expect(
+            "clicking a stack of notifications opens the group",
+            |session| {
+                let header = on_stage(session, &format!("{SYSTEM} .message-group-header"))?;
+                let third = on_stage(session, &format!("{SYSTEM} .message:2"))?;
+                Ok(header.is_some()
+                    && third.is_some_and(|card| !tree::classes(&card).contains(&"lower-in-stack")))
+            },
+        );
+        checker.expect("and fades the other groups back", |session| {
+            Ok(count_on_stage(session, "shaded")? > 0)
+        });
+        if on_path("wtype") {
+            key(&checker.session, "Escape")?;
+            checker.expect("Escape closes the group first", |session| {
+                Ok(
+                    on_stage(session, &format!("{SYSTEM} .message-group-header"))?.is_none()
+                        && on_stage(session, ".datemenu-popover")?.is_some(),
+                )
+            });
+        } else {
+            println!("  skip wtype is not installed");
+            click(
+                &checker.session,
+                &format!("{SYSTEM} .message-collapse-button"),
+            )?;
+        }
+        click(
+            &checker.session,
+            &format!("{SYSTEM} .message:0 .message-close-button"),
+        )?;
+        checker.expect("closing a closed group dismisses all of it", |session| {
+            Ok(sent(session, "notifications: DismissSource(\"system\")")?
+                && on_stage(session, SYSTEM)?.is_none())
+        });
+
+        click(&checker.session, ".calendar-change-month-forward")?;
+        checker.expect("the arrow shows the next month", |session| {
+            Ok(on_stage(session, ".calendar")?
+                .and_then(|calendar| text_of(&calendar, ".calendar-month-label"))
+                .as_deref()
+                == Some("December"))
+        });
+        checker.expect("and wakes the today button", |session| {
+            Ok(on_stage(session, ".datemenu-today-button")?
+                .is_some_and(|button| !has_state(&button, "insensitive")))
+        });
+        click(&checker.session, ".datemenu-today-button")?;
+        checker.expect("which goes back to today", |session| {
+            Ok(on_stage(session, ".calendar")?
+                .and_then(|calendar| text_of(&calendar, ".calendar-month-label"))
+                .as_deref()
+                == Some("November"))
+        });
+        click(&checker.session, ".calendar-day:8")?;
+        checker.expect("choosing a day names it on the events card", |session| {
+            Ok(on_stage(session, ".events-title")?
+                .and_then(|title| title["text"].as_str().map(str::to_owned))
+                .as_deref()
+                == Some("November 2"))
+        });
+
+        click(&checker.session, ".message-list-clear-button")?;
+        checker.expect("Clear empties the list", |session| {
+            Ok(sent(session, "notifications: Clear")?
+                && count_on_stage(session, "message")? == 0
+                && on_stage(session, ".message-list-placeholder")?.is_some())
+        });
+
+        click(&checker.session, ".world-clocks-button")?;
+        checker.expect(
+            "a card starts its application and closes the menu",
+            |session| {
+                Ok(sent(session, "launch-app: \"org.gnome.clocks\"")?
+                    && surface(session, "gniri-stage")?.is_none())
+            },
+        );
+
+        let click_clock = |session: &Session| -> Result<()> {
+            let panel = panel(session)?;
+            let [x, y, width, height] = tree::rect(tree::select(&panel, CLOCK)?, "box")?;
+            hover_at(
+                session,
+                (x + width / 2.0).round() as i32,
+                (y + height / 2.0).round() as i32,
+                "the clock",
+                || {
+                    let panel = self::panel(session)?;
+                    Ok(has_state(tree::select(&panel, CLOCK)?, "hover"))
+                },
+            )?;
+            pointer(session, &["click", "left"])
+        };
+        click_clock(&checker.session)?;
+        checker.expect("clicking the clock opens the menu", menu_is_open);
+        click_status_button(&checker.session)?;
+        checker.expect("the status button swaps it for quick settings", |session| {
+            Ok(on_stage(session, ".quick-settings")?.is_some()
+                && on_stage(session, ".datemenu-popover")?.is_none())
+        });
+        click_clock(&checker.session)?;
+        checker.expect("and the clock swaps back", menu_is_open);
+        click_clock(&checker.session)?;
+        checker.expect("clicking the clock again closes it", menu_is_closed);
+    } else {
+        println!("  skip wlrctl is not installed");
+        checker.session.gniri_msg(&["debug", "close-menu"])?;
+    }
+
+    println!("do not disturb");
+    checker
+        .session
+        .gniri_msg(&["debug", "open-menu", "quick-settings"])?;
+    checker.expect("(quick settings are open)", |session| {
+        Ok(on_stage(session, ".quick-settings")?.is_some())
+    });
+    if on_path("wlrctl") {
+        // The toggles that show depend on the scene; find this one by name.
+        let stage = surface(&checker.session, "gniri-stage")?
+            .ok_or_else(|| anyhow!("the quick settings menu did not open"))?;
+        let mut titles = Vec::new();
+        tree::walk(&stage["tree"], &mut |node| {
+            if tree::classes(node).contains(&"quick-toggle") {
+                titles.push(text_of(node, ".quick-toggle-title").unwrap_or_default());
+            }
+        });
+        let index = titles
+            .iter()
+            .position(|title| title == "Do Not Disturb")
+            .ok_or_else(|| anyhow!("no Do Not Disturb toggle among {titles:?}"))?;
+        click(&checker.session, &format!(".quick-toggle:{index}"))?;
+        checker.expect("the toggle asks for quiet", |session| {
+            sent(session, "do-not-disturb: Set(true)")
+        });
+        checker.session.gniri_msg(&["debug", "close-menu"])?;
+        checker.expect("(the menu is closed)", menu_is_closed);
+        notify(&checker.session, &["--app", "Tester", "Hush", "Not now"])?;
+        notify(&checker.session, &["--urgency", "critical", "Fire", "Now"])?;
+        checker.expect(
+            "then only a critical notification gets a banner",
+            |session| Ok(banner_title(session)?.as_deref() == Some("Fire")),
+        );
+    } else {
+        println!("  skip wlrctl is not installed");
+    }
+
+    let Checker {
+        session,
+        passed,
+        failed,
+    } = checker;
+    session.quit()?;
+    Ok((passed, failed))
+}
+
+/// The notification server itself: a session with no fixture, so gniri
+/// serves `org.freedesktop.Notifications` on the session's private bus, and
+/// `notify-send` as any application would use it.
+fn notifications_over_the_bus() -> Result<(usize, usize)> {
+    println!("notifications over the bus");
+    if !on_path("notify-send") {
+        println!("  skip notify-send is not installed");
+        return Ok((0, 0));
+    }
+    let session = Session::start(&SessionOptions {
+        name: "check-bus".to_owned(),
+        niri_config: None,
+        renderer: "vulkan".to_owned(),
+        gniri_args: scene::gniri_args(None, Some(WALLPAPER)),
+    })?;
+    let mut checker = Checker {
+        session,
+        passed: 0,
+        failed: 0,
+    };
+    let send = |session: &Session, arguments: &[&str]| -> Result<()> {
+        let mut command = vec!["notify-send".to_owned()];
+        command.extend(arguments.iter().map(|argument| (*argument).to_owned()));
+        // Started by niri, so it talks to the session's own bus.
+        session.action(Action::Spawn { command })
+    };
+
+    // The server takes a moment to claim its name; an application that
+    // starts before then would have its notification go nowhere.
+    std::thread::sleep(std::time::Duration::from_millis(500));
+    send(
+        &checker.session,
+        &[
+            "--app-name",
+            "Tester",
+            "Over the bus",
+            "From <b>notify-send</b>",
+        ],
+    )?;
+    checker.expect("notify-send gets a banner", |session| {
+        let Some(banner) = surface(session, "gniri-banner")? else {
+            return Ok(false);
+        };
+        Ok(
+            text_of(&banner["tree"], ".message-title").as_deref() == Some("Over the bus")
+                && text_of(&banner["tree"], ".message-source-title").as_deref() == Some("Tester")
+                && text_of(&banner["tree"], ".message-body").as_deref() == Some("From notify-send"),
+        )
+    });
+    checker.expect_within("which leaves by itself", BANNER_TIME, |session| {
+        Ok(surface(session, "gniri-banner")?.is_none())
+    });
+    checker.expect(
+        "and leaves the dot beside the clock gone, it having been seen",
+        |session| {
+            let panel = panel(session)?;
+            Ok(tree::select(&panel, "#panelCenter .messages-indicator").is_err())
+        },
+    );
+    send(
+        &checker.session,
+        &["--urgency", "low", "Quietly", "No banner for this"],
+    )?;
+    checker.expect("a low-urgency one only lights the dot", |session| {
+        let panel = panel(session)?;
+        Ok(
+            tree::select(&panel, "#panelCenter .messages-indicator").is_ok()
+                && surface(session, "gniri-banner")?.is_none(),
+        )
+    });
+    checker
+        .session
+        .gniri_msg(&["debug", "open-menu", "date-menu"])?;
+    checker.expect(
+        "both are in the date menu, and the dot goes out",
+        |session| {
+            let panel = panel(session)?;
+            Ok(count_on_stage(session, "message-notification-group")? == 2
+                && tree::select(&panel, "#panelCenter .messages-indicator").is_err())
+        },
+    );
 
     let Checker {
         session,

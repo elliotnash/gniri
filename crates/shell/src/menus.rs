@@ -34,6 +34,9 @@ pub struct Open {
     /// output without a name.
     pub output: Option<String>,
     pub submenu: Option<Submenu>,
+    /// Key of the notification source whose group is open in the date
+    /// menu's list.
+    pub group: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -54,6 +57,7 @@ impl Menus {
                 menu,
                 output: output.map(str::to_owned),
                 submenu: None,
+                group: None,
             });
         }
     }
@@ -87,10 +91,28 @@ impl Menus {
         }
     }
 
+    /// The notification source whose group is open in the date menu.
+    pub fn group(&self) -> Option<&str> {
+        self.open.as_ref().and_then(|open| open.group.as_deref())
+    }
+
+    /// Opens the group of the source called `group` in the date menu's list
+    /// (closing any other), or closes it with `None`. Does nothing unless
+    /// the date menu is open.
+    pub fn set_group(&mut self, group: Option<String>) {
+        if let Some(open) = &mut self.open
+            && open.menu == Menu::DateMenu
+        {
+            open.group = group;
+        }
+    }
+
     /// What Escape does: close the innermost thing that is open.
     pub fn back(&mut self) {
         if self.submenu().is_some() {
             self.set_submenu(None);
+        } else if self.group().is_some() {
+            self.set_group(None);
         } else {
             self.close();
         }
@@ -147,6 +169,25 @@ mod tests {
         );
         menus.set_submenu(Some(Submenu::Wifi));
         assert_eq!(menus.submenu(), None);
+        menus.back();
+        assert_eq!(menus, Menus::default());
+    }
+
+    #[test]
+    fn escape_closes_an_open_group_first() {
+        let mut menus = Menus::default();
+        menus.set_group(Some("mail".to_owned()));
+        assert_eq!(menus.group(), None, "no menu is open");
+        menus.open(Menu::QuickSettings, None);
+        menus.set_group(Some("mail".to_owned()));
+        assert_eq!(menus.group(), None, "quick settings has no groups");
+
+        menus.toggle(Menu::DateMenu, None);
+        menus.set_group(Some("mail".to_owned()));
+        assert_eq!(menus.group(), Some("mail"));
+        menus.back();
+        assert!(menus.is_open(Menu::DateMenu, None));
+        assert_eq!(menus.group(), None);
         menus.back();
         assert_eq!(menus, Menus::default());
     }

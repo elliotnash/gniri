@@ -24,7 +24,7 @@ pub struct DateMenu {
     pub widget: gtk::Box,
     services: Rc<Services>,
     calendar: Calendar,
-    messages: Rc<MessageList>,
+    _messages: Rc<MessageList>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -166,15 +166,20 @@ pub fn build(services: &Rc<Services>) -> DateMenu {
     // The selected day decides the events card's title and whether the
     // today button has anything to do.
     calendar.connect_selected_date_changed({
+        // Held weakly: the today button holds the calendar.
         let (services, events_title, today_button) = (
             Rc::clone(services),
-            events_title.clone(),
-            today_button.clone(),
+            events_title.downgrade(),
+            today_button.downgrade(),
         );
         move |selected: Date| {
             let today = services.time.with(|time| time.date());
-            events_title.set_label(&selected.events_title(today));
-            today_button.set_sensitive(selected != today);
+            if let Some(events_title) = events_title.upgrade() {
+                events_title.set_label(&selected.events_title(today));
+            }
+            if let Some(today_button) = today_button.upgrade() {
+                today_button.set_sensitive(selected != today);
+            }
         }
     });
     subscriptions.push(services.time.select(|time| time.date(), {
@@ -194,6 +199,7 @@ pub fn build(services: &Rc<Services>) -> DateMenu {
         .build();
     click.connect_pressed({
         let (widget, list) = (widget.downgrade(), Rc::downgrade(&messages));
+        let services = Rc::clone(services);
         move |click, _, x, y| {
             let (Some(widget), Some(list)) = (widget.upgrade(), list.upgrade()) else {
                 return;
@@ -205,7 +211,7 @@ pub fn build(services: &Rc<Services>) -> DateMenu {
                 .pick(x, y, gtk::PickFlags::DEFAULT)
                 .is_some_and(|picked| picked == group || picked.is_ancestor(&group));
             if !inside {
-                list.collapse();
+                services.menus.update(|menus| menus.set_group(None));
                 click.set_state(gtk::EventSequenceState::Claimed);
             }
         }
@@ -216,7 +222,7 @@ pub fn build(services: &Rc<Services>) -> DateMenu {
         widget,
         services: Rc::clone(services),
         calendar,
-        messages,
+        _messages: messages,
         _subscriptions: subscriptions,
     }
 }
@@ -235,16 +241,5 @@ impl DateMenu {
         if unseen {
             self.services.notifications.send(Command::AcknowledgeAll);
         }
-    }
-
-    /// Called when the menu closes.
-    pub fn closed(&self) {
-        self.messages.collapse();
-    }
-
-    /// What Escape does before it closes the menu: close the open group.
-    /// Returns whether it did.
-    pub fn back(&self) -> bool {
-        self.messages.collapse()
     }
 }

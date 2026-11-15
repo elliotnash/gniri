@@ -43,7 +43,6 @@ pub struct Inner {
     time: gtk::Label,
     expand_button: gtk::Button,
     close_button: gtk::Button,
-    icon_bin: gtk::Box,
     icon: gtk::Image,
     title: gtk::Label,
     body: gtk::Label,
@@ -124,19 +123,14 @@ impl Message {
         header.append(&close_button);
 
         // `Message`
+        // The image is its own frame: it centres what it shows in the
+        // size the theme gives it, and cuts a picture to its corners.
         let icon = gtk::Image::builder()
-            .halign(gtk::Align::Center)
-            .valign(gtk::Align::Center)
-            .hexpand(true)
-            .vexpand(true)
-            .build();
-        let icon_bin = gtk::Box::builder()
             .css_classes(["message-icon"])
             .valign(gtk::Align::Start)
             .overflow(gtk::Overflow::Hidden)
             .visible(false)
             .build();
-        icon_bin.append(&icon);
 
         let title = text_label("message-title");
         title.set_valign(gtk::Align::End);
@@ -156,7 +150,7 @@ impl Message {
             .css_classes(["message-media-controls"])
             .build();
         let message_box = gtk::Box::builder().css_classes(["message-box"]).build();
-        message_box.append(&icon_bin);
+        message_box.append(&icon);
         message_box.append(&content);
         message_box.append(&media_controls);
 
@@ -183,7 +177,6 @@ impl Message {
             time,
             expand_button,
             close_button,
-            icon_bin,
             icon,
             title,
             body,
@@ -329,13 +322,13 @@ impl Message {
 
     /// The picture beside the text, if any.
     pub fn set_icon(&self, picture: Option<&Image>) {
-        self.icon_bin.set_visible(picture.is_some());
+        self.icon.set_visible(picture.is_some());
         if picture.is_some() {
             let symbolic = picture::show(&self.icon, picture, "image-missing-symbolic");
             if symbolic {
-                self.icon_bin.add_css_class("message-themed-icon");
+                self.icon.add_css_class("message-themed-icon");
             } else {
-                self.icon_bin.remove_css_class("message-themed-icon");
+                self.icon.remove_css_class("message-themed-icon");
             }
         }
     }

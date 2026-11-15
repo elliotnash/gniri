@@ -90,44 +90,18 @@ impl Inner {
         }
     }
 
-    /// Tells `menu` it is no longer showing.
-    fn closed(&self, menu: Menu) {
-        if menu == Menu::DateMenu
-            && let Some(date_menu) = &*self.date_menu.borrow()
-        {
-            date_menu.closed();
-        }
-    }
-
-    /// What Escape does: close the innermost thing that is open.
-    fn back(&self) {
-        let handled = self.shown.get() == Some(Menu::DateMenu)
-            && self
-                .date_menu
-                .borrow()
-                .as_ref()
-                .is_some_and(|date_menu| date_menu.back());
-        if !handled {
-            self.services.menus.update(|menus| menus.back());
-        }
-    }
-
     fn show(self: &Rc<Self>, menu: Menu) {
         let generation = self.generation.get() + 1;
         self.generation.set(generation);
 
         // Only one menu shows; the other, if it was open, goes at once.
-        let before = self.shown.replace(Some(menu));
+        self.shown.set(Some(menu));
         for other in [Menu::QuickSettings, Menu::DateMenu] {
-            if other == menu {
-                continue;
-            }
-            if let Some(widget) = self.widget(other) {
+            if other != menu
+                && let Some(widget) = self.widget(other)
+            {
                 widget.remove_css_class("open");
                 widget.set_visible(false);
-            }
-            if before == Some(other) {
-                self.closed(other);
             }
         }
 
@@ -186,12 +160,8 @@ impl Inner {
         if !self.window.is_visible() {
             return;
         }
-        let shown = self.shown.take();
-        if let Some(widget) = shown.and_then(|menu| self.widget(menu)) {
+        if let Some(widget) = self.shown.take().and_then(|menu| self.widget(menu)) {
             widget.remove_css_class("open");
-        }
-        if let Some(menu) = shown {
-            self.closed(menu);
         }
 
         let unmap = {
@@ -283,12 +253,10 @@ pub fn build(
         .propagation_phase(gtk::PropagationPhase::Capture)
         .build();
     keys.connect_key_pressed({
-        let inner = Rc::downgrade(&inner);
+        let services = Rc::clone(services);
         move |_, key, _, _| {
             if key == gdk::Key::Escape {
-                if let Some(inner) = inner.upgrade() {
-                    inner.back();
-                }
+                services.menus.update(|menus| menus.back());
                 glib::Propagation::Stop
             } else {
                 glib::Propagation::Proceed

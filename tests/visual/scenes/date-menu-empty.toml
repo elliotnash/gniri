@@ -1,0 +1,8 @@
+# The date menu with nothing in its list, on a day other than a Saturday.
+# GNOME was not captured in this state; the scene is for looking at.
+
+[fixture]
+time = "2026-01-15T09:41:00"
+
+[[steps]]
+gniri = ["debug", "open-menu", "date-menu"]

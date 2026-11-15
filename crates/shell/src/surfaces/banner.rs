@@ -73,44 +73,35 @@ pub fn build(app: &adw::Application, monitor: &gdk::Monitor) -> Banner {
         generation: Cell::new(0),
     });
     // Only the banner itself takes input, not the room for its shadow.
-    window.connect_map({
-        let surface = Rc::downgrade(&surface);
-        move |window| {
-            let Some(gdk_surface) = window.surface() else {
-                return;
-            };
-            let surface = surface.clone();
-            gdk_surface.connect_layout(move |_, _, _| {
-                if let Some(surface) = surface.upgrade() {
-                    surface.update_input_region();
-                }
-            });
-        }
-    });
-    Banner { window, surface }
-}
-
-impl Surface {
-    fn update_input_region(&self) {
-        let Some(surface) = self.window.surface() else {
+    // Worked out from the surface's size, which is known the moment the
+    // compositor has placed it; the banner's own box is not until GTK has
+    // laid the new content out, which is later.
+    let token = |name: &str| {
+        gniri_theme::token(name)
+            .and_then(|value| value.strip_suffix("px"))
+            .and_then(|value| value.parse::<i32>().ok())
+            .unwrap_or(0)
+    };
+    let margin = token("notification-banner-margin");
+    let room = token("notification-banner-shadow-room");
+    window.connect_realize(move |window| {
+        let Some(surface) = window.surface() else {
             return;
         };
-        let region = cairo::Region::create();
-        if !layer::pointer_ignored()
-            && let Some(bounds) = self
-                .area
-                .first_child()
-                .and_then(|banner| banner.compute_bounds(&self.window))
-        {
-            let _ = region.union_rectangle(&cairo::RectangleInt::new(
-                bounds.x().floor() as i32,
-                bounds.y().floor() as i32,
-                bounds.width().ceil() as i32,
-                bounds.height().ceil() as i32,
-            ));
-        }
-        surface.set_input_region(Some(&region));
-    }
+        surface.connect_layout(move |surface, width, height| {
+            let region = cairo::Region::create();
+            if !layer::pointer_ignored() {
+                let _ = region.union_rectangle(&cairo::RectangleInt::new(
+                    room + margin,
+                    margin,
+                    (width - 2 * (room + margin)).max(0),
+                    (height - room - 2 * margin).max(0),
+                ));
+            }
+            surface.set_input_region(Some(&region));
+        });
+    });
+    Banner { window, surface }
 }
 
 impl Banner {
@@ -126,7 +117,6 @@ impl Banner {
         }
         surface.area.append(banner);
         surface.window.present();
-        surface.update_input_region();
         // The surface must be on screen with the banner in its hidden look
         // before the class that starts the transition is added.
         glib::idle_add_local_once({
@@ -134,7 +124,6 @@ impl Banner {
             move || {
                 if surface.generation.get() == generation {
                     banner.add_css_class("open");
-                    surface.update_input_region();
                 }
             }
         });
@@ -249,6 +238,11 @@ impl Inner {
 
     /// `MessageTray._onNotificationHoverChanged`
     fn hover_changed(self: &Rc<Self>, hovered: bool) {
+        // A banner that is on its way out is left by the pointer as its
+        // surface goes; that must not count against the next one.
+        if self.phase.get() != Phase::Shown {
+            return;
+        }
         self.clear_left_timeout();
         if hovered {
             self.pointer_in.set(true);

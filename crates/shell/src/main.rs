@@ -95,6 +95,9 @@ enum DebugRequest {
     },
     /// Open a menu inside the quick settings menu.
     OpenSubmenu { submenu: menus::Submenu },
+    /// Open the group of one application's notifications in the date menu,
+    /// by the key of its source (the name of its widget in the dump).
+    OpenGroup { source: String },
     /// Close whatever menu is open.
     CloseMenu,
     /// Show the on-screen display with a given icon, label and level.
@@ -122,6 +125,7 @@ impl Message {
                 DebugRequest::Commands => ipc::Request::Commands,
                 DebugRequest::OpenMenu { menu, output } => ipc::Request::OpenMenu { menu, output },
                 DebugRequest::OpenSubmenu { submenu } => ipc::Request::OpenSubmenu(submenu),
+                DebugRequest::OpenGroup { source } => ipc::Request::OpenGroup(source),
                 DebugRequest::CloseMenu => ipc::Request::CloseMenu,
                 DebugRequest::Osd { icon, label, level } => {
                     ipc::Request::Osd { icon, label, level }
