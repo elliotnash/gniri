@@ -36,6 +36,7 @@ fn application_id() -> String {
 struct Running {
     _outputs: Rc<Outputs>,
     _ipc: Option<gio::SocketService>,
+    _subscriptions: Vec<gniri_core::Subscription>,
 }
 
 pub fn run(cli: Cli) -> glib::ExitCode {
@@ -161,9 +162,20 @@ fn activate(
     // process alive on every platform; hold the application explicitly.
     std::mem::forget(app.hold());
 
+    // Opening the overview closes any menu, as in GNOME.
+    let close_menus = services.niri.select(|niri| niri.overview_open, {
+        let services = Rc::clone(&services);
+        move |open| {
+            if *open {
+                services.menus.update(|menus| menus.close());
+            }
+        }
+    });
+
     Some(Running {
         _outputs: outputs,
         _ipc: ipc,
+        _subscriptions: vec![close_menus],
     })
 }
 
