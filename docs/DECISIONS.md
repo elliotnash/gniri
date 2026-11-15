@@ -314,6 +314,95 @@ These hold for every widget port that follows.
 - **A fixture turns GTK animations off**, so a screenshot or a widget dump
   never catches something half way.
 
+## M2: what the menu, the display and the services taught
+
+### Looks
+
+- **St sets Adwaita Sans at a larger optical size than GTK.** The font is
+  variable; its optical-size axis tightens the spacing as it grows, and GTK
+  leaves it at the minimum (14). GNOME's labels were up to 7px narrower than
+  ours. Fitted over twenty labels in the reference dumps, St's widths are
+  those of the axis at about 1.5 times the font's pixel size (22 for 11pt).
+  The theme sets `font-variation-settings` to that (`st-optical-size()`),
+  and every label is now within a pixel, the panel clock included. Why St
+  ends up there was not established. `gtk-hint-font-metrics` changed nothing.
+- **libadwaita owns some class names.** A widget given the class `dimmed`
+  became 55% opaque: libadwaita has a `.dimmed` of its own. Check a new
+  class name against libadwaita's stylesheet; ours is `shaded`.
+- **A reset must be a bare class selector.** `button.popup-menu-item { all:
+  unset }` outranks `.quick-toggle { min-height }` and wipes it. `all:
+  unset` goes first in a rule whose selector is a single class.
+- **St paints a box-shadow under the element too.** A translucent menu is
+  therefore darker than its tint over the blur: the menu over flat grey
+  reads the tint over 128 × 0.6 (blur-my-shell's brightness) × 0.8 (the
+  shadow's alpha). GTK clips a shadow away under its element, so the factor
+  is folded into the menu's colour (`_bms-popup.scss`). The OSD has no
+  shadow and reads like the panel.
+- **St's shadows reach further.** The menu's 4px shadow fits a Gaussian of
+  sigma blur/2 over a box grown by 0.4 × blur; GTK's `st-shadow()` adds that
+  as spread.
+- **GNOME dims a menu's own pixels under a submenu, not its backdrop**
+  (`Clutter.BrightnessContrastEffect` at -0.4 multiplies by 0.6). Here each
+  item of the grid gets `filter: brightness(0.6)` and the menu's tint a
+  darker colour of the same alpha.
+- **A submenu is one flat colour here.** blur-my-shell blurs the submenu as
+  a surface of its own, over the menu as it looks before dimming. What is
+  under a submenu is only the menu's flat background, so the result is one
+  colour over the dimmed menu; `bms-submenu-colour()` derives it.
+- **GNOME places a submenu one pixel up and left** of the room its grid
+  makes for it (the overlay's offset leaves out the menu's border). Copied.
+- **Em lengths keep their fraction when drawn.** GTK lays out with a padding
+  rounded down but draws the box with the exact value, so `0.716em` (10.5px)
+  gave a button 37px wide in a 36px slot. Lengths St rounds are written as
+  the pixel value they round to (`to_em(10px)`, `em_at_most()`).
+- **St centres a row in a button and an icon in the row, rounding down
+  twice.** A 16px icon beside one 19px line sits a pixel above centre. The
+  same nesting with `valign: center` reproduces it.
+
+### Structure
+
+- **Services are state plus two kinds of message** (`gniri_services::Model`):
+  events from the backend, commands from the shell, both pure functions on
+  the state. A fixture replaces every backend with the prediction function
+  and a log, which is what the behaviour checks read.
+- **System-bus backends share one connection and one thread.** zbus 6 has no
+  blocking API and needs no tokio. It stops reading the socket while any
+  signal stream's queue (64 messages) is full: a backend must never await a
+  reply while its own signals pile up. NetworkManager and BlueZ therefore
+  read all their signals from one ordered stream and make calls beside it.
+- **Proxies were written by hand**, not generated with `zbus_xmlgen` as
+  planned: each backend uses a handful of properties.
+- **Sound runs libpulse's plain main loop on its own thread**, woken for
+  commands through a pipe; `libpulse-glib-binding` would have put GLib into
+  the services crate.
+- **Bluetooth is switched by the kill switch as well as the adapter**, as
+  GNOME does through gnome-settings-daemon: `/dev/rfkill` is writable for the
+  seat's user (systemd's uaccess rule), so no daemon is needed.
+- **Night light uses a Wayland connection of its own** (`wayland-client`),
+  never GTK's. niri offers `wlr-gamma-control` only on real outputs: nested,
+  the toggle is hidden and the code path cannot run.
+- **A custom widget is allowed.** `GniriQuickGrid` subclasses `GtkWidget`
+  with `unsafe_code = "forbid"` still in force; the subclassing macros pass.
+
+### Harness
+
+- **Sleeping is not synchronisation.** The first menu screenshot was taken
+  before the stage had drawn. `gniri msg debug sync` answers when every
+  mapped surface has painted after the request.
+- **The host pointer leaks into the nested session.** A toggle was drawn
+  hovered because the real pointer was over the nested window. Screenshot
+  runs pass `--no-pointer`, which gives every surface an empty input region.
+- **`wlrctl` calls are separate clients.** niri may apply two of them in
+  either order; the checks pause between them and wait for the target to
+  show `hover` before clicking. A surface mapped under a resting pointer is
+  not told so until the pointer moves, so the wait nudges it.
+- **Half pixels need care.** Two sums that should give the same .5 can
+  round apart; the reference crops are cut at whole pixels and say which.
+- **Edge antialiasing is not a difference.** See docs/TESTING.md: tier 2
+  compares against the range of colours within a pixel.
+- **The reference holds private text.** The Wi-Fi name is blacked out of the
+  committed pictures and never compared.
+
 ## Standing rules
 
 - Nested niri: never `--session`; find the instance through the `NIRI_SOCKET`
