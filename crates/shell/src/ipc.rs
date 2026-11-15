@@ -4,6 +4,10 @@
 //! answers with a line of JSON and closes. The socket is
 //! `$XDG_RUNTIME_DIR/gniri.<wayland display>.sock`, so each compositor
 //! session has its own, and `$GNIRI_SOCKET` overrides it.
+//!
+//! The lock screen and the polkit agent are processes of their own. In a
+//! test scene, and only there, each answers the requests that inspect it
+//! on a socket of its own ([`Role`]).
 
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::UnixStream;
@@ -13,7 +17,30 @@ use gtk::prelude::*;
 use gtk::{gio, glib};
 use serde::{Deserialize, Serialize};
 
+use crate::dialogs::end_session;
 use crate::menus::{Menu, Submenu};
+
+/// Which of gniri's processes a request is for.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, clap::ValueEnum)]
+pub enum Role {
+    #[default]
+    Shell,
+    /// `gniri lock`
+    Lock,
+    /// `gniri polkit`
+    Polkit,
+}
+
+impl Role {
+    /// What the socket's name starts with.
+    fn socket_prefix(self) -> &'static str {
+        match self {
+            Self::Shell => "gniri",
+            Self::Lock => "gniri-lock",
+            Self::Polkit => "gniri-polkit",
+        }
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Request {
@@ -37,6 +64,17 @@ pub enum Request {
     CloseMenu,
     Volume(VolumeKey),
     Brightness(Step),
+    /// Lock the screen.
+    Lock,
+    /// Open the dialog that asks before ending the session.
+    EndSession(end_session::Kind),
+    /// Close that dialog, as its Cancel button does.
+    CloseDialog,
+    /// Report an idle timer as passed, or as over, as the compositor would.
+    Idle {
+        timer: IdleTimer,
+        resumed: bool,
+    },
     /// Show the on-screen display with exactly this, as GNOME Shell's
     /// `ShowOSD` D-Bus method does.
     Osd {
@@ -86,6 +124,31 @@ pub enum Urgency {
     Critical,
 }
 
+/// A point in the idle time ([`gniri_services::idle::Timer`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, clap::ValueEnum)]
+pub enum IdleTimer {
+    /// The screen dims.
+    Dim,
+    /// The screens turn off.
+    Blank,
+    /// The session locks.
+    Lock,
+    /// The screens turn off while the lock screen shows.
+    BlankLocked,
+}
+
+impl IdleTimer {
+    pub fn timer(self) -> gniri_services::idle::Timer {
+        use gniri_services::idle::Timer;
+        match self {
+            Self::Dim => Timer::Dim,
+            Self::Blank => Timer::Blank,
+            Self::Lock => Timer::Lock,
+            Self::BlankLocked => Timer::BlankLocked,
+        }
+    }
+}
+
 /// What a volume key does.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, clap::ValueEnum)]
 pub enum VolumeKey {
@@ -104,20 +167,23 @@ pub enum Step {
 /// What the shell answers: the result, or why it could not be produced.
 pub type Reply = Result<serde_json::Value, String>;
 
-pub fn socket_path() -> Option<PathBuf> {
-    if let Some(path) = std::env::var_os("GNIRI_SOCKET").filter(|path| !path.is_empty()) {
+pub fn socket_path(role: Role) -> Option<PathBuf> {
+    if role == Role::Shell
+        && let Some(path) = std::env::var_os("GNIRI_SOCKET").filter(|path| !path.is_empty())
+    {
         return Some(PathBuf::from(path));
     }
     let runtime = std::env::var_os("XDG_RUNTIME_DIR").filter(|dir| !dir.is_empty())?;
     let display = std::env::var("WAYLAND_DISPLAY").unwrap_or_else(|_| "wayland-0".to_owned());
     // The display may itself be a path; only its last part names it.
     let display = display.rsplit('/').next().unwrap_or("wayland-0").to_owned();
-    Some(PathBuf::from(runtime).join(format!("gniri.{display}.sock")))
+    Some(PathBuf::from(runtime).join(format!("{}.{display}.sock", role.socket_prefix())))
 }
 
-/// Sends one request to the running shell and waits for the reply.
-pub fn send(request: &Request) -> Result<serde_json::Value, String> {
-    let path = socket_path().ok_or("XDG_RUNTIME_DIR is not set")?;
+/// Sends one request to the running process of `role` and waits for the
+/// reply.
+pub fn send(role: Role, request: &Request) -> Result<serde_json::Value, String> {
+    let path = socket_path(role).ok_or("XDG_RUNTIME_DIR is not set")?;
     let mut stream = UnixStream::connect(&path)
         .map_err(|error| format!("cannot reach gniri at {}: {error}", path.display()))?;
     let mut line = serde_json::to_string(request).map_err(|error| error.to_string())?;
@@ -142,8 +208,11 @@ pub type Pending = std::pin::Pin<Box<dyn std::future::Future<Output = Reply>>>;
 ///
 /// Returns the listener, which must be kept alive, or `None` (after saying
 /// why on stderr) if the socket cannot be set up: the shell works without.
-pub fn serve(handle: impl Fn(Request) -> Pending + 'static) -> Option<gio::SocketService> {
-    let path = socket_path()?;
+pub fn serve(
+    role: Role,
+    handle: impl Fn(Request) -> Pending + 'static,
+) -> Option<gio::SocketService> {
+    let path = socket_path(role)?;
     // A socket file left by a shell that crashed would block the bind. If
     // nothing answers on it, it is stale.
     if path.exists() {
@@ -199,8 +268,8 @@ pub fn serve(handle: impl Fn(Request) -> Pending + 'static) -> Option<gio::Socke
 }
 
 /// Removes the socket file at exit.
-pub fn cleanup() {
-    if let Some(path) = socket_path() {
+pub fn cleanup(role: Role) {
+    if let Some(path) = socket_path(role) {
         let _ = std::fs::remove_file(path);
     }
 }

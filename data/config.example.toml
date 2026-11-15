@@ -50,6 +50,25 @@
 # is warmer. 1700 to 4700. Default: 2700.
 # temperature = 3500
 
+[idle]
+# Seconds without input after which the screens turn off (GNOME's "Blank
+# Screen Delay"). A video or a call that asks the compositor to stay awake
+# holds this off. Default: 300. Set to 0 for never.
+# blank_after = 600
+
+# Dim the screen for the last fifth of that time. Default: true.
+# dim = false
+
+[lock]
+# Lock when the screens turn off for idleness. Default: true.
+# automatic = false
+
+# Seconds between the screens turning off and the lock. Default: 0.
+# delay = 30
+
+# Lock before the machine sleeps. Default: true.
+# on_suspend = false
+
 [commands]
 # The settings application, started as `<settings> <panel>` by entries such
 # as "Power Settings" (panels: power, wifi, bluetooth, sound). Default:

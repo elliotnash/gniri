@@ -1,9 +1,15 @@
-//! The login session: suspending and locking, through logind.
+//! The login session: suspending, restarting, powering off and locking,
+//! through logind.
 //!
-//! Restart and power off are not here yet: GNOME asks first, and the dialog
-//! that asks arrives with the session milestone (M4).
+//! Locking has three parts. Asking for it is a call to logind
+//! ([`Command::Lock`]), which answers with a signal to whoever locks this
+//! session's screen. That is the backend here: it starts the screen locker,
+//! a process of its own ([`locker`]), and follows it. And before the machine
+//! sleeps the backend holds logind back until the locker has covered the
+//! screen, so that waking up never shows the desktop.
 
 pub mod backend;
+pub mod locker;
 
 use serde::Deserialize;
 
@@ -14,19 +20,31 @@ use crate::model::Model;
 pub struct State {
     /// logind would let this session suspend the machine.
     pub can_suspend: bool,
+    pub can_restart: bool,
+    pub can_power_off: bool,
+    /// The screen locker has the screen.
+    pub locked: bool,
 }
 
 /// What the backend reports.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Event {
-    State(State),
+    /// What logind would let this session do.
+    Abilities {
+        suspend: bool,
+        restart: bool,
+        power_off: bool,
+    },
+    Locked(bool),
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Command {
     Suspend,
-    /// Ask logind to lock this session. Whatever screen locker listens for
-    /// logind's `Lock` signal does the locking.
+    Restart,
+    PowerOff,
+    /// Ask logind to lock this session. The backend hears logind's `Lock`
+    /// signal like any other screen locker would and starts the locker.
     Lock,
 }
 
@@ -36,10 +54,49 @@ impl Model for State {
 
     fn apply(&mut self, event: Event) {
         match event {
-            Event::State(state) => *self = state,
+            Event::Abilities {
+                suspend,
+                restart,
+                power_off,
+            } => {
+                self.can_suspend = suspend;
+                self.can_restart = restart;
+                self.can_power_off = power_off;
+            }
+            Event::Locked(locked) => self.locked = locked,
         }
     }
 
-    /// Neither command changes anything the shell shows.
+    /// No command changes anything the shell shows: `locked` only turns
+    /// true once the locker says the screen is covered.
     fn predict(&mut self, _command: &Command) {}
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn events_fold_in_and_commands_predict_nothing() {
+        let mut state = State::default();
+        state.apply(Event::Abilities {
+            suspend: true,
+            restart: false,
+            power_off: true,
+        });
+        state.apply(Event::Locked(true));
+        assert_eq!(
+            state,
+            State {
+                can_suspend: true,
+                can_restart: false,
+                can_power_off: true,
+                locked: true,
+            }
+        );
+        let before = state.clone();
+        state.predict(&Command::Lock);
+        state.predict(&Command::PowerOff);
+        assert_eq!(state, before);
+    }
 }

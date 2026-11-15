@@ -1,0 +1,28 @@
+# gniri as a systemd user service, for a niri session started the usual
+# way (`niri-session`, or niri from a display manager).
+#
+#     cp data/systemd/gniri.service ~/.config/systemd/user/
+#     systemctl --user add-wants niri.service gniri.service
+#
+# and take any `spawn-at-startup "gniri"` out of niri's config.
+
+[Unit]
+Description=gniri, a GNOME Shell lookalike for niri
+PartOf=graphical-session.target
+After=graphical-session.target
+Requisite=graphical-session.target
+
+[Service]
+# systemd looks in /usr/local/bin and /usr/bin, not in your shell's PATH:
+# give the full path if gniri is somewhere else.
+ExecStart=gniri
+Restart=on-failure
+RestartSec=1
+Slice=session.slice
+# The lock screen and the polkit agent are processes gniri starts. Stopping
+# or restarting gniri must not take the lock screen away from a locked
+# session, which would leave it locked with nothing to unlock it.
+KillMode=process
+
+[Install]
+WantedBy=niri.service

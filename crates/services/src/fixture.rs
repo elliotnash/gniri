@@ -11,7 +11,8 @@ use gniri_core::{FixedClock, LocalTime};
 use serde::Deserialize;
 
 use crate::{
-    audio, bluetooth, brightness, mpris, network, notifications, power, rfkill, session, toggles,
+    audio, bluetooth, brightness, idle, mpris, network, notifications, polkit, power, rfkill,
+    session, toggles, user,
 };
 
 #[derive(Clone, Debug, Default, PartialEq, Deserialize)]
@@ -31,6 +32,27 @@ pub struct Fixture {
     pub do_not_disturb: toggles::State,
     pub notifications: notifications::State,
     pub mpris: mpris::State,
+    pub idle: idle::State,
+    /// Who the lock screen and the authentication dialog show.
+    pub user: user::User,
+    /// For `gniri lock`.
+    pub lock: Lock,
+    /// For `gniri polkit`: the request its dialog shows.
+    pub polkit: polkit::State,
+}
+
+/// The lock screen of a scene.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct Lock {
+    /// The one password that unlocks. No scene ever asks PAM.
+    pub password: String,
+    /// Start on the password prompt, where a key press would lead.
+    pub prompt: bool,
+    /// Show the lock screen without locking: on an ordinary surface over
+    /// everything else. A compositor takes no screenshots of a locked
+    /// session, so this is how a test gets a picture of it.
+    pub preview: bool,
 }
 
 impl Fixture {

@@ -35,7 +35,7 @@ impl State {
             std::process::id(),
             var("NIRI_SOCKET"),
             var("WAYLAND_DISPLAY"),
-            crate::ipc::socket_path()
+            crate::ipc::socket_path(crate::ipc::Role::Shell)
                 .map(|path| path.display().to_string())
                 .unwrap_or_default(),
         );

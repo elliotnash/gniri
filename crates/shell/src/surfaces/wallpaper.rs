@@ -10,6 +10,9 @@
 //! Both are rendered once at the output's pixel size and the full-size image
 //! is dropped: wallpapers are often far larger than the screen (Fedora's is
 //! 5120x5120, 105 MB uncompressed).
+//!
+//! The lock screen shows the blurred copy too ([`backdrop`]): blur-my-shell
+//! blurs the lock screen's background the way it does the overview's.
 
 use std::cell::Cell;
 use std::path::{Path, PathBuf};
@@ -83,35 +86,55 @@ pub fn build(
             ));
         }
         WallpaperSource::Image(path) => {
+            let sharp = picture();
             let image = Rc::new(Image {
                 path: path.clone(),
-                sharp: picture(),
+                sharp: Some(sharp.clone()),
                 blurred: picture(),
                 rendered_for: Cell::new(None),
             });
-            wallpaper.set_child(Some(&image.sharp));
+            wallpaper.set_child(Some(&sharp));
             backdrop.set_child(Some(&image.blurred));
-            // Render when the output's size or scale is known, and again
-            // whenever either changes.
-            wallpaper.connect_realize(move |window| {
-                let surface = window.surface().expect("a realized window has a surface");
-                let on_layout = {
-                    let (image, window) = (Rc::clone(&image), window.clone());
-                    move |_: &gdk::Surface, _: i32, _: i32| image.update(&window)
-                };
-                let on_scale = {
-                    let (image, window) = (Rc::clone(&image), window.clone());
-                    move |_: &gdk::Surface| image.update(&window)
-                };
-                surface.connect_layout(on_layout);
-                surface.connect_scale_notify(on_scale);
-            });
+            image.follow(&wallpaper);
         }
     }
 
     wallpaper.present();
     backdrop.present();
     [wallpaper, backdrop]
+}
+
+/// A widget that shows the blurred, dimmed wallpaper at the size of
+/// `window`, which it is to be put in: what the lock screen has behind its
+/// clock. `class` styles it.
+pub fn backdrop(
+    window: &gtk::ApplicationWindow,
+    source: &WallpaperSource,
+    class: &str,
+) -> gtk::Widget {
+    match source {
+        WallpaperSource::Colour(colour) => {
+            let dimmed = gdk::RGBA::new(
+                colour.red() * BACKDROP_BRIGHTNESS,
+                colour.green() * BACKDROP_BRIGHTNESS,
+                colour.blue() * BACKDROP_BRIGHTNESS,
+                1.0,
+            );
+            style::add_rule(&format!(".{class} {{ background-color: {dimmed}; }}"));
+            gtk::Box::builder().css_classes([class]).build().upcast()
+        }
+        WallpaperSource::Image(path) => {
+            let image = Rc::new(Image {
+                path: path.clone(),
+                sharp: None,
+                blurred: picture(),
+                rendered_for: Cell::new(None),
+            });
+            image.blurred.add_css_class(class);
+            image.follow(window);
+            image.blurred.clone().upcast()
+        }
+    }
 }
 
 /// A picture showing a texture that already has the output's pixel size.
@@ -122,16 +145,36 @@ fn picture() -> gtk::Picture {
         .build()
 }
 
-/// An image wallpaper and the two pictures showing it.
+/// An image wallpaper and the pictures showing it.
 struct Image {
     path: PathBuf,
-    sharp: gtk::Picture,
+    /// Absent where only the blurred copy is shown.
+    sharp: Option<gtk::Picture>,
     blurred: gtk::Picture,
     /// Physical pixel size the pictures were last rendered for.
     rendered_for: Cell<Option<(u32, u32)>>,
 }
 
 impl Image {
+    /// Renders the pictures when `window`'s size and scale are known, and
+    /// again whenever either changes.
+    fn follow(self: &Rc<Self>, window: &gtk::ApplicationWindow) {
+        let image = Rc::clone(self);
+        window.connect_realize(move |window| {
+            let surface = window.surface().expect("a realized window has a surface");
+            let on_layout = {
+                let (image, window) = (Rc::clone(&image), window.clone());
+                move |_: &gdk::Surface, _: i32, _: i32| image.update(&window)
+            };
+            let on_scale = {
+                let (image, window) = (Rc::clone(&image), window.clone());
+                move |_: &gdk::Surface| image.update(&window)
+            };
+            surface.connect_layout(on_layout);
+            surface.connect_scale_notify(on_scale);
+        });
+    }
+
     /// Re-renders both pictures if the output's pixel size changed.
     fn update(&self, window: &gtk::ApplicationWindow) {
         let Some(surface) = window.surface() else {
@@ -159,7 +202,9 @@ impl Image {
         };
         let sharp = render_sharp(&renderer, &original, size);
         let blurred = render_backdrop(&renderer, &sharp, size, BACKDROP_SIGMA * scale);
-        self.sharp.set_paintable(Some(&sharp));
+        if let Some(picture) = &self.sharp {
+            picture.set_paintable(Some(&sharp));
+        }
         self.blurred.set_paintable(Some(&blurred));
     }
 }

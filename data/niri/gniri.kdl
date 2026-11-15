@@ -27,7 +27,7 @@ blur {
 // blur-my-shell's popups do. Without this rule niri blurs only the wallpaper
 // ("xray"), which is what the panel wants and is also much cheaper.
 layer-rule {
-    match namespace="^gniri-(stage|banner|osd)$"
+    match namespace="^gniri-(stage|banner|osd|dialog)$"
 
     background-effect {
         xray false
@@ -47,7 +47,13 @@ layer-rule {
 // earlier one, so put the include line after your own `binds` for these to
 // win. `gniri` must be on PATH; with the binary elsewhere, bind the same
 // keys in your own config, after the include line, with its full path.
+//
+// Super+Alt+L locks the screen (niri's own suggestion for a screen locker;
+// Super+L, GNOME's, moves the focus in niri). Ctrl+Alt+Delete asks whether
+// to power off, as in GNOME.
 binds {
+    Super+Alt+L { spawn "gniri" "msg" "lock"; }
+    Ctrl+Alt+Delete { spawn "gniri" "msg" "power-off"; }
     XF86AudioRaiseVolume allow-when-locked=true { spawn "gniri" "msg" "volume" "up"; }
     XF86AudioLowerVolume allow-when-locked=true { spawn "gniri" "msg" "volume" "down"; }
     XF86AudioMute allow-when-locked=true { spawn "gniri" "msg" "volume" "mute"; }

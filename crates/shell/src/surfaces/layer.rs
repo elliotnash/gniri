@@ -24,7 +24,7 @@ pub fn pointer_ignored() -> bool {
 
 /// Gives `window`'s surface an empty input region, now and whenever GTK
 /// lays the surface out again.
-fn take_no_input(window: &gtk::ApplicationWindow) {
+pub fn take_no_input(window: &gtk::ApplicationWindow) {
     window.connect_map(|window| {
         let Some(surface) = window.surface() else {
             return;

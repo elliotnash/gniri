@@ -3,12 +3,16 @@
 mod app;
 mod date_menu;
 mod debug;
+mod dialogs;
+mod idle;
 mod ipc;
 mod keys;
+mod lock;
 mod menus;
 mod messages;
 mod outputs;
 mod panel;
+mod polkit;
 mod quick_settings;
 mod ready;
 mod services;
@@ -49,13 +53,36 @@ pub struct Cli {
     no_pointer: bool,
 }
 
+impl Cli {
+    /// The options that make `gniri lock` read what this process reads.
+    fn locker_arguments(&self) -> Vec<String> {
+        let mut arguments = Vec::new();
+        if let Some(config) = &self.config {
+            arguments.extend(["--config".to_owned(), config.display().to_string()]);
+        }
+        if let Some(wallpaper) = &self.wallpaper {
+            arguments.extend(["--wallpaper".to_owned(), wallpaper.clone()]);
+        }
+        arguments
+    }
+}
+
 #[derive(Subcommand, Debug, Clone)]
 enum Command {
     /// Send a request to the running shell.
     Msg {
+        /// The process to ask. The lock screen and the polkit agent only
+        /// answer in a test scene.
+        #[arg(long, value_enum, default_value = "shell")]
+        to: ipc::Role,
         #[command(subcommand)]
         message: Message,
     },
+    /// Lock the screen and ask for the password. The shell starts this
+    /// when the session is to be locked; `gniri msg lock` asks it to.
+    Lock,
+    /// Run the polkit authentication agent. The shell starts this itself.
+    Polkit,
     /// Open a plain flat-coloured window (for tests).
     DebugWindow {
         #[arg(long, default_value = "#f6f5f4")]
@@ -71,6 +98,14 @@ enum Message {
     /// Change the screen brightness by one step and show the on-screen
     /// display. Bind this to the brightness keys.
     Brightness { step: ipc::Step },
+    /// Lock the screen.
+    Lock,
+    /// Ask whether to log out, and do it after a minute without an answer.
+    LogOut,
+    /// Ask whether to restart.
+    Restart,
+    /// Ask whether to power off.
+    PowerOff,
     /// Inspect or drive the running shell (for tests).
     Debug {
         #[command(subcommand)]
@@ -112,6 +147,16 @@ enum DebugRequest {
     /// Deliver a notification as if an application had sent it, and print
     /// its id.
     Notify(ipc::Notify),
+    /// Close the end-session dialog, as its Cancel button does.
+    CloseDialog,
+    /// Report an idle timer as passed, as the compositor would after that
+    /// long without input.
+    Idle {
+        timer: ipc::IdleTimer,
+        /// Report input coming back instead.
+        #[arg(long)]
+        resumed: bool,
+    },
 }
 
 impl Message {
@@ -119,6 +164,10 @@ impl Message {
         match self.clone() {
             Self::Volume { key } => ipc::Request::Volume(key),
             Self::Brightness { step } => ipc::Request::Brightness(step),
+            Self::Lock => ipc::Request::Lock,
+            Self::LogOut => ipc::Request::EndSession(dialogs::end_session::Kind::LogOut),
+            Self::Restart => ipc::Request::EndSession(dialogs::end_session::Kind::Restart),
+            Self::PowerOff => ipc::Request::EndSession(dialogs::end_session::Kind::PowerOff),
             Self::Debug { request } => match request {
                 DebugRequest::DumpTree => ipc::Request::DumpTree,
                 DebugRequest::Sync => ipc::Request::Sync,
@@ -131,6 +180,8 @@ impl Message {
                     ipc::Request::Osd { icon, label, level }
                 }
                 DebugRequest::Notify(notify) => ipc::Request::Notify(notify),
+                DebugRequest::CloseDialog => ipc::Request::CloseDialog,
+                DebugRequest::Idle { timer, resumed } => ipc::Request::Idle { timer, resumed },
             },
         }
     }
@@ -140,8 +191,10 @@ fn main() -> glib::ExitCode {
     let cli = Cli::parse();
     match &cli.command {
         None => app::run(cli),
+        Some(Command::Lock) => lock::run(cli),
+        Some(Command::Polkit) => polkit::run(cli),
         Some(Command::DebugWindow { color }) => debug::window::run(color),
-        Some(Command::Msg { message }) => match ipc::send(&message.request()) {
+        Some(Command::Msg { to, message }) => match ipc::send(*to, &message.request()) {
             Ok(value) => {
                 if !value.is_null() {
                     println!("{value:#}");

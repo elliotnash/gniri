@@ -1,0 +1,59 @@
+// Text entries. Upstream: widgets/_entries.scss and %entry in _common.scss.
+//
+// Widget tree (crates/shell/src/widgets/password_entry.rs):
+//
+//   box.st-entry                     StEntry / StPasswordEntry
+//     text                             its ClutterText
+//       placeholder                      StLabel.hint-text
+//     image.peek-password              StIcon.peek-password
+//
+// Only the geometry is here. Every entry gniri has sits on a blurred
+// dialog or on the lock screen, each of which has colours of its own
+// (_bms-popup.scss, _login-lock.scss).
+
+.st-entry {
+    // %entry_common
+    border-radius: $base_border_radius;
+    padding: ($base_padding * 1.5) ($base_padding * 1.5);
+    // StEntry lays its text and its icons out 6px apart.
+    border-spacing: $base_padding;
+    transition: box-shadow 200ms $st_transition_easing;
+
+    > text {
+        // GtkText as a child of something else is a bare text field:
+        // no frame, no padding of its own.
+        all: unset;
+        @include st_line_height;
+        // The dot StPasswordEntry hides a character behind is drawn at the
+        // interface font's own size.
+        caret-color: currentColor;
+
+        > placeholder {
+            // StLabel.hint-text
+            margin-left: $base_margin * 2;
+        }
+    }
+
+    // StIcon.peek-password
+    > .peek-password {
+        all: unset;
+        padding: 0 $base_margin;
+        -gtk-icon-size: $scalable_icon_size;
+        -gtk-icon-style: symbolic;
+    }
+}
+
+// shellEntry.js CapsLockWarning
+.caps-lock-warning-label {
+    @include caption;
+    @include st_line_height;
+    padding-bottom: 8px;
+    color: $warning_color;
+}
+
+:root {
+    --gniri-entry-padding: #{$base_padding * 1.5} #{$base_padding * 1.5};
+    --gniri-entry-radius: #{$base_border_radius};
+    --gniri-entry-hint-margin: #{$base_margin * 2};
+    --gniri-entry-icon-padding: #{$base_margin};
+}

@@ -1,0 +1,215 @@
+// The lock screen. Upstream: widgets/_login-lock.scss, the parts the
+// unlock dialog uses.
+//
+// Widget tree (crates/shell/src/lock/):
+//
+//   window.gniri-lock-window                    #lockDialogGroup
+//     overlay
+//       picture.screen-shield-background          .screen-shield-background
+//       stack.unlock-dialog                       .unlock-dialog
+//         box.unlock-dialog-clock                   .unlock-dialog-clock
+//           label.unlock-dialog-clock-time
+//           label.unlock-dialog-clock-date
+//           label.unlock-dialog-clock-hint
+//         box.unlock-dialog-column                  (the prompt's column)
+//         box.login-dialog-prompt-layout            AuthPrompt
+//           box.user-widget.vertical                  UserWidget
+//             box.user-icon.user-avatar
+//             label.user-widget-label
+//           box.login-dialog-input-well
+//             box.login-dialog-button-box
+//               box.login-dialog-button-room            the cancel button's room
+//               overlay.login-dialog-prompt-entry-area
+//                 box.st-entry.login-dialog-prompt-entry
+//                 box.login-dialog-default-button-well
+//                   button.login-dialog-button.next-button
+//               box.login-dialog-button-room
+//             label.caps-lock-warning-label
+//             label.login-dialog-message
+
+$_gdm_bg: $system_base_color;
+$_gdm_fg: $system_fg_color;
+// Upstream: 25em * 1.2, which St rounds to 440px.
+$_gdm_prompt_width: em_at_most(440px);
+// unlockDialog.js CROSSFADE_TIME
+$unlock_crossfade_time: 300ms;
+
+// #lockDialogGroup: what shows where there is no wallpaper.
+window.gniri-lock-window {
+    background-color: $_gdm_bg;
+}
+
+// common style for login and lockscreen
+.unlock-dialog {
+    color: $_gdm_fg;
+
+    .caps-lock-warning-label,
+    .login-dialog-message-warning {
+        color: $_gdm_fg;
+    }
+
+    .login-dialog-prompt-layout {
+        min-width: $_gdm_prompt_width;
+        min-height: 550px;
+    }
+
+    .login-dialog-input-well {
+        margin: ($base_padding * 1.5) 0;
+    }
+
+    // Upstream: 4em, which St rounds to 59px.
+    .login-dialog-button-box {
+        min-height: em_at_most(59px);
+    }
+
+    // The cancel button of GDM's login screen: 16px of icon in 12px of
+    // padding. The unlock dialog hides it and keeps its room.
+    .login-dialog-button-room {
+        min-width: em_at_most(40px);
+    }
+
+    .login-dialog-prompt-entry-area {
+        // Upstream: 0.5em, which St rounds to 7px.
+        margin: to_em(7px) ($base_margin * 5);
+    }
+
+    .login-dialog-prompt-entry {
+        border-radius: $base_border_radius * 1.5;
+        // %lockscreen_entry
+        background-color: transparentize($_gdm_fg, 0.9);
+        color: transparentize($_gdm_fg, 0.3);
+
+        &:focus-within {
+            // focus_ring() and focus_bg_color() with the entry's own
+            // focus colour, a faint white.
+            box-shadow: inset 0 0 0 2px transparentize($_gdm_fg, 0.8);
+            background-color: rgba(255, 255, 255, 0.11);
+            color: $_gdm_fg;
+        }
+
+        &:disabled {
+            color: transparentize($_gdm_fg, 0.5);
+        }
+
+        > text > placeholder { color: transparentize($_gdm_fg, 0.3); }
+
+        // Make room for button-well inside entry. Upstream: 2.5em, which
+        // St rounds to 37px.
+        > .peek-password { padding-right: to_em(37px); }
+    }
+
+    // Upstream gives everything inside the well 0.5em (7px) on the
+    // right: the button, and the icon inside the button.
+    .login-dialog-default-button-well {
+        padding-right: to_em(14px);
+    }
+
+    .login-dialog-button.next-button {
+        all: unset;
+        color: $_gdm_fg;
+        border-radius: $forced_circular_radius;
+        min-height: em_at_most(16px);
+
+        image {
+            -gtk-icon-size: $scalable_icon_size;
+            -gtk-icon-style: symbolic;
+        }
+    }
+
+    .login-dialog-message {
+        color: darken($_gdm_fg, 10%);
+        // Upstream: 2.75em and 2em, which St rounds to 40px and 29px.
+        min-height: em_at_most(40px);
+        margin-top: to_em(29px);
+    }
+
+    // User Widget, in the layout of the login prompt
+    .user-widget.vertical {
+        border-spacing: $base_padding * 4;
+
+        .user-widget-label {
+            color: $_gdm_fg;
+            font-weight: 400;
+            @include fontsize(20pt);
+            // Upstream: .75em of this label's own size, which is a hair
+            // under the 20px St rounds it to and GTK would round down.
+            margin-bottom: 0.751em;
+        }
+
+        .user-icon {
+            background-color: transparentize($_gdm_fg, 0.87);
+            color: $_gdm_fg;
+            min-width: $base_icon_size * 10;
+            min-height: $base_icon_size * 10;
+
+            > image { -gtk-icon-size: $base_icon_size * 10 - $base_padding * 10; }
+        }
+    }
+}
+
+// The prompt is centred in the same column as the clock: 457px wide (see
+// the clock), which at most screen widths puts it a pixel left of centre.
+.unlock-dialog-column {
+    min-width: em_at_most(457px);
+}
+
+// Clock
+.unlock-dialog-clock {
+    color: $_gdm_fg;
+    // Upstream: 2em, which St rounds to 29px.
+    border-spacing: to_em(29px);
+    // `UnlockDialogLayout` makes the clock's column as wide as the list of
+    // notifications under it: 29em of list in 12px of margin and its
+    // scroll bar's room, 457px.
+    min-width: em_at_most(457px);
+
+    .unlock-dialog-clock-time {
+        font-feature-settings: "tnum";
+        @include fontsize(72pt);
+        font-weight: 800;
+    }
+
+    .unlock-dialog-clock-date {
+        // %title_1
+        @include fontsize(20pt);
+        font-weight: 400;
+    }
+
+    .unlock-dialog-clock-hint {
+        margin-top: to_em(29px);
+        // A pixel more below: st_line_height.
+        padding: $base_padding ($base_padding * 3) ($base_padding + 1px);
+        border-radius: $base_border_radius * 2;
+        font-weight: bold;
+
+        // `UnlockDialogClock`: it fades in after a while.
+        opacity: 0;
+        transition: opacity $unlock_crossfade_time $ease_out_quad;
+
+        &.shown { opacity: 1; }
+    }
+}
+
+:root {
+    --gniri-lock-bg-color: #{$_gdm_bg};
+    --gniri-lock-fg-color: #{$_gdm_fg};
+    --gniri-lock-prompt-width: #{$_gdm_prompt_width};
+    --gniri-lock-entry-color: #{transparentize($_gdm_fg, 0.9)};
+    --gniri-lock-entry-focus-ring-color: #{transparentize($_gdm_fg, 0.8)};
+    --gniri-lock-entry-focus-color: #{rgba(255, 255, 255, 0.11)};
+    --gniri-lock-entry-icon-room: #{to_em(37px)};
+    --gniri-lock-entry-radius: #{$base_border_radius * 1.5};
+    --gniri-lock-entry-area-margin: #{to_em(7px)} #{$base_margin * 5};
+    --gniri-lock-input-well-margin: #{$base_padding * 1.5};
+    --gniri-lock-button-box-height: #{em_at_most(59px)};
+    --gniri-lock-message-color: #{darken($_gdm_fg, 10%)};
+    --gniri-lock-message-height: #{em_at_most(40px)};
+    --gniri-lock-message-margin-top: #{to_em(29px)};
+    --gniri-lock-user-spacing: #{$base_padding * 4};
+    --gniri-lock-avatar-size: #{$base_icon_size * 10};
+    --gniri-lock-avatar-color: #{transparentize($_gdm_fg, 0.87)};
+    --gniri-lock-clock-spacing: #{to_em(29px)};
+    --gniri-lock-hint-padding: #{$base_padding} #{$base_padding * 3};
+    --gniri-lock-hint-radius: #{$base_border_radius * 2};
+    --gniri-unlock-crossfade-time: #{$unlock_crossfade_time};
+}

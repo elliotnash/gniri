@@ -10,6 +10,8 @@ use gtk::{gdk, gio, glib};
 
 use crate::Cli;
 use crate::debug;
+use crate::dialogs;
+use crate::idle;
 use crate::ipc;
 use crate::keys;
 use crate::menus::Menu;
@@ -26,18 +28,48 @@ const APP_ID: &str = "dev.gniri.Shell";
 ///
 /// `GNIRI_INSTANCE` adds a suffix so a nested test instance can run beside a
 /// real one without the two fighting over the same D-Bus name.
-fn application_id() -> String {
+fn application_id(role: ipc::Role) -> String {
+    let id = match role {
+        ipc::Role::Shell => APP_ID.to_owned(),
+        ipc::Role::Lock => format!("{APP_ID}.Lock"),
+        ipc::Role::Polkit => format!("{APP_ID}.Polkit"),
+    };
     match std::env::var("GNIRI_INSTANCE") {
-        Ok(instance) if !instance.is_empty() => format!("{APP_ID}.{instance}"),
-        _ => APP_ID.to_owned(),
+        Ok(instance) if !instance.is_empty() => format!("{id}.{instance}"),
+        _ => id,
+    }
+}
+
+/// The polkit agent, a process the shell starts and stops with itself.
+struct PolkitAgent(std::process::Child);
+
+impl PolkitAgent {
+    fn start() -> Option<Self> {
+        let program = std::env::current_exe().ok()?;
+        match std::process::Command::new(program).arg("polkit").spawn() {
+            Ok(child) => Some(Self(child)),
+            Err(error) => {
+                eprintln!("gniri: cannot start the polkit agent: {error}");
+                None
+            }
+        }
+    }
+}
+
+impl Drop for PolkitAgent {
+    fn drop(&mut self) {
+        let _ = self.0.kill();
+        let _ = self.0.wait();
     }
 }
 
 /// Everything that must live as long as the application.
 struct Running {
     _outputs: Rc<Outputs>,
+    _dialogs: dialogs::Host,
     _ipc: Option<gio::SocketService>,
     _subscriptions: Vec<gniri_core::Subscription>,
+    _polkit: Option<PolkitAgent>,
 }
 
 pub fn run(cli: Cli) -> glib::ExitCode {
@@ -53,18 +85,7 @@ pub fn run(cli: Cli) -> glib::ExitCode {
         }
     };
 
-    let app = adw::Application::builder()
-        .application_id(application_id())
-        // We parsed the command line ourselves; GApplication must not.
-        .flags(gio::ApplicationFlags::NON_UNIQUE)
-        .build();
-
-    app.connect_startup(|_| {
-        // GNOME Shell's own chrome is dark whatever the app colour scheme is.
-        adw::StyleManager::default().set_color_scheme(adw::ColorScheme::ForceDark);
-        style::load();
-    });
-
+    let app = application(ipc::Role::Shell);
     let running: Rc<RefCell<Option<Running>>> = Rc::default();
     let setup = RefCell::new(Some((config, fixture)));
     app.connect_activate({
@@ -78,14 +99,121 @@ pub fn run(cli: Cli) -> glib::ExitCode {
     });
     app.connect_shutdown(move |_| {
         if running.borrow_mut().take().is_some() {
-            ipc::cleanup();
+            ipc::cleanup(ipc::Role::Shell);
         }
     });
     // Pass no arguments: clap already consumed them.
     app.run_with_args::<&str>(&[])
 }
 
-fn load_config(cli: &Cli) -> Config {
+/// An application for one of gniri's processes, themed as the shell is.
+fn application(role: ipc::Role) -> adw::Application {
+    let app = adw::Application::builder()
+        .application_id(application_id(role))
+        // We parsed the command line ourselves; GApplication must not.
+        .flags(gio::ApplicationFlags::NON_UNIQUE)
+        .build();
+    app.connect_startup(|_| {
+        // GNOME Shell's own chrome is dark whatever the app colour scheme is.
+        adw::StyleManager::default().set_color_scheme(adw::ColorScheme::ForceDark);
+        style::load();
+    });
+    app
+}
+
+/// What a helper process keeps alive while it runs.
+pub type Kept = Box<dyn std::any::Any>;
+
+/// Runs `gniri lock` or `gniri polkit`: an application of its own that
+/// reads the same configuration, looks the same, and in a test scene
+/// answers the requests that inspect it.
+///
+/// `activate` builds the process's surfaces once. Returning `None` ends
+/// the process. The exit status is whatever [`quit_with`] was told, or
+/// success.
+pub fn run_helper(
+    cli: Cli,
+    role: ipc::Role,
+    activate: impl Fn(&adw::Application, &Config, Option<&Fixture>) -> Option<Kept> + 'static,
+) -> glib::ExitCode {
+    let config = load_config(&cli);
+    let fixture = match cli.fixture.as_deref().map(Fixture::load).transpose() {
+        Ok(fixture) => fixture,
+        Err(error) => {
+            eprintln!("gniri: {error}");
+            return glib::ExitCode::FAILURE;
+        }
+    };
+
+    let app = application(role);
+    let kept: Rc<RefCell<Vec<Kept>>> = Rc::default();
+    let activated = std::cell::Cell::new(false);
+    app.connect_activate({
+        let kept = Rc::clone(&kept);
+        move |app| {
+            if activated.replace(true) {
+                return;
+            }
+            if fixture.is_some() {
+                if let Some(settings) = gtk::Settings::default() {
+                    settings.set_gtk_enable_animations(false);
+                }
+                // Only a scene's process can be looked into: the real lock
+                // screen and the real agent take no requests.
+                let served = ipc::serve(role, {
+                    let app = app.clone();
+                    move |request| -> ipc::Pending {
+                        match request {
+                            ipc::Request::Sync => Box::pin(sync(app.clone())),
+                            ipc::Request::DumpTree => {
+                                let reply = serde_json::to_value(debug::dump::dump(&app))
+                                    .map_err(|error| error.to_string());
+                                Box::pin(async move { reply })
+                            }
+                            _ => Box::pin(async {
+                                Err("this process only answers dump-tree and sync".to_owned())
+                            }),
+                        }
+                    }
+                });
+                if let Some(served) = served {
+                    kept.borrow_mut().push(Box::new(served));
+                }
+            }
+            if cli.no_pointer {
+                crate::surfaces::layer::ignore_pointer();
+            }
+            match activate(app, &config, fixture.as_ref()) {
+                Some(state) => {
+                    kept.borrow_mut().push(state);
+                    std::mem::forget(app.hold());
+                }
+                None => app.quit(),
+            }
+        }
+    });
+    app.connect_shutdown(move |_| {
+        if !kept.borrow().is_empty() {
+            kept.borrow_mut().clear();
+            ipc::cleanup(role);
+        }
+    });
+    app.run_with_args::<&str>(&[]);
+    EXIT_STATUS.with(|status| glib::ExitCode::from(status.get()))
+}
+
+thread_local! {
+    /// What [`run_helper`] exits with.
+    static EXIT_STATUS: std::cell::Cell<u8> = const { std::cell::Cell::new(0) };
+}
+
+/// Ends a helper process with `status`.
+pub fn quit_with(app: &adw::Application, status: u8) {
+    EXIT_STATUS.with(|current| current.set(status));
+    app.quit();
+}
+
+pub fn load_config(cli: &Cli) -> Config {
     let path = cli.config.clone().or_else(gniri_config::default_path);
     let Some(path) = path else {
         return Config::default();
@@ -98,7 +226,7 @@ fn load_config(cli: &Cli) -> Config {
 }
 
 /// The wallpaper to draw: `--wallpaper` if given, else the config file's.
-fn wallpaper_source(cli: &Cli, config: &Config) -> Option<WallpaperSource> {
+pub fn wallpaper_source(cli: &Cli, config: &Config) -> Option<WallpaperSource> {
     if let Some(spec) = &cli.wallpaper {
         return match WallpaperSource::parse(spec) {
             Ok(source) => Some(source),
@@ -142,13 +270,15 @@ fn activate(
         crate::surfaces::layer::ignore_pointer();
     }
     let wallpaper = wallpaper_source(cli, &config);
-    let services = Services::start(config, fixture);
+    // Not under a fixture: a scene starts the agent it wants to look at.
+    let polkit = fixture.is_none().then(PolkitAgent::start).flatten();
+    let services = Services::start(config, fixture, cli.locker_arguments());
 
     let ready = ReadyTracker::new();
     let outputs = Outputs::start(app, &services, wallpaper, &ready);
     ready.arm();
 
-    let ipc = ipc::serve({
+    let ipc = ipc::serve(ipc::Role::Shell, {
         let (app, services, outputs) = (app.clone(), Rc::clone(&services), Rc::clone(&outputs));
         move |request| -> ipc::Pending {
             if request == ipc::Request::Sync {
@@ -172,11 +302,34 @@ fn activate(
             }
         }
     });
+    // So does a dialog, and the lock screen: neither leaves a menu open
+    // behind it.
+    let close_menus_for_dialog = services.end_session.select(|open| open.is_some(), {
+        let services = Rc::clone(&services);
+        move |open| {
+            if *open {
+                services.menus.update(|menus| menus.close());
+            }
+        }
+    });
+    let close_for_lock = services.session.state.select(|session| session.locked, {
+        let services = Rc::clone(&services);
+        move |locked| {
+            if *locked {
+                services.menus.update(|menus| menus.close());
+                services.end_session.update(|open| *open = None);
+            }
+        }
+    });
+    let mut subscriptions = vec![close_menus, close_menus_for_dialog, close_for_lock];
+    subscriptions.extend(idle::start(&services));
 
     Some(Running {
         _outputs: outputs,
+        _dialogs: dialogs::host(app, &services),
         _ipc: ipc,
-        _subscriptions: vec![close_menus],
+        _subscriptions: subscriptions,
+        _polkit: polkit,
     })
 }
 
@@ -250,6 +403,30 @@ fn handle(
             Ok(Value::Null)
         }
         ipc::Request::Notify(notify) => Ok(Value::from(debug::notify(services, notify))),
+        ipc::Request::Lock => {
+            services
+                .session
+                .send(gniri_services::session::Command::Lock);
+            Ok(Value::Null)
+        }
+        ipc::Request::EndSession(kind) => {
+            services.end_session.update(|open| *open = Some(kind));
+            Ok(Value::Null)
+        }
+        ipc::Request::CloseDialog => {
+            services.end_session.update(|open| *open = None);
+            Ok(Value::Null)
+        }
+        ipc::Request::Idle { timer, resumed } => {
+            use gniri_services::idle::Event;
+            let timer = timer.timer();
+            services.idle.inject(if resumed {
+                Event::Resumed(timer)
+            } else {
+                Event::Idle(timer)
+            });
+            Ok(Value::Null)
+        }
         ipc::Request::Brightness(step) => {
             let steps = match step {
                 ipc::Step::Up => 1,
@@ -276,7 +453,7 @@ fn handle(
 /// draw. So: let the main loop go idle, then wait for every mapped surface
 /// to finish painting one more frame, twice over to cover a surface that
 /// only became mapped during the first wait.
-async fn sync(app: adw::Application) -> ipc::Reply {
+pub async fn sync(app: adw::Application) -> ipc::Reply {
     for _ in 0..2 {
         let (idle, went_idle) = async_channel::bounded::<()>(1);
         glib::idle_add_local_full(glib::Priority::LOW, move || {

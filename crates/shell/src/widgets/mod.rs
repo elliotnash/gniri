@@ -1,5 +1,7 @@
 //! Widgets shared by several parts of the shell.
 
+pub mod avatar;
 pub mod level;
+pub mod password_entry;
 pub mod picture;
 pub mod slider;

@@ -1,0 +1,16 @@
+#%PAM-1.0
+# gniri's lock screen: checking the password of the user who locked.
+#
+#     sudo cp data/pam/gniri data/pam/gniri-fingerprint /etc/pam.d/
+#
+# The password only: a fingerprint is asked for side by side, through
+# gniri-fingerprint. That is why this does not include the login stack,
+# which on a system set up for fingerprints waits for the reader before it
+# looks at a password.
+#
+# Written for Fedora and its relatives, where password-auth is that
+# password-only stack (GDM's password prompt uses it too). Elsewhere, put
+# the distribution's equivalent here: on Debian and Ubuntu
+# `@include common-auth`, on Arch `auth include system-auth`.
+auth        substack      password-auth
+account     include       password-auth

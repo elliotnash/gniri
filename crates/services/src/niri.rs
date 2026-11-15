@@ -201,6 +201,16 @@ impl Client {
         }
     }
 
+    /// Connector name of the output with the keyboard focus. Blocks for
+    /// one local socket round trip.
+    pub fn focused_output(&self) -> Option<String> {
+        let mut connection = Socket::connect_to(&self.socket).ok()?;
+        match connection.send(Request::FocusedOutput) {
+            Ok(Ok(niri_ipc::Response::FocusedOutput(output))) => output.map(|output| output.name),
+            _ => None,
+        }
+    }
+
     pub fn toggle_overview(&self) -> Result<(), String> {
         self.action(Action::ToggleOverview {})
     }

@@ -1,0 +1,218 @@
+// Modal dialogs. Upstream: widgets/_dialogs.scss.
+//
+// Widget tree (crates/shell/src/dialogs/):
+//
+//   box.modal-dialog-lightbox            Lightbox, and blur-my-shell's backdrop
+//     box.modal-dialog                     .modal-dialog
+//       box.modal-dialog-content-box         .modal-dialog-content-box
+//         box.message-dialog-content           MessageDialogContent
+//           label.message-dialog-title
+//           label.message-dialog-description
+//         box.message-dialog-content           (the polkit dialog's second)
+//           box.polkit-dialog-user-layout
+//             box.user-icon.user-avatar
+//             label.polkit-dialog-user-label
+//           box.prompt-dialog-password-layout
+//             box.st-entry.prompt-dialog-password-entry
+//             box
+//               label.caps-lock-warning-label
+//               label.prompt-dialog-null-label   (or -error-, -info-)
+//       box.modal-dialog-button-box          .modal-dialog-button-box
+//         button.modal-dialog-button
+
+// modalDialog.js OPEN_AND_CLOSE_TIME
+$modal_dialog_fade_time: 100ms;
+// lightbox.js VIGNETTE_BRIGHTNESS and VIGNETTE_SHARPNESS: the screen under
+// a dialog keeps half its brightness in the middle, and 30% of that in the
+// corners.
+$lightbox_vignette_brightness: 0.5;
+$lightbox_vignette_sharpness: 0.7;
+// dialog.js: `new Clutter.BoxLayout({spacing: 12, homogeneous: true})`
+$modal_dialog_button_spacing: 12px;
+
+// The lightbox's black at `$t`: 0 in the middle of the screen, 1 in its
+// corners. $backdrop is how bright what is under it is drawn already.
+@function lightbox-shade($t, $backdrop: 1) {
+    $brightness: (1 - $lightbox_vignette_sharpness * $t) * $lightbox_vignette_brightness;
+    @return rgba(0, 0, 0, 1 - $brightness * $backdrop);
+}
+
+// `ModalDialog.open`: the dialog and the shade fade in together.
+.modal-dialog-lightbox {
+    // The RadialShaderEffect measures from the middle of the screen to its
+    // corners, as `farthest-corner` does.
+    background-image: radial-gradient(farthest-corner at center, lightbox-shade(0), lightbox-shade(1));
+
+    opacity: 0;
+    transition: opacity $modal_dialog_fade_time $ease_out_quad;
+
+    &.open { opacity: 1; }
+}
+
+// style for all dialogs
+.modal-dialog {
+    background-color: $bg_color;
+    border-radius: $alert_radius;
+    padding: $base_padding * 4;
+    border-spacing: $base_padding * 3;
+    box-shadow: st-shadow(0, 12px, 8px, rgba(0, 0, 0, 0.03), 12px);
+
+    .modal-dialog-content-box {
+        padding-top: $base_padding * 2;
+        border-spacing: $base_padding * 3;
+    }
+
+    .modal-dialog-button-box {
+        padding-top: $base_padding;
+        border-spacing: $modal_dialog_button_spacing;
+
+        .modal-dialog-button {
+            all: unset;
+            // %dialog_button
+            font-weight: bold;
+            padding: $base_padding * 2;
+            border-radius: $base_border_radius * 1.5;
+            transition: background-color 200ms $st_transition_easing,
+                        box-shadow 200ms $st_transition_easing;
+
+            label { @include st_line_height; }
+        }
+    }
+}
+
+/* End Session Dialog */
+// Upstream: 24em, which St rounds to 352px.
+$end_session_dialog_width: em_at_most(352px);
+
+.end-session-dialog {
+    min-width: $end_session_dialog_width;
+
+    // special style for session warnings
+    .end-session-dialog-battery-warning {
+        @include st_line_height;
+        color: $warning_color;
+        background-color: transparentize($warning_color, 0.9);
+        padding: $base_padding * 1.5;
+        border-radius: $base_border_radius;
+        margin: $base_margin 0;
+    }
+}
+
+/* Message Dialog */
+.message-dialog-content {
+    border-spacing: $base_padding * 3;
+
+    // At this size St and Pango agree on the height of a line; the
+    // pixel of st_line_height is not needed.
+    .message-dialog-title {
+        @include title_2;
+    }
+
+    .message-dialog-description {
+        @include st_line_height;
+    }
+}
+
+/* Password or Authentication Dialog */
+// Upstream: 28em, which St rounds to 411px.
+$prompt_dialog_width: em_at_most(411px);
+// Upstream: 20em, which St rounds to 293px.
+$prompt_dialog_entry_width: em_at_most(293px);
+
+.prompt-dialog {
+    min-width: $prompt_dialog_width;
+
+    .prompt-dialog-password-layout {
+        border-spacing: $base_margin * 2;
+    }
+
+    .prompt-dialog-password-entry {
+        min-width: $prompt_dialog_entry_width;
+        padding: ($base_padding * 2) ($base_padding * 1.5);
+    }
+
+    .prompt-dialog-error-label,
+    .prompt-dialog-info-label,
+    .prompt-dialog-null-label {
+        @include caption;
+        @include st_line_height;
+        padding: $base_padding * 1.5;
+        border-radius: $base_border_radius;
+        margin: $base_margin 0;
+    }
+
+    .prompt-dialog-error-label {
+        color: $warning_color;
+        background-color: transparentize($warning_color, 0.9);
+    }
+
+    .prompt-dialog-info-label {
+        color: $fg_color;
+        background-color: transparentize($fg_color, 0.9);
+    }
+}
+
+/* Polkit Dialog */
+// polkitAgent.js gives the avatar DIALOG_ICON_SIZE; it comes out at 64px.
+$polkit_dialog_avatar_size: 64px;
+
+.polkit-dialog-user-layout {
+    border-spacing: $base_margin * 2;
+    margin-bottom: $base_padding;
+
+    .user-icon {
+        min-width: $polkit_dialog_avatar_size;
+        min-height: $polkit_dialog_avatar_size;
+
+        > image { -gtk-icon-size: $polkit_dialog_avatar_size - $base_padding * 4; }
+    }
+
+    .polkit-dialog-user-label,
+    .polkit-dialog-user-root-label {
+        @include title_4;
+        @include st_line_height;
+    }
+
+    .polkit-dialog-user-root-label {
+        color: $warning_color;
+    }
+}
+
+// animationUtils.js `wiggle`: a wrong password shakes the entry, 6px to
+// each side, 65ms a leg.
+@keyframes wiggle {
+    0% { transform: translateX(0); }
+    10% { transform: translateX(-6px); }
+    30% { transform: translateX(6px); }
+    50% { transform: translateX(-6px); }
+    70% { transform: translateX(6px); }
+    90% { transform: translateX(-6px); }
+    100% { transform: translateX(0); }
+}
+
+.wiggle {
+    animation: wiggle 455ms linear;
+}
+
+:root {
+    --gniri-modal-dialog-fade-time: #{$modal_dialog_fade_time};
+    --gniri-modal-dialog-radius: #{$alert_radius};
+    --gniri-modal-dialog-padding: #{$base_padding * 4};
+    --gniri-modal-dialog-spacing: #{$base_padding * 3};
+    --gniri-modal-dialog-content-padding-top: #{$base_padding * 2};
+    --gniri-modal-dialog-button-box-padding-top: #{$base_padding};
+    --gniri-modal-dialog-button-padding: #{$base_padding * 2};
+    --gniri-modal-dialog-button-radius: #{$base_border_radius * 1.5};
+    --gniri-prompt-dialog-width: #{$prompt_dialog_width};
+    --gniri-prompt-dialog-entry-width: #{$prompt_dialog_entry_width};
+    --gniri-prompt-dialog-entry-padding: #{$base_padding * 2} #{$base_padding * 1.5};
+    --gniri-prompt-dialog-layout-spacing: #{$base_margin * 2};
+    --gniri-prompt-dialog-label-padding: #{$base_padding * 1.5};
+    --gniri-prompt-dialog-label-margin: #{$base_margin};
+    --gniri-polkit-dialog-user-spacing: #{$base_margin * 2};
+    --gniri-polkit-dialog-user-margin-bottom: #{$base_padding};
+    --gniri-polkit-dialog-avatar-size: #{$polkit_dialog_avatar_size};
+    --gniri-end-session-dialog-width: #{$end_session_dialog_width};
+    --gniri-lightbox-centre-color: #{lightbox-shade(0)};
+    --gniri-lightbox-corner-color: #{lightbox-shade(1)};
+}

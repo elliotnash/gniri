@@ -219,6 +219,35 @@ pub fn panel_clock_text(time: &LocalTime, format: &ClockFormat) -> String {
     text
 }
 
+/// The time on the lock screen: the wall clock without the date, as
+/// `UnlockDialogClock._updateClock` shows it. The hours and minutes are
+/// divided by a ratio sign (U+2236), which sits at the height of the digits
+/// where a colon would hang low.
+pub fn lock_clock_time(time: &LocalTime, hour12: bool) -> String {
+    const RATIO: char = '\u{2236}';
+    if hour12 {
+        let hour = match time.hour % 12 {
+            0 => 12,
+            hour => hour,
+        };
+        let half = if time.hour < 12 { "AM" } else { "PM" };
+        format!("{hour}{RATIO}{:02} {half}", time.minute)
+    } else {
+        format!("{:02}{RATIO}{:02}", time.hour, time.minute)
+    }
+}
+
+/// The date under it: "Friday November 13" (format `%A %B %-d`).
+pub fn lock_clock_date(time: &LocalTime) -> String {
+    let date = time.date();
+    format!(
+        "{} {} {}",
+        time.weekday().name(),
+        date.month_name(),
+        date.day
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -313,5 +342,18 @@ mod tests {
             ),
             "12:00 PM"
         );
+    }
+
+    #[test]
+    fn the_lock_screen_clock() {
+        let evening = time("2026-11-13T22:08:00");
+        assert_eq!(lock_clock_time(&evening, true), "10\u{2236}08 PM");
+        assert_eq!(lock_clock_time(&evening, false), "22\u{2236}08");
+        assert_eq!(lock_clock_date(&evening), "Friday November 13");
+
+        let night = time("2026-01-05T00:07:59");
+        assert_eq!(lock_clock_time(&night, true), "12\u{2236}07 AM");
+        assert_eq!(lock_clock_time(&night, false), "00\u{2236}07");
+        assert_eq!(lock_clock_date(&night), "Monday January 5");
     }
 }

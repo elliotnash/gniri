@@ -20,6 +20,8 @@ pub struct Config {
     pub panel: Panel,
     pub date_menu: DateMenu,
     pub night_light: NightLight,
+    pub idle: Idle,
+    pub lock: Lock,
     pub commands: Commands,
 }
 
@@ -150,6 +152,49 @@ pub struct NightLight {
 impl Default for NightLight {
     fn default() -> Self {
         Self { temperature: 2700 }
+    }
+}
+
+/// What happens when nobody touches the machine. GNOME Settings calls the
+/// delay "Blank Screen Delay".
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct Idle {
+    /// Seconds without input after which the screens turn off. 0 for
+    /// never.
+    pub blank_after: u32,
+    /// Dim the screen for the last fifth of that time, as a warning.
+    pub dim: bool,
+}
+
+impl Default for Idle {
+    fn default() -> Self {
+        Self {
+            blank_after: 300,
+            dim: true,
+        }
+    }
+}
+
+/// The lock screen. GNOME Settings: "Automatic Screen Lock" and its delay.
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct Lock {
+    /// Lock when the screens turn off for idleness.
+    pub automatic: bool,
+    /// Seconds between the screens turning off and the lock.
+    pub delay: u32,
+    /// Lock before the machine sleeps.
+    pub on_suspend: bool,
+}
+
+impl Default for Lock {
+    fn default() -> Self {
+        Self {
+            automatic: true,
+            delay: 0,
+            on_suspend: true,
+        }
     }
 }
 
@@ -291,6 +336,10 @@ mod tests {
         assert!(config.panel.shows_on("eDP-1"));
         assert_eq!(config.wallpaper.image, None);
         assert_eq!(config.commands.settings, "gnome-control-center");
+        // GNOME's defaults: blank and lock after five minutes.
+        assert_eq!(config.idle.blank_after, 300);
+        assert!(config.idle.dim && config.lock.automatic && config.lock.on_suspend);
+        assert_eq!(config.lock.delay, 0);
     }
 
     #[test]
@@ -319,6 +368,15 @@ mod tests {
             [night_light]
             temperature = 3500
 
+            [idle]
+            blank_after = 600
+            dim = false
+
+            [lock]
+            automatic = false
+            delay = 30
+            on_suspend = false
+
             [commands]
             settings = "my-settings"
             "##,
@@ -343,6 +401,21 @@ mod tests {
         assert!(!config.panel.shows_on("HDMI-A-1"));
         assert_eq!(config.commands.settings, "my-settings");
         assert_eq!(config.night_light.temperature, 3500);
+        assert_eq!(
+            config.idle,
+            Idle {
+                blank_after: 600,
+                dim: false
+            }
+        );
+        assert_eq!(
+            config.lock,
+            Lock {
+                automatic: false,
+                delay: 30,
+                on_suspend: false
+            }
+        );
         assert_eq!(
             config.date_menu,
             DateMenu {

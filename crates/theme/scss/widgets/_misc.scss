@@ -1,0 +1,27 @@
+// Small shared things. Upstream: widgets/_misc.scss.
+//
+// Widget tree (crates/shell/src/widgets/avatar.rs):
+//
+//   box.user-icon.user-avatar        Avatar (userWidget.js)
+//     picture | image                  its background image, or the icon
+
+// User icon
+.user-icon {
+    // The widget cuts its picture to this (crates/shell/src/widgets/avatar.rs).
+    border-radius: $forced_circular_radius;
+    background-color: transparentize($fg_color, 0.95);
+    color: $fg_color;
+
+    > image {
+        -gtk-icon-style: symbolic;
+    }
+
+    &.user-avatar {
+        box-shadow: inset 0 0 0 1px transparentize($fg_color, 0.9);
+    }
+}
+
+:root {
+    --gniri-user-icon-color: #{transparentize($fg_color, 0.95)};
+    --gniri-user-avatar-outline-color: #{transparentize($fg_color, 0.9)};
+}

@@ -8,12 +8,14 @@ use gniri_config::Config;
 use gniri_core::{Clock, LocalTime, Scheduler, Store};
 use gniri_services::desktop_entry::DesktopEntry;
 use gniri_services::keyboard::LayoutNames;
+use gniri_services::user::User;
 use gniri_services::{
-    Bus, Fixture, Link, Model, audio, bluetooth, brightness, mpris, network, night_light, niri,
-    notifications, power, rfkill, session, toggles,
+    Bus, Fixture, Link, Model, audio, bluetooth, brightness, idle, logind, mpris, network,
+    night_light, niri, notifications, power, rfkill, session, toggles,
 };
 use gtk::glib;
 
+use crate::dialogs::end_session;
 use crate::menus::Menus;
 use crate::settings;
 
@@ -37,11 +39,16 @@ impl Scheduler for GlibScheduler {
     }
 }
 
+/// The scheduler every store of this process shares.
+pub fn scheduler() -> Rc<dyn Scheduler> {
+    Rc::new(GlibScheduler)
+}
+
 /// The system's local time.
-struct SystemClock;
+pub struct SystemClock;
 
 impl SystemClock {
-    fn read() -> (LocalTime, u32) {
+    pub fn read() -> (LocalTime, u32) {
         let now = glib::DateTime::now_local().expect("the local time is representable");
         let time = LocalTime {
             year: now.year(),
@@ -68,7 +75,7 @@ impl Clock for SystemClock {
 pub struct CommandLog(Rc<RefCell<Vec<String>>>);
 
 impl CommandLog {
-    fn push(&self, service: &str, command: &dyn std::fmt::Debug) {
+    pub fn push(&self, service: &str, command: &dyn std::fmt::Debug) {
         self.0.borrow_mut().push(format!("{service}: {command:?}"));
     }
 
@@ -87,7 +94,12 @@ pub struct Service<M: Model> {
 impl<M: Model> Service<M> {
     /// A service with no system behind it: a command only changes the state
     /// the way [`Model::predict`] says, and is logged.
-    fn fake(name: &'static str, state: M, scheduler: &Rc<dyn Scheduler>, log: &CommandLog) -> Self {
+    pub fn fake(
+        name: &'static str,
+        state: M,
+        scheduler: &Rc<dyn Scheduler>,
+        log: &CommandLog,
+    ) -> Self {
         let state = Store::new(state, Rc::clone(scheduler));
         let send = {
             let (state, log) = (state.clone(), log.clone());
@@ -105,11 +117,26 @@ impl<M: Model> Service<M> {
     /// A service fed by a running backend. Commands are predicted at once,
     /// so widgets respond without waiting for the system, and whatever the
     /// backend reports afterwards is the truth.
-    fn live(
+    pub fn live(
         name: &'static str,
         link: Link<M>,
         scheduler: &Rc<dyn Scheduler>,
         log: &CommandLog,
+    ) -> Self
+    where
+        M: Default,
+    {
+        Self::live_then(name, link, scheduler, log, || {})
+    }
+
+    /// The same, running `ended` once the backend has stopped: its end of
+    /// the events is closed.
+    pub fn live_then(
+        name: &'static str,
+        link: Link<M>,
+        scheduler: &Rc<dyn Scheduler>,
+        log: &CommandLog,
+        ended: impl FnOnce() + 'static,
     ) -> Self
     where
         M: Default,
@@ -122,6 +149,7 @@ impl<M: Model> Service<M> {
                 while let Ok(event) = events.recv().await {
                     state.update(|current| current.apply(event));
                 }
+                ended();
             }
         });
         let send = {
@@ -170,8 +198,14 @@ pub struct Services {
     pub do_not_disturb: Service<toggles::State>,
     pub notifications: Service<notifications::State>,
     pub mpris: Service<mpris::State>,
+    pub idle: Service<idle::State>,
     /// Which menu is open, and where.
     pub menus: Store<Menus>,
+    /// The dialog that asks before logging out, restarting or powering
+    /// off, while it is open.
+    pub end_session: Store<Option<end_session::Kind>>,
+    /// Who is logged in.
+    pub user: User,
     pub commands: CommandLog,
     /// True under a fixture: nothing the shell does may reach the system.
     pub sandboxed: bool,
@@ -185,8 +219,16 @@ pub struct Services {
 impl Services {
     /// Starts every service. With a fixture the clock is frozen at its time,
     /// every service takes its state from it and no backend runs.
-    pub fn start(config: Config, fixture: Option<Fixture>) -> Rc<Self> {
-        let scheduler: Rc<dyn Scheduler> = Rc::new(GlibScheduler);
+    ///
+    /// `locker_arguments` are what the screen locker is started with
+    /// before its subcommand: the options that make it read the same
+    /// configuration as this process.
+    pub fn start(
+        config: Config,
+        fixture: Option<Fixture>,
+        locker_arguments: Vec<String>,
+    ) -> Rc<Self> {
+        let scheduler = scheduler();
         let log = CommandLog::default();
 
         let fixed = fixture.as_ref().and_then(|fixture| {
@@ -217,6 +259,7 @@ impl Services {
         let settings_program = Some(config.commands.settings.clone())
             .filter(|program| !program.is_empty() && (sandboxed || on_path(program)));
         let menus = Store::new(Menus::default(), Rc::clone(&scheduler));
+        let end_session = Store::new(None, Rc::clone(&scheduler));
         let (scheduler, log_ref) = (&scheduler, &log);
         let services = match fixture {
             Some(fixture) => {
@@ -243,12 +286,15 @@ impl Services {
                     do_not_disturb,
                     notifications,
                     mpris: Service::fake("mpris", fixture.mpris, scheduler, log_ref),
+                    idle: Service::fake("idle", fixture.idle, scheduler, log_ref),
+                    user: fixture.user,
                     _do_not_disturb_link: link,
                     config,
                     time,
                     niri,
                     niri_client: socket.map(niri::Client::new),
                     menus,
+                    end_session,
                     commands: log.clone(),
                     sandboxed,
                     settings_program,
@@ -261,7 +307,22 @@ impl Services {
                 let network = bus.add("network", network::backend::run);
                 let bluetooth = bus.add("bluetooth", bluetooth::backend::run);
                 let brightness = bus.add("brightness", brightness::backend::run);
-                let session = bus.add("session", session::backend::run);
+                let session = bus.add("session", {
+                    let options = session::backend::Options {
+                        session_id: logind::session_id_from_env(),
+                        lock_on_suspend: config.lock.on_suspend,
+                    };
+                    let locker = session::locker::Process::this_program(locker_arguments);
+                    move |connection, events, commands| {
+                        session::backend::run(
+                            connection,
+                            events,
+                            commands,
+                            Box::new(locker),
+                            options,
+                        )
+                    }
+                });
                 bus.start();
 
                 let mut session_bus = Bus::session();
@@ -310,12 +371,20 @@ impl Services {
                     do_not_disturb,
                     notifications,
                     mpris: Service::live("mpris", mpris, scheduler, log_ref),
+                    idle: Service::live(
+                        "idle",
+                        idle::backend::spawn(idle::timers(&idle_settings(&config))),
+                        scheduler,
+                        log_ref,
+                    ),
+                    user: User::current(),
                     _do_not_disturb_link: link,
                     config,
                     time,
                     niri,
                     niri_client: socket.map(niri::Client::new),
                     menus,
+                    end_session,
                     commands: log.clone(),
                     sandboxed,
                     settings_program,
@@ -402,6 +471,38 @@ impl Services {
             eprintln!("gniri: niri refused an action: {error}");
         }
     }
+
+    /// An action that would end or blank a test's own session: under a
+    /// fixture it is only logged.
+    fn drastic_niri_action(&self, action: niri_ipc::Action) {
+        self.commands.push("niri", &action);
+        if !self.sandboxed {
+            self.niri_action(action);
+        }
+    }
+
+    /// Ends the session: niri quits, and with it everything it started.
+    pub fn log_out(&self) {
+        self.drastic_niri_action(niri_ipc::Action::Quit {
+            skip_confirmation: true,
+        });
+    }
+
+    /// Turns every screen off until the next input.
+    pub fn power_off_monitors(&self) {
+        self.drastic_niri_action(niri_ipc::Action::PowerOffMonitors {});
+    }
+}
+
+/// The `[idle]` and `[lock]` settings as the idle service takes them.
+fn idle_settings(config: &Config) -> idle::Settings {
+    idle::Settings {
+        blank_after: (config.idle.blank_after > 0)
+            .then(|| Duration::from_secs(u64::from(config.idle.blank_after))),
+        dim: config.idle.dim,
+        lock: config.lock.automatic,
+        lock_delay: Duration::from_secs(u64::from(config.lock.delay)),
+    }
 }
 
 /// Makes the notification state follow the Do Not Disturb toggle, from the
@@ -430,7 +531,7 @@ fn on_path(program: &str) -> bool {
 ///
 /// The timer does not run while the machine is suspended, so after a resume
 /// the clock can be stale until the next boundary.
-fn tick(time: Store<LocalTime>, every_second: bool) {
+pub fn tick(time: Store<LocalTime>, every_second: bool) {
     let (now, microsecond) = SystemClock::read();
     let whole_seconds = if every_second {
         0

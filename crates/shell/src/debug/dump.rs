@@ -59,32 +59,53 @@ pub struct Node {
     pub children: Vec<Node>,
 }
 
-/// Describes every mapped layer surface of `app`.
+/// The style class of a window that is a session-lock surface.
+pub const SESSION_LOCK_CLASS: &str = "gniri-session-lock";
+
+/// Describes every mapped surface of `app`: its layer surfaces, and the
+/// lock screen's, which cover their outputs and go by their widget name.
 pub fn dump(app: &impl IsA<gtk::Application>) -> Dump {
+    const EDGES: [(Edge, &str); 4] = [
+        (Edge::Top, "top"),
+        (Edge::Bottom, "bottom"),
+        (Edge::Left, "left"),
+        (Edge::Right, "right"),
+    ];
     let mut surfaces: Vec<Surface> = app
         .windows()
         .iter()
-        .filter(|window| window.is_mapped() && window.is_layer_window())
-        .map(|window| Surface {
-            namespace: window.namespace().map(Into::into).unwrap_or_default(),
-            output: window
-                .monitor()
-                .and_then(|monitor| monitor.connector())
-                .map(Into::into),
-            width: window.width(),
-            height: window.height(),
-            scale: window.surface().map_or(1.0, |surface| surface.scale()),
-            anchors: [
-                (Edge::Top, "top"),
-                (Edge::Bottom, "bottom"),
-                (Edge::Left, "left"),
-                (Edge::Right, "right"),
-            ]
-            .into_iter()
-            .filter(|(edge, _)| window.is_anchor(*edge))
-            .map(|(_, name)| name)
-            .collect(),
-            tree: node(window.upcast_ref(), window.upcast_ref()),
+        .filter(|window| window.is_mapped())
+        .map(|window| {
+            // The layer shell library takes a session-lock surface for one
+            // of its own and then reads what is not there: such a window
+            // says what it is, and is never asked.
+            let layer = !window.has_css_class(SESSION_LOCK_CLASS) && window.is_layer_window();
+            let monitor = if layer {
+                window.monitor()
+            } else {
+                window
+                    .surface()
+                    .and_then(|surface| surface.display().monitor_at_surface(&surface))
+            };
+            Surface {
+                namespace: if layer {
+                    window.namespace().map(Into::into).unwrap_or_default()
+                } else {
+                    window.widget_name().to_string()
+                },
+                output: monitor
+                    .and_then(|monitor| monitor.connector())
+                    .map(Into::into),
+                width: window.width(),
+                height: window.height(),
+                scale: window.surface().map_or(1.0, |surface| surface.scale()),
+                anchors: EDGES
+                    .into_iter()
+                    .filter(|(edge, _)| !layer || window.is_anchor(*edge))
+                    .map(|(_, name)| name)
+                    .collect(),
+                tree: node(window.upcast_ref(), window.upcast_ref()),
+            }
         })
         .collect();
     surfaces.sort_by(|a, b| (&a.output, &a.namespace).cmp(&(&b.output, &b.namespace)));

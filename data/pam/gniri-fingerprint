@@ -1,0 +1,10 @@
+#%PAM-1.0
+# gniri's lock screen: unlocking with a fingerprint, asked for while the
+# password prompt shows. Without this file (or the distribution's
+# fingerprint-auth, which gniri uses if this is missing) no finger is asked
+# for. See data/pam/gniri.
+#
+# Written for Fedora and its relatives. Elsewhere:
+#     auth    required    pam_fprintd.so
+auth        substack      fingerprint-auth
+account     include       fingerprint-auth

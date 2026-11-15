@@ -73,11 +73,19 @@ $bms_menu_backdrop: $bms_brightness * (1 - alpha($shadow_color));
     &:active { background-color: rgba(255, 255, 255, $active); }
 }
 
-// `box-shadow: inset 0 0 0 2px st-transparentize(st-mix(-st-accent-color,
-// rgba(255,255,255,0.9), 60%), 0.2)`
+// dark.css: `box-shadow: inset 0 0 0 2px st-transparentize(st-mix(
+// -st-accent-color, rgba(255,255,255,0.9), 60%), 0.2)`.
+//
+// St mixes the two colours channel by channel and the result is opaque:
+// the ring of a focused entry reads (133,181,238) at alpha 0.8 in the
+// reference. CSS `color-mix` would weigh the white by its alpha and carry
+// the alpha over, which comes out darker and fainter, so the white is
+// given here as the opaque colour St in effect uses.
+$bms_focus_ring_color: st-transparentize(st-mix(-st-accent-color, #ffffff, 60%), 0.2);
+
 @mixin bms-focus-ring {
     &:focus-visible {
-        box-shadow: inset 0 0 0 2px st-transparentize(st-mix(-st-accent-color, rgba(255, 255, 255, 0.9), 60%), 0.2);
+        box-shadow: inset 0 0 0 2px $bms_focus_ring_color;
     }
 }
 
@@ -270,7 +278,7 @@ $bms_dim_fg_color: rgba(255, 255, 255, 0.68);
     .calendar-day:focus-visible,
     .calendar-month-header .pager-button:focus-visible {
         background-color: rgba(255, 255, 255, 0.1);
-        box-shadow: inset 0 0 0 2px st-transparentize(st-mix(-st-accent-color, rgba(255, 255, 255, 0.9), 60%), 0.2);
+        box-shadow: inset 0 0 0 2px $bms_focus_ring_color;
     }
 
     .calendar-day:selected,
@@ -325,6 +333,81 @@ $bms_dim_fg_color: rgba(255, 255, 255, 0.68);
 .world-clocks-button .world-clocks-header.no-world-clocks,
 .weather-button .weather-header.no-location {
     color: $bms_popup_fg_color;
+}
+
+// Modal dialogs. base.css and dark.css, and `dialog_backdrops.js`.
+//
+// The extension blurs the whole screen behind a dialog's shade (its
+// "blur behind dialogs"), dimmed to its brightness like every blur of its
+// own. So the shade here is a blurred surface too, and the dimming is
+// folded into the shade's black.
+.modal-dialog-lightbox {
+    @include bms-blur;
+    background-image: radial-gradient(
+        farthest-corner at center,
+        lightbox-shade(0, $bms_brightness),
+        lightbox-shade(1, $bms_brightness)
+    );
+}
+
+// The dialog is a blurred surface of its own on top of that: its tint over
+// what is under it (the shaded screen), dimmed once more and darkened by
+// the dialog's own shadow, which St paints under it too. Measured over
+// flat #808080 in the middle of the screen: (25,25,27).
+$bms_dialog_backdrop: $bms_brightness * (1 - 0.03);
+// The extension's "dialog corner radius".
+$bms_dialog_radius: 18px;
+$bms_dialog_border_color: rgba(255, 255, 255, 0.1);
+
+.modal-dialog {
+    color: $bms_popup_fg_color;
+    background-color: bms-fold($bms_popup_tint, $bms_dialog_backdrop);
+    border: 1px solid $bms_dialog_border_color;
+    border-radius: $bms_dialog_radius;
+
+    .modal-dialog-button-box .modal-dialog-button {
+        @include bms-button(0.1, 0.15, 0.3);
+        @include bms-focus-ring;
+
+        &:disabled {
+            color: rgba(255, 255, 255, 0.35);
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+    }
+
+    // `StEntry` and its states.
+    .st-entry {
+        background-color: rgba(255, 255, 255, 0.1);
+        color: rgba(255, 255, 255, 0.7);
+
+        &:focus-within {
+            color: $bms_popup_fg_color;
+            // %entry's focus ring, in the extension's colour.
+            box-shadow: inset 0 0 0 2px $bms_focus_ring_color;
+        }
+
+        &:disabled {
+            background-color: rgba(255, 255, 255, 0.05);
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        > text > placeholder { color: rgba(255, 255, 255, 0.5); }
+    }
+
+    .user-icon { color: #ffffff; }
+}
+
+:root {
+    --gniri-bms-dialog-color: #{bms-fold($bms_popup_tint, $bms_dialog_backdrop)};
+    --gniri-bms-dialog-border-color: #{$bms_dialog_border_color};
+    --gniri-bms-dialog-radius: #{$bms_dialog_radius};
+    --gniri-bms-dialog-button-color: #{rgba(255, 255, 255, 0.1)};
+    --gniri-bms-dialog-button-disabled-color: #{rgba(255, 255, 255, 0.05)};
+    --gniri-bms-dialog-button-disabled-fg-color: #{rgba(255, 255, 255, 0.35)};
+    --gniri-bms-entry-color: #{rgba(255, 255, 255, 0.1)};
+    --gniri-bms-entry-hint-color: #{rgba(255, 255, 255, 0.5)};
+    --gniri-bms-lightbox-centre-color: #{lightbox-shade(0, $bms_brightness)};
+    --gniri-bms-lightbox-corner-color: #{lightbox-shade(1, $bms_brightness)};
 }
 
 :root {

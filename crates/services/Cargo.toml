@@ -12,10 +12,12 @@ async-channel.workspace = true
 futures-lite.workspace = true
 libpulse-binding.workspace = true
 niri-ipc.workspace = true
+nonstick.workspace = true
 roxmltree.workspace = true
 serde.workspace = true
 toml.workspace = true
 wayland-client.workspace = true
+wayland-protocols.workspace = true
 wayland-protocols-wlr.workspace = true
 zbus.workspace = true
 

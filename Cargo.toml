@@ -24,6 +24,8 @@ gniri-services = { path = "crates/services" }
 gtk = { package = "gtk4", version = "0.11", features = ["v4_24"] }
 adw = { package = "libadwaita", version = "0.9", features = ["v1_10"] }
 gtk4-layer-shell = { version = "0.8", features = ["v1_3"] }
+# ext-session-lock, from the same C library as the layer shell.
+gtk4-session-lock = { version = "0.4", features = ["v1_2"] }
 clap = { version = "4", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -37,8 +39,12 @@ futures-lite = "2"
 # (gamma control). Never GTK's connection: see docs/DECISIONS.md.
 wayland-client = "0.31"
 wayland-protocols-wlr = { version = "0.3", features = ["client"] }
+# "staging" holds ext-idle-notify.
+wayland-protocols = { version = "0.32", features = ["client", "staging"] }
 # The PulseAudio client library, for the audio backend.
 libpulse-binding = "2.30"
+# PAM, for the lock screen. Links libpam (Fedora: pam-devel).
+nonstick = "0.1"
 # Follows niri releases and is not semver-stable: pin to the installed niri.
 niri-ipc = "=26.4.0"
 

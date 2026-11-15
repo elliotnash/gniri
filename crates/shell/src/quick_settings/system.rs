@@ -10,6 +10,7 @@ use gtk::prelude::*;
 
 use super::menu::ToggleMenu;
 use super::toggle::set_checked;
+use crate::dialogs::end_session;
 use crate::menus::Submenu;
 use crate::services::Services;
 
@@ -128,8 +129,8 @@ pub fn build(services: &Rc<Services>, subscriptions: &mut Vec<Subscription>) -> 
         },
     ));
 
-    // `ShutdownItem`'s menu. "Restart…" and "Power Off…" need the dialog
-    // that asks first, which arrives with M4.
+    // `ShutdownItem`'s menu. The entries with an ellipsis ask first
+    // (crates/shell/src/dialogs/end_session.rs).
     let menu = ToggleMenu::new("system-shutdown-symbolic", "Power Off");
     let suspend = menu.add_action("Suspend", {
         let services = Rc::clone(services);
@@ -142,17 +143,25 @@ pub fn build(services: &Rc<Services>, subscriptions: &mut Vec<Subscription>) -> 
         |state| state.can_suspend,
         move |can| suspend.set_visible(*can),
     ));
-    menu.add_separator();
-    menu.add_action("Log Out…", {
+    let ask = |kind: end_session::Kind| {
         let services = Rc::clone(services);
         move || {
-            services.menus.update(|menus| menus.close());
-            // niri asks for confirmation itself.
-            services.niri_action(niri_ipc::Action::Quit {
-                skip_confirmation: false,
-            });
+            // Opening the dialog closes the menu.
+            services.end_session.update(|open| *open = Some(kind));
         }
-    });
+    };
+    let restart = menu.add_action("Restart…", ask(end_session::Kind::Restart));
+    subscriptions.push(services.session.state.select(
+        |state| state.can_restart,
+        move |can| restart.set_visible(*can),
+    ));
+    let power_off = menu.add_action("Power Off…", ask(end_session::Kind::PowerOff));
+    subscriptions.push(services.session.state.select(
+        |state| state.can_power_off,
+        move |can| power_off.set_visible(*can),
+    ));
+    menu.add_separator();
+    menu.add_action("Log Out…", ask(end_session::Kind::LogOut));
 
     let root = gtk::Box::builder()
         .css_classes(["quick-settings-system-item"])
