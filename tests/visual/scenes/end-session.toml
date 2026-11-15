@@ -1,0 +1,12 @@
+# The dialog that asks before powering off. GNOME's was not captured; this
+# scene is for looking at (docs/TESTING.md).
+
+[fixture]
+time = "2026-11-14T08:28:00"
+power = { profile = "performance", battery = { percentage = 91 } }
+network = { primary = { kind = "wifi", strength = 70 } }
+session = { can_suspend = true, can_restart = true, can_power_off = true }
+user = { name = "user", real_name = "Example User" }
+
+[[steps]]
+gniri = ["power-off"]

@@ -1,0 +1,12 @@
+# The lock screen's clock, as in GNOME's capture of its own lock screen.
+#
+# A preview: the same surface, without locking the session, since niri
+# takes no screenshot of a locked one. `cargo xtask check` locks for real.
+
+[fixture]
+time = "2026-11-13T22:08:00"
+user = { name = "user", real_name = "Example User" }
+lock = { password = "open sesame", preview = true }
+
+[[steps]]
+spawn = "lock"

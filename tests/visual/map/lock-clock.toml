@@ -1,0 +1,44 @@
+# The lock screen's clock: gniri's widgets against GNOME Shell's actors.
+# Read by `cargo xtask diff lock-clock` (crates/xtask/src/diff.rs).
+#
+# GNOME's own lock screen was only captured over the real wallpaper (and by
+# accident: docs/DECISIONS.md, S15), so there is no flat-wallpaper tier.
+
+surface = "gniri-lock"
+root = ".unlock-dialog-clock"
+attach = "center"
+vertical = "center"
+margin = 24
+wallpaper = "/usr/share/backgrounds/f45/default/f45-01-night.jxl"
+flat = false
+
+[[states]]
+scene = "lock"
+reference = "lock-clock"
+
+[[regions]]
+name = "clock"
+anchor = "stretch"
+
+[[pairs]]
+name = "time"
+ours = ".unlock-dialog-clock-time"
+theirs = ".unlock-dialog-clock-time"
+anchor = "center"
+
+[[pairs]]
+name = "date"
+ours = ".unlock-dialog-clock-date"
+theirs = ".unlock-dialog-clock-date"
+anchor = "center"
+# Its text is a pixel wider than GNOME's.
+tolerance_px = 1
+
+[[pairs]]
+name = "hint"
+ours = ".unlock-dialog-clock-hint"
+theirs = ".unlock-dialog-clock-hint"
+anchor = "center"
+# Hidden until the clock has shown for a while. Its bold text is two
+# pixels narrower than GNOME's.
+tolerance_px = 2

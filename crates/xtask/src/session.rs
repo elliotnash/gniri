@@ -5,6 +5,7 @@
 //! names such as `org.freedesktop.Notifications` that the host desktop
 //! already holds, and nothing it does leaks into the real session.
 
+use std::cell::RefCell;
 use std::fs::{self, File};
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::UnixStream;
@@ -37,6 +38,13 @@ pub struct Session {
     /// The gniri binary the session runs.
     gniri: PathBuf,
     gniri_socket: PathBuf,
+    /// What the shell was started with: its helpers get the same.
+    gniri_args: Vec<String>,
+    /// Names the log files of this run.
+    name: String,
+    /// The helper processes started so far (`lock`, `polkit`), which
+    /// have widgets of their own to dump.
+    helpers: RefCell<Vec<String>>,
     pub niri_socket: PathBuf,
     pub wayland_display: String,
 }
@@ -207,6 +215,9 @@ impl Session {
             gniri_pid: field("pid")?.parse().context("pid in ready file")?,
             gniri,
             gniri_socket: PathBuf::from(field("gniri_socket")?),
+            gniri_args: options.gniri_args.clone(),
+            name: options.name.clone(),
+            helpers: RefCell::new(Vec::new()),
             niri_socket: PathBuf::from(field("niri_socket")?),
             wayland_display: field("wayland_display")?,
         })
@@ -274,19 +285,87 @@ impl Session {
         })
     }
 
-    /// Every mapped widget of the shell (`gniri msg debug dump-tree`).
-    pub fn dump_tree(&self) -> Result<serde_json::Value> {
-        let mut stream = UnixStream::connect(&self.gniri_socket)
-            .with_context(|| format!("connecting to {}", self.gniri_socket.display()))?;
-        stream.write_all(b"\"DumpTree\"\n")?;
+    /// The socket one of gniri's helper processes answers on in this
+    /// session (crates/shell/src/ipc.rs).
+    fn helper_socket(&self, helper: &str) -> PathBuf {
+        let runtime = std::env::var_os("XDG_RUNTIME_DIR").unwrap_or_default();
+        PathBuf::from(runtime).join(format!("gniri-{helper}.{}.sock", self.wayland_display))
+    }
+
+    /// Sends one request to a gniri process and returns what it answered.
+    fn ask(socket: &Path, request: &str) -> Result<serde_json::Value> {
+        let mut stream = UnixStream::connect(socket)
+            .with_context(|| format!("connecting to {}", socket.display()))?;
+        stream.write_all(format!("\"{request}\"\n").as_bytes())?;
         let mut line = String::new();
         BufReader::new(stream).read_line(&mut line)?;
         let mut reply: serde_json::Value =
             serde_json::from_str(&line).context("gniri's reply is not JSON")?;
         if let Some(error) = reply.get("Err") {
-            bail!("gniri could not dump its widgets: {error}");
+            bail!("gniri answered {request} with an error: {error}");
         }
         Ok(reply["Ok"].take())
+    }
+
+    /// Starts `gniri <subcommand>` in the session, with the options the
+    /// shell has (the same config, fixture and wallpaper), and waits until
+    /// it answers. For the lock screen and the polkit agent, which are
+    /// processes of their own.
+    pub fn spawn_helper(&self, subcommand: &str) -> Result<()> {
+        let gniri = self
+            .gniri
+            .to_str()
+            .ok_or_else(|| anyhow!("non-UTF-8 path to gniri"))?;
+        let log = visual_dir()?
+            .join("logs")
+            .join(format!("{}-{subcommand}.log", self.name));
+        let socket = self.helper_socket(subcommand);
+        // One left behind by a run that was killed would look like an
+        // answer.
+        let _ = fs::remove_file(&socket);
+        let mut command = vec![
+            "sh".to_owned(),
+            "-c".to_owned(),
+            r#"log="$1"; shift; exec "$@" >"$log" 2>&1"#.to_owned(),
+            "sh".to_owned(),
+            log.display().to_string(),
+            gniri.to_owned(),
+        ];
+        command.extend(self.gniri_args.iter().cloned());
+        command.push(subcommand.to_owned());
+        self.action(Action::Spawn { command })?;
+        wait_until(&format!("gniri {subcommand} to start"), || {
+            Ok(Self::ask(&socket, "Sync").is_ok())
+        })
+        .with_context(|| format!("see {}", log.display()))?;
+        self.helpers.borrow_mut().push(subcommand.to_owned());
+        Ok(())
+    }
+
+    /// Whether a helper process started with [`Session::spawn_helper`]
+    /// still answers.
+    pub fn helper_runs(&self, subcommand: &str) -> bool {
+        Self::ask(&self.helper_socket(subcommand), "Sync").is_ok()
+    }
+
+    /// Every mapped widget of the shell and of its helper processes
+    /// (`gniri msg debug dump-tree`).
+    pub fn dump_tree(&self) -> Result<serde_json::Value> {
+        let mut dump = Self::ask(&self.gniri_socket, "DumpTree")?;
+        for helper in self.helpers.borrow().iter() {
+            // A helper that has done its work (the screen was unlocked)
+            // is gone, and so are its widgets.
+            let Ok(mut other) = Self::ask(&self.helper_socket(helper), "DumpTree") else {
+                continue;
+            };
+            if let (Some(surfaces), Some(more)) = (
+                dump["surfaces"].as_array_mut(),
+                other["surfaces"].as_array_mut(),
+            ) {
+                surfaces.append(more);
+            }
+        }
+        Ok(dump)
     }
 
     /// Runs a command as a client of the nested compositor (for `wlrctl`).
@@ -317,6 +396,9 @@ impl Session {
     pub fn settle(&self) -> Result<()> {
         std::thread::sleep(Duration::from_millis(100));
         self.gniri_msg(&["debug", "sync"])?;
+        for helper in self.helpers.borrow().iter() {
+            let _ = Self::ask(&self.helper_socket(helper), "Sync");
+        }
         std::thread::sleep(Duration::from_millis(200));
         Ok(())
     }

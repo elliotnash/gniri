@@ -1,0 +1,758 @@
+{
+ "gnome_shell": "51.1",
+ "state": "osd",
+ "stage": [
+  1792,
+  1120
+ ],
+ "pixels_per_unit": 1.25,
+ "root_box": [
+  675,
+  335,
+  440,
+  550
+ ],
+ "shot_box": [
+  674.4,
+  334.4,
+  440.8,
+  551.2
+ ],
+ "tree": {
+  "type": "Gjs_gdm_authPrompt_AuthPrompt",
+  "box": [
+   675,
+   335,
+   440,
+   550
+  ],
+  "opacity": 255,
+  "classes": "login-dialog-prompt-layout",
+  "pseudo": "first-child last-child",
+  "style": {
+   "fg": [
+    250,
+    250,
+    251,
+    255
+   ],
+   "font": "Adwaita Sans 14.666px",
+   "width": 440,
+   "height": 550,
+   "min_width": 440,
+   "min_height": 550,
+   "max_width": 440,
+   "max_height": 550
+  },
+  "children": [
+   {
+    "type": "StBin",
+    "box": [
+     675,
+     335,
+     440,
+     237
+    ],
+    "opacity": 255,
+    "pseudo": "insensitive first-child",
+    "style": {
+     "fg": [
+      250,
+      250,
+      251,
+      255
+     ],
+     "font": "Adwaita Sans 14.666px"
+    },
+    "children": [
+     {
+      "type": "Gjs_ui_userWidget_UserWidget",
+      "box": [
+       815,
+       335,
+       160,
+       237
+      ],
+      "opacity": 255,
+      "classes": "user-widget vertical",
+      "pseudo": "insensitive first-child last-child",
+      "style": {
+       "fg": [
+        250,
+        250,
+        251,
+        255
+       ],
+       "font": "Adwaita Sans 14.666px",
+       "spacing": 24
+      },
+      "children": [
+       {
+        "type": "Gjs_ui_userWidget_Avatar",
+        "box": [
+         815,
+         335,
+         160,
+         160
+        ],
+        "opacity": 255,
+        "classes": "user-icon user-avatar",
+        "pseudo": "insensitive first-child",
+        "style": {
+         "bg": [
+          250,
+          250,
+          251,
+          33
+         ],
+         "fg": [
+          250,
+          250,
+          251,
+          255
+         ],
+         "radius": [
+          999,
+          999,
+          999,
+          999
+         ],
+         "font": "Adwaita Sans 14.666px",
+         "box_shadow": {
+          "color": [
+           255,
+           255,
+           255,
+           25
+          ],
+          "blur": 0,
+          "spread": 1,
+          "x": 0,
+          "y": 0,
+          "inset": true
+         }
+        },
+        "redacted": true
+       },
+       {
+        "type": "Gjs_ui_userWidget_UserWidgetLabel",
+        "box": [
+         815,
+         519,
+         160,
+         53
+        ],
+        "opacity": 255,
+        "pseudo": "insensitive last-child",
+        "style": {
+         "fg": [
+          250,
+          250,
+          251,
+          255
+         ],
+         "font": "Adwaita Sans 14.666px"
+        },
+        "children": [
+         {
+          "type": "StLabel",
+          "box": [
+           815,
+           519,
+           160,
+           33
+          ],
+          "opacity": 255,
+          "classes": "user-widget-label",
+          "pseudo": "insensitive first-child",
+          "style": {
+           "fg": [
+            250,
+            250,
+            251,
+            255
+           ],
+           "margin": [
+            0,
+            0,
+            20,
+            0
+           ],
+           "font": "Adwaita Sans 26.662px"
+          },
+          "text": "xxxxxxxxxxx",
+          "children": [
+           {
+            "type": "ClutterText",
+            "box": [
+             815,
+             519,
+             160,
+             33
+            ],
+            "opacity": 255
+           }
+          ],
+          "redacted": true
+         },
+         {
+          "type": "StLabel",
+          "box": [
+           815,
+           519,
+           0,
+           0
+          ],
+          "opacity": 255,
+          "classes": "user-widget-label",
+          "pseudo": "insensitive last-child",
+          "style": {
+           "fg": [
+            250,
+            250,
+            251,
+            255
+           ],
+           "margin": [
+            0,
+            0,
+            20,
+            0
+           ],
+           "font": "Adwaita Sans 26.662px"
+          },
+          "text": "xxxxxx",
+          "children": [
+           {
+            "type": "ClutterText",
+            "box": [
+             815,
+             519,
+             0,
+             0
+            ],
+            "opacity": 255
+           }
+          ],
+          "redacted": true
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "type": "StBoxLayout",
+    "box": [
+     675,
+     581,
+     440,
+     128
+    ],
+    "opacity": 255,
+    "classes": "login-dialog-input-well",
+    "pseudo": "insensitive last-child",
+    "style": {
+     "fg": [
+      250,
+      250,
+      251,
+      255
+     ],
+     "margin": [
+      9,
+      0,
+      9,
+      0
+     ],
+     "font": "Adwaita Sans 14.666px"
+    },
+    "children": [
+     {
+      "type": "StBoxLayout",
+      "box": [
+       675,
+       581,
+       440,
+       59
+      ],
+      "opacity": 255,
+      "classes": "login-dialog-button-box",
+      "pseudo": "first-child",
+      "style": {
+       "fg": [
+        250,
+        250,
+        251,
+        255
+       ],
+       "font": "Adwaita Sans 14.666px",
+       "height": 59,
+       "min_height": 59,
+       "max_height": 59
+      },
+      "children": [
+       {
+        "type": "StButton",
+        "box": [
+         675,
+         590,
+         40,
+         40
+        ],
+        "opacity": 0,
+        "classes": "login-dialog-button cancel-button",
+        "pseudo": "insensitive first-child",
+        "style": {
+         "bg": [
+          250,
+          250,
+          251,
+          25
+         ],
+         "fg": [
+          250,
+          250,
+          251,
+          127
+         ],
+         "radius": [
+          999,
+          999,
+          999,
+          999
+         ],
+         "padding": [
+          12,
+          12,
+          12,
+          12
+         ],
+         "margin": [
+          7,
+          0,
+          7,
+          0
+         ],
+         "font": "Adwaita Sans Bold 14.666px",
+         "height": 16,
+         "min_height": 16
+        },
+        "children": [
+         {
+          "type": "StIcon",
+          "box": [
+           687,
+           602,
+           16,
+           16
+          ],
+          "opacity": 0,
+          "pseudo": "insensitive first-child last-child",
+          "style": {
+           "fg": [
+            250,
+            250,
+            251,
+            127
+           ],
+           "font": "Adwaita Sans Bold 14.666px"
+          },
+          "icon": "go-previous-symbolic",
+          "icon_size": -1,
+          "children": [
+           {
+            "type": "ClutterActor",
+            "box": [
+             687,
+             602,
+             16,
+             16
+            ],
+            "opacity": 0
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "type": "StWidget",
+        "box": [
+         735,
+         588,
+         320,
+         45
+        ],
+        "opacity": 255,
+        "classes": "login-dialog-prompt-entry-area",
+        "pseudo": "insensitive",
+        "style": {
+         "fg": [
+          250,
+          250,
+          251,
+          255
+         ],
+         "margin": [
+          7,
+          20,
+          7,
+          20
+         ],
+         "font": "Adwaita Sans 14.666px"
+        },
+        "children": [
+         {
+          "type": "StPasswordEntry",
+          "box": [
+           735,
+           588,
+           320,
+           45
+          ],
+          "opacity": 255,
+          "classes": "login-dialog-prompt-entry",
+          "pseudo": "first-child focus",
+          "style": {
+           "bg": [
+            255,
+            255,
+            255,
+            28
+           ],
+           "fg": [
+            250,
+            250,
+            251,
+            255
+           ],
+           "radius": [
+            12,
+            12,
+            12,
+            12
+           ],
+           "padding": [
+            9,
+            9,
+            9,
+            9
+           ],
+           "font": "Adwaita Sans 14.666px",
+           "box_shadow": {
+            "color": [
+             250,
+             250,
+             251,
+             51
+            ],
+            "blur": 0,
+            "spread": 2,
+            "x": 0,
+            "y": 0,
+            "inset": true
+           }
+          },
+          "children": [
+           {
+            "type": "ClutterText",
+            "box": [
+             744,
+             601,
+             239,
+             19
+            ],
+            "opacity": 255
+           },
+           {
+            "type": "StIcon",
+            "box": [
+             989,
+             602,
+             57,
+             16
+            ],
+            "opacity": 255,
+            "classes": "peek-password",
+            "pseudo": "last-child",
+            "style": {
+             "fg": [
+              250,
+              250,
+              251,
+              255
+             ],
+             "padding": [
+              0,
+              37,
+              0,
+              4
+             ],
+             "font": "Adwaita Sans 14.666px"
+            },
+            "icon": "view-reveal-symbolic",
+            "icon_size": -1,
+            "children": [
+             {
+              "type": "ClutterActor",
+              "box": [
+               993,
+               602,
+               16,
+               16
+              ],
+              "opacity": 255
+             }
+            ]
+           }
+          ]
+         },
+         {
+          "type": "StWidget",
+          "box": [
+           1025,
+           602,
+           30,
+           16
+          ],
+          "opacity": 255,
+          "classes": "login-dialog-default-button-well",
+          "pseudo": "insensitive last-child",
+          "style": {
+           "fg": [
+            250,
+            250,
+            251,
+            255
+           ],
+           "font": "Adwaita Sans 14.666px"
+          },
+          "children": [
+           {
+            "type": "StButton",
+            "box": [
+             1025,
+             602,
+             23,
+             16
+            ],
+            "opacity": 255,
+            "classes": "login-dialog-button next-button",
+            "pseudo": "default first-child",
+            "style": {
+             "fg": [
+              250,
+              250,
+              251,
+              255
+             ],
+             "radius": [
+              999,
+              999,
+              999,
+              999
+             ],
+             "margin": [
+              0,
+              7,
+              0,
+              0
+             ],
+             "font": "Adwaita Sans Bold 14.666px",
+             "height": 16,
+             "min_height": 16
+            },
+            "children": [
+             {
+              "type": "StIcon",
+              "box": [
+               1025,
+               602,
+               16,
+               16
+              ],
+              "opacity": 255,
+              "pseudo": "insensitive first-child last-child",
+              "style": {
+               "fg": [
+                250,
+                250,
+                251,
+                255
+               ],
+               "margin": [
+                0,
+                7,
+                0,
+                0
+               ],
+               "font": "Adwaita Sans Bold 14.666px"
+              },
+              "icon": "go-next-symbolic",
+              "icon_size": -1,
+              "children": [
+               {
+                "type": "ClutterActor",
+                "box": [
+                 1025,
+                 602,
+                 16,
+                 16
+                ],
+                "opacity": 255
+               }
+              ]
+             }
+            ]
+           },
+           {
+            "type": "Gjs_ui_animation_Spinner",
+            "box": [
+             1028,
+             602,
+             16,
+             16
+            ],
+            "opacity": 0,
+            "pseudo": "insensitive last-child",
+            "style": {
+             "fg": [
+              250,
+              250,
+              251,
+              255
+             ],
+             "margin": [
+              0,
+              7,
+              0,
+              0
+             ],
+             "font": "Adwaita Sans 14.666px"
+            }
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "type": "ClutterActor",
+        "box": [
+         1075,
+         581,
+         40,
+         59
+        ],
+        "opacity": 255
+       }
+      ]
+     },
+     {
+      "type": "StBin",
+      "box": [
+       675,
+       640,
+       0,
+       0
+      ],
+      "opacity": 255,
+      "classes": "login-dialog-timed-login-indicator",
+      "pseudo": "insensitive",
+      "style": {
+       "fg": [
+        250,
+        250,
+        251,
+        255
+       ],
+       "font": "Adwaita Sans 14.666px"
+      }
+     },
+     {
+      "type": "Gjs_ui_shellEntry_CapsLockWarning",
+      "box": [
+       852,
+       640,
+       85,
+       0
+      ],
+      "opacity": 0,
+      "classes": "caps-lock-warning-label",
+      "pseudo": "insensitive",
+      "style": {
+       "fg": [
+        250,
+        250,
+        251,
+        255
+       ],
+       "padding": [
+        0,
+        0,
+        8,
+        0
+       ],
+       "font": "Adwaita Sans 11.996px"
+      },
+      "text": "xxxxxxxxxxxxxxx",
+      "children": [
+       {
+        "type": "ClutterText",
+        "box": [
+         852,
+         640,
+         85,
+         0
+        ],
+        "opacity": 0
+       }
+      ]
+     },
+     {
+      "type": "StLabel",
+      "box": [
+       894,
+       669,
+       1,
+       40
+      ],
+      "opacity": 0,
+      "classes": "login-dialog-message",
+      "pseudo": "insensitive last-child",
+      "style": {
+       "fg": [
+        222,
+        222,
+        228,
+        255
+       ],
+       "margin": [
+        29,
+        0,
+        0,
+        0
+       ],
+       "font": "Adwaita Sans 14.666px",
+       "height": 40,
+       "min_height": 40
+      },
+      "text": "",
+      "children": [
+       {
+        "type": "ClutterText",
+        "box": [
+         894,
+         669,
+         1,
+         40
+        ],
+        "opacity": 0
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ }
+}

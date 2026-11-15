@@ -302,6 +302,55 @@ fn key(session: &Session, name: &str) -> Result<()> {
     Ok(())
 }
 
+/// Presses a key that a surface which was only just mapped is to get.
+///
+/// The compositor gives a new surface the keyboard a moment after it is
+/// mapped, and a key sent before that goes elsewhere. So the key is
+/// pressed again, a few times at most, until `done` shows it arrived.
+fn key_until(
+    session: &Session,
+    name: &str,
+    mut done: impl FnMut(&Session) -> Result<bool>,
+) -> Result<()> {
+    for _ in 0..4 {
+        session.gniri_msg(&["debug", "sync"])?;
+        key(session, name)?;
+        let arrived = wait_until_within(
+            "the key to arrive",
+            std::time::Duration::from_millis(700),
+            || done(session),
+        );
+        if arrived.is_ok() {
+            break;
+        }
+    }
+    Ok(())
+}
+
+/// Types `text` in the nested session, as a keyboard would.
+fn type_text(session: &Session, text: &str) -> Result<()> {
+    let status = session
+        .client_command("wtype")
+        .arg(text)
+        .status()
+        .context("running wtype")?;
+    if !status.success() {
+        bail!("wtype failed");
+    }
+    Ok(())
+}
+
+/// The text of every label below `node`, in order.
+fn texts(node: &Value) -> Vec<String> {
+    let mut texts = Vec::new();
+    tree::walk(node, &mut |node| {
+        if let Some(text) = node["text"].as_str().filter(|text| !text.is_empty()) {
+            texts.push(text.to_owned());
+        }
+    });
+    texts
+}
+
 /// Every command the shell has sent to a service so far.
 fn commands(session: &Session) -> Result<Vec<String>> {
     let text = session.gniri_msg(&["debug", "commands"])?;
@@ -340,7 +389,9 @@ fn pointer(session: &Session, arguments: &[&str]) -> Result<()> {
     Ok(())
 }
 
-pub fn run() -> Result<bool> {
+/// The panel: workspace dots, the overview, fullscreen windows and the
+/// pointer, with real services behind it.
+fn panel_and_overview() -> Result<(usize, usize)> {
     // An empty fixture: real clock and services, but animations off, so a
     // dump never catches a dot half way through growing.
     let fixture = session::visual_dir()?.join("logs/check.fixture.toml");
@@ -450,10 +501,36 @@ pub fn run() -> Result<bool> {
         failed,
     } = checker;
     session.quit()?;
+    Ok((passed, failed))
+}
 
-    let mut passed = passed;
-    let mut failed = failed;
-    for part in [quick_settings, notifications, notifications_over_the_bus] {
+/// A part of the checks: a session of its own.
+type Part = fn() -> Result<(usize, usize)>;
+
+/// The parts, by the names `cargo xtask check <part>` takes.
+const PARTS: [(&str, Part); 7] = [
+    ("panel", panel_and_overview),
+    ("quick-settings", quick_settings),
+    ("notifications", notifications),
+    ("notifications-bus", notifications_over_the_bus),
+    ("session", end_session_and_idle),
+    ("lock", lock_screen),
+    ("polkit", authentication_dialog),
+];
+
+/// Runs every part, or only the one called `only`.
+pub fn run(only: Option<&str>) -> Result<bool> {
+    if let Some(name) = only
+        && !PARTS.iter().any(|(part, _)| *part == name)
+    {
+        let names: Vec<&str> = PARTS.iter().map(|(part, _)| *part).collect();
+        bail!("no part called {name:?}; there are: {}", names.join(", "));
+    }
+    let (mut passed, mut failed) = (0, 0);
+    for (name, part) in PARTS {
+        if only.is_some_and(|only| only != name) {
+            continue;
+        }
         let (part_passed, part_failed) = part()?;
         passed += part_passed;
         failed += part_failed;
@@ -1068,6 +1145,342 @@ fn notifications_over_the_bus() -> Result<(usize, usize)> {
                 && tree::select(&panel, "#panelCenter .messages-indicator").is_err())
         },
     );
+
+    let Checker {
+        session,
+        passed,
+        failed,
+    } = checker;
+    session.quit()?;
+    Ok((passed, failed))
+}
+
+/// Starts a session whose fixture is `fixture`, written to a file named
+/// after `name`.
+fn fixture_session(name: &str, fixture: &str) -> Result<Session> {
+    let path = session::visual_dir()?
+        .join("logs")
+        .join(format!("{name}.fixture.toml"));
+    fs::write(&path, fixture)?;
+    Session::start(&SessionOptions {
+        name: name.to_owned(),
+        niri_config: None,
+        renderer: "vulkan".to_owned(),
+        gniri_args: scene::gniri_args(Some(&path), Some(WALLPAPER)),
+    })
+}
+
+/// The dialog that asks before ending the session, and what idleness
+/// does, with a fixture for services: what the shell asks of logind, niri
+/// and the backlight is read back from the command log, and nothing is
+/// powered off.
+fn end_session_and_idle() -> Result<(usize, usize)> {
+    const TITLE: &str = ".message-dialog-title";
+    const DESCRIPTION: &str = ".message-dialog-description";
+
+    let session = fixture_session(
+        "check-session",
+        r#"
+        time = "2026-11-14T08:28:00"
+        session = { can_suspend = true, can_restart = true, can_power_off = true }
+        user = { name = "user", real_name = "Example User" }
+        brightness = { level = 0.8 }
+        idle = { available = true }
+        "#,
+    )?;
+    let mut checker = Checker {
+        session,
+        passed: 0,
+        failed: 0,
+    };
+    let dialog = |session: &Session, selector: &str| on_surface(session, "gniri-dialog", selector);
+    let dialog_text = |session: &Session, selector: &str| -> Result<Option<String>> {
+        Ok(dialog(session, selector)?.and_then(|node| node["text"].as_str().map(str::to_owned)))
+    };
+
+    println!("end-session dialog");
+    checker
+        .session
+        .gniri_msg(&["debug", "open-menu", "quick-settings"])?;
+    checker
+        .session
+        .gniri_msg(&["debug", "open-submenu", "shutdown"])?;
+    checker.expect("the power menu offers what logind allows", |session| {
+        let Some(menu) = on_stage(session, ".quick-toggle-menu")? else {
+            return Ok(false);
+        };
+        let texts = texts(&menu);
+        Ok(["Suspend", "Restart…", "Power Off…", "Log Out…"]
+            .iter()
+            .all(|entry| texts.iter().any(|text| text == entry)))
+    });
+    checker.session.gniri_msg(&["power-off"])?;
+    checker.expect("asking to power off opens the dialog", |session| {
+        Ok(dialog_text(session, TITLE)?.as_deref() == Some("Power Off"))
+    });
+    checker.expect("which gives a minute", |session| {
+        Ok(dialog_text(session, DESCRIPTION)?.as_deref()
+            == Some("The system will power off automatically in 60 seconds"))
+    });
+    checker.expect("and closes the menu behind it", |session| {
+        Ok(surface(session, "gniri-stage")?.is_none())
+    });
+    if on_path("wtype") {
+        key_until(&checker.session, "Escape", |session| {
+            Ok(surface(session, "gniri-dialog")?.is_none())
+        })?;
+        checker.expect("Escape cancels", |session| {
+            Ok(surface(session, "gniri-dialog")?.is_none())
+        });
+        checker.expect("and nothing was asked of logind", |session| {
+            Ok(!sent(session, "session:")?)
+        });
+    } else {
+        println!("  skip wtype is not installed");
+        checker.session.gniri_msg(&["debug", "close-dialog"])?;
+    }
+
+    checker.session.gniri_msg(&["restart"])?;
+    checker.expect("asking to restart opens the dialog", |session| {
+        Ok(dialog_text(session, TITLE)?.as_deref() == Some("Restart"))
+    });
+    if on_path("wlrctl") {
+        click_on(&checker.session, "gniri-dialog", ".modal-dialog-button:1")?;
+        checker.expect("its second button restarts", |session| {
+            sent(session, "session: Restart")
+        });
+        checker.expect("and closes the dialog", |session| {
+            Ok(surface(session, "gniri-dialog")?.is_none())
+        });
+    } else {
+        println!("  skip wlrctl is not installed");
+        checker.session.gniri_msg(&["debug", "close-dialog"])?;
+    }
+
+    checker.session.gniri_msg(&["log-out"])?;
+    checker.expect("the log-out dialog names the user", |session| {
+        Ok(
+            dialog_text(session, TITLE)?.as_deref() == Some("Log Out Example User")
+                && dialog_text(session, DESCRIPTION)?.as_deref()
+                    == Some("Example User will be logged out automatically in 60 seconds"),
+        )
+    });
+    if on_path("wlrctl") {
+        click_on(&checker.session, "gniri-dialog", ".modal-dialog-button:1")?;
+        checker.expect("confirming asks niri to quit", |session| {
+            sent(session, "niri: Quit")
+        });
+    } else {
+        checker.session.gniri_msg(&["debug", "close-dialog"])?;
+    }
+
+    println!("idle");
+    checker.session.gniri_msg(&["debug", "idle", "dim"])?;
+    checker.expect("four fifths of the way the screen dims", |session| {
+        sent(session, "brightness: Set(0.3)")
+    });
+    checker
+        .session
+        .gniri_msg(&["debug", "idle", "dim", "--resumed"])?;
+    checker.expect("and is as bright as before at the next input", |session| {
+        sent(session, "brightness: Set(0.8)")
+    });
+    checker.session.gniri_msg(&["debug", "idle", "dim"])?;
+    checker.session.gniri_msg(&["debug", "idle", "blank"])?;
+    checker.expect("then the screens turn off", |session| {
+        sent(session, "niri: PowerOffMonitors")
+    });
+    checker.session.gniri_msg(&["debug", "idle", "lock"])?;
+    checker.expect("and the session is asked to lock", |session| {
+        sent(session, "session: Lock")
+    });
+    let locks = |session: &Session| -> Result<usize> {
+        Ok(commands(session)?
+            .iter()
+            .filter(|command| command.starts_with("session: Lock"))
+            .count())
+    };
+    checker.session.gniri_msg(&["lock"])?;
+    checker.expect("`gniri msg lock` asks the same", |session| {
+        Ok(locks(session)? == 2)
+    });
+
+    let Checker {
+        session,
+        passed,
+        failed,
+    } = checker;
+    session.quit()?;
+    Ok((passed, failed))
+}
+
+/// The lock screen, locking the nested session for real: the compositor
+/// hides everything else, keys reach only the lock surface, and only the
+/// fixture's password ends it. No PAM: a scene's lock screen never asks it.
+fn lock_screen() -> Result<(usize, usize)> {
+    const CLOCK: &str = ".unlock-dialog-clock";
+    const PROMPT: &str = ".login-dialog-prompt-layout";
+    const MESSAGE: &str = ".login-dialog-message";
+
+    if !on_path("wtype") {
+        println!("lock screen");
+        println!("  skip wtype is not installed");
+        return Ok((0, 0));
+    }
+    let session = fixture_session(
+        "check-lock",
+        r#"
+        time = "2026-11-13T22:08:00"
+        user = { name = "user", real_name = "Example User" }
+        lock = { password = "sesame" }
+        "#,
+    )?;
+    let mut checker = Checker {
+        session,
+        passed: 0,
+        failed: 0,
+    };
+    let log = session::visual_dir()?.join("logs/check-lock-lock.log");
+    let on_lock = |session: &Session, selector: &str| on_surface(session, "gniri-lock", selector);
+
+    println!("lock screen");
+    checker.expect("(the desktop shows before)", |session| {
+        Ok(near(pixel(session, 300, 20)?, [53, 53, 55]))
+    });
+    checker.session.spawn_helper("lock")?;
+    checker.expect("the locker says when the compositor has locked", |_| {
+        Ok(fs::read_to_string(&log).is_ok_and(|log| log.lines().any(|line| line == "locked")))
+    });
+    checker.expect("the lock screen starts on the clock", |session| {
+        let Some(clock) = on_lock(session, CLOCK)? else {
+            return Ok(false);
+        };
+        Ok(texts(&clock)
+            == [
+                "10\u{2236}08 PM",
+                "Friday November 13",
+                "Click or press a key",
+            ]
+            && on_lock(session, PROMPT)?.is_none())
+    });
+    key_until(&checker.session, "Return", |session| {
+        Ok(on_lock(session, PROMPT)?.is_some())
+    })?;
+    checker.expect("a key brings up the prompt for the user", |session| {
+        let Some(prompt) = on_lock(session, PROMPT)? else {
+            return Ok(false);
+        };
+        Ok(
+            text_of(&prompt, ".user-widget-label").as_deref() == Some("Example User")
+                && on_lock(session, CLOCK)?.is_none(),
+        )
+    });
+    key(&checker.session, "Escape")?;
+    checker.expect("Escape goes back to the clock", |session| {
+        Ok(on_lock(session, CLOCK)?.is_some() && on_lock(session, PROMPT)?.is_none())
+    });
+
+    // Typed on the clock: the first letter brings the prompt up and is
+    // not lost.
+    type_text(&checker.session, "sesam")?;
+    key(&checker.session, "Return")?;
+    checker.expect("a wrong password is turned down", |session| {
+        Ok(on_lock(session, MESSAGE)?
+            .is_some_and(|message| message["text"] == "Sorry, that didn’t work. Please try again."))
+    });
+    checker.expect("and the session stays locked", |session| {
+        Ok(session.helper_runs("lock") && on_lock(session, PROMPT)?.is_some())
+    });
+    type_text(&checker.session, "sesame")?;
+    key(&checker.session, "Return")?;
+    checker.expect("the right password ends the locker", |session| {
+        Ok(!session.helper_runs("lock"))
+    });
+    checker.expect("and the desktop is back", |session| {
+        Ok(near(pixel(session, 300, 20)?, [53, 53, 55]))
+    });
+
+    let Checker {
+        session,
+        passed,
+        failed,
+    } = checker;
+    session.quit()?;
+    Ok((passed, failed))
+}
+
+/// The authentication dialog in the process that shows it, `gniri
+/// polkit`, with the scene's request in place of polkit and the scene's
+/// password in place of polkit's helper.
+fn authentication_dialog() -> Result<(usize, usize)> {
+    const AUTHENTICATE: &str = ".modal-dialog-button:1";
+    const ENTRY: &str = ".prompt-dialog-password-entry";
+
+    if !on_path("wtype") {
+        println!("authentication dialog");
+        println!("  skip wtype is not installed");
+        return Ok((0, 0));
+    }
+    let session = fixture_session(
+        "check-polkit",
+        r#"
+        time = "2026-11-14T08:28:00"
+        user = { name = "user", real_name = "Example User" }
+        lock = { password = "sesame" }
+
+        [polkit.request]
+        action_id = "org.freedesktop.policykit.exec"
+        message = "Authentication is needed to run `/usr/bin/true' as the super user"
+        user = "user"
+        prompt = { text = "Password: " }
+        "#,
+    )?;
+    let mut checker = Checker {
+        session,
+        passed: 0,
+        failed: 0,
+    };
+    let dialog = |session: &Session, selector: &str| on_surface(session, "gniri-dialog", selector);
+
+    println!("authentication dialog");
+    checker.session.spawn_helper("polkit")?;
+    checker.expect("a request opens the dialog for the user", |session| {
+        let Some(dialog) = dialog(session, ".modal-dialog")? else {
+            return Ok(false);
+        };
+        let texts = texts(&dialog);
+        Ok(
+            texts.first().map(String::as_str) == Some("Authentication Required")
+                && texts.iter().any(|text| text == "Example User")
+                && texts.iter().any(|text| text == "Password"),
+        )
+    });
+    checker.expect("with nothing typed there is nothing to send", |session| {
+        Ok(dialog(session, AUTHENTICATE)?.is_some_and(|button| has_state(&button, "insensitive")))
+    });
+    type_text(&checker.session, "wrong")?;
+    checker.expect("typing makes Authenticate available", |session| {
+        Ok(dialog(session, AUTHENTICATE)?.is_some_and(|button| !has_state(&button, "insensitive")))
+    });
+    key(&checker.session, "Return")?;
+    checker.expect(
+        "a wrong password is turned down, in the warning's look",
+        |session| {
+            Ok(dialog(session, ".prompt-dialog-error-label")?
+                .is_some_and(|label| label["text"] == "Sorry, that didn’t work. Please try again."))
+        },
+    );
+    checker.expect("and the entry is ready for another try", |session| {
+        Ok(dialog(session, ENTRY)?.is_some_and(|entry| !has_state(&entry, "insensitive")))
+    });
+    type_text(&checker.session, "sesame")?;
+    key(&checker.session, "Return")?;
+    checker.expect("the right one closes the dialog", |session| {
+        Ok(surface(session, "gniri-dialog")?.is_none())
+    });
+    checker.expect("and the agent stays for the next request", |session| {
+        Ok(session.helper_runs("polkit"))
+    });
 
     let Checker {
         session,

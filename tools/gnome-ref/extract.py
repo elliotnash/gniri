@@ -44,7 +44,12 @@ WALLPAPERS = ["flat-808080", "flat-3584e4", "real"]
 #   redact     (optional) actors whose text is private even so: each is
 #              {"within": match, "match": match}. Their text is replaced,
 #              their box is blacked out in the shots, and they are marked
-#              "redacted" so the comparison skips that box.
+#              "redacted" so the comparison skips that box. Every actor
+#              that matches inside the first "within" is redacted.
+#   raw        (optional) the capture the state is from, a directory under
+#              raw/ with its own metrics/ and shots, where that is not the
+#              main one.
+#   wallpapers (optional) the wallpapers that capture has shots for.
 WIFI_NAME = {
     "within": {"type": "Gjs_status_network_NMWirelessToggle"},
     "match": {"classes": "quick-toggle-subtitle"},
@@ -57,6 +62,22 @@ QUICK_SETTINGS = {
     "keep_text": True,
     "redact": [WIFI_NAME],
 }
+# The user's name and picture, wherever they are shown.
+USER_PRIVATE = [
+    {"within": {"classes": "polkit-dialog-user-layout"},
+     "match": {"classes": "user-icon user-avatar"}},
+    {"within": {"classes": "polkit-dialog-user-layout"},
+     "match": {"classes": "polkit-dialog-user-label"}},
+]
+LOCK_USER_PRIVATE = [
+    {"within": {"classes": "user-widget vertical"},
+     "match": {"classes": "user-icon user-avatar"}},
+    {"within": {"classes": "user-widget vertical"},
+     "match": {"classes": "user-widget-label"}},
+]
+# GNOME's own lock screen, from the run of the capture that happened behind
+# it (docs/DECISIONS.md, S15): over the real wallpaper only.
+LOCK = {"raw": "lock-accidental", "wallpapers": ["real"]}
 EXTRACTS = {
     # Clock and battery percentage only.
     "panel": {"state": "desktop", "match": {"name": "panel"}, "keep_text": True},
@@ -86,6 +107,31 @@ EXTRACTS = {
         "margin": 12,
         "keep_text": True,
     },
+    # `pkexec true`: polkit's sentence about it and the dialog's own words.
+    "polkit-dialog": {
+        "state": "polkit-dialog",
+        "match": {"classes": "modal-dialog prompt-dialog bms-popup-blurred"},
+        "margin": 24,
+        "keep_text": True,
+        "redact": USER_PRIVATE,
+    },
+    # The time and the date.
+    "lock-clock": {
+        **LOCK,
+        "state": "desktop",
+        "match": {"classes": "unlock-dialog-clock"},
+        "margin": 24,
+        "keep_text": True,
+    },
+    # The prompt's own words. The capture was showing its volume display at
+    # the time, well below the prompt.
+    "lock-prompt": {
+        **LOCK,
+        "state": "osd",
+        "match": {"classes": "login-dialog-prompt-layout"},
+        "keep_text": True,
+        "redact": LOCK_USER_PRIVATE,
+    },
 }
 
 
@@ -110,9 +156,19 @@ def find(node, match):
     return path[-1] if path else None
 
 
+def find_all(node, match):
+    """Every actor at or below `node` that matches."""
+    found = [node] if matches(node, match) else []
+    for child in node.get("children", []):
+        found += find_all(child, match)
+    return found
+
+
 def redact(node):
     if node.get("text"):
         node["text"] = "x" * len(node["text"])
+    # An inline style can name a file, such as the user's picture.
+    node.pop("inline_style", None)
     for child in node.get("children", []):
         redact(child)
 
@@ -127,7 +183,15 @@ def redact_unseen(node):
 
 
 def extract(name, spec):
-    dump = json.loads((RAW / "metrics" / f"{spec['state']}.json").read_text())
+    raw = RAW / spec["raw"] if "raw" in spec else RAW
+    wallpapers = spec.get("wallpapers", WALLPAPERS)
+
+    def shot(wallpaper):
+        # A capture of one wallpaper keeps its shots beside its metrics.
+        directory = raw / wallpaper if "raw" not in spec else raw
+        return directory / f"{spec['state']}.png"
+
+    dump = json.loads((raw / "metrics" / f"{spec['state']}.json").read_text())
     path = find_path(dump["tree"], spec["match"])
     if path is None:
         sys.exit(f"{name}: no actor matching {spec['match']} in state {spec['state']}")
@@ -145,15 +209,16 @@ def extract(name, spec):
     blackout = []
     for rule in spec.get("redact", []):
         scope = find(tree, rule["within"])
-        actor = scope and find(scope, rule["match"])
-        if actor is None:
+        actors = find_all(scope, rule["match"]) if scope else []
+        if not actors:
             sys.exit(f"{name}: nothing to redact for {rule}")
-        redact(actor)
-        actor["redacted"] = True
-        blackout.append(actor["box"])
+        for actor in actors:
+            redact(actor)
+            actor["redacted"] = True
+            blackout.append(actor["box"])
 
     stage_width, stage_height = dump["stage"]
-    source = RAW / WALLPAPERS[0] / f"{spec['state']}.png"
+    source = shot(wallpapers[0])
     size = subprocess.run(
         ["magick", "identify", "-format", "%w", str(source)],
         check=True, capture_output=True, text=True).stdout
@@ -187,8 +252,8 @@ def extract(name, spec):
     def pixels(value):
         return round(value * ratio)
 
-    for wallpaper in WALLPAPERS:
-        source = RAW / wallpaper / f"{spec['state']}.png"
+    for wallpaper in wallpapers:
+        source = shot(wallpaper)
         command = ["magick", str(source), "-crop",
                    f"{right - left}x{bottom - top}+{left}+{top}", "+repage",
                    "-alpha", "off", "-fill", "black"]
@@ -203,7 +268,7 @@ def extract(name, spec):
     target = REFERENCE / "metrics" / f"{name}.json"
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(json.dumps(document, indent=1) + "\n")
-    print(f"{name}: {target.relative_to(REFERENCE)} and {len(WALLPAPERS)} shots")
+    print(f"{name}: {target.relative_to(REFERENCE)} and {len(wallpapers)} shots")
 
 
 def main():

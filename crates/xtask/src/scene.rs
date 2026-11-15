@@ -17,6 +17,9 @@
 //!
 //! [[steps]]
 //! gniri = ["debug", "open-menu", "quick-settings"]   # `gniri msg ...`
+//!
+//! [[steps]]
+//! spawn = "lock"                 # start `gniri lock` with the same fixture
 //! ```
 //!
 //! A scene can start from another one: `extends = "quick-settings"` takes
@@ -42,6 +45,9 @@ pub enum Step {
     Action(niri_ipc::Action),
     /// Run `gniri msg` with these arguments.
     Gniri(Vec<String>),
+    /// Start one of gniri's helper processes, `lock` or `polkit`, with the
+    /// scene's fixture, and wait until it answers.
+    Spawn(String),
 }
 
 #[derive(Deserialize, Default)]
@@ -146,6 +152,7 @@ impl Scene {
                     let arguments: Vec<&str> = arguments.iter().map(String::as_str).collect();
                     session.gniri_msg(&arguments)?;
                 }
+                Step::Spawn(subcommand) => session.spawn_helper(subcommand)?,
             }
             std::thread::sleep(Duration::from_millis(100));
         }

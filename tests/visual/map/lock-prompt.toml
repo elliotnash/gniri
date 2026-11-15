@@ -1,0 +1,99 @@
+# The lock screen's password prompt: gniri's widgets against GNOME Shell's
+# actors. Read by `cargo xtask diff lock-prompt`.
+#
+# Over the real wallpaper only, as for the clock (lock-clock.toml). The
+# user's picture and name are blacked out of the reference and are not
+# compared; the capture had one character typed, the scene has none.
+
+surface = "gniri-lock"
+root = ".login-dialog-prompt-layout"
+attach = "center"
+vertical = "center"
+wallpaper = "/usr/share/backgrounds/f45/default/f45-01-night.jxl"
+flat = false
+
+[[states]]
+scene = "lock-prompt"
+reference = "lock-prompt"
+
+[[regions]]
+name = "prompt"
+anchor = "stretch"
+
+[[pairs]]
+name = "user"
+ours = ".user-widget"
+theirs = ".user-widget"
+anchor = "center"
+# As wide as the wider of the picture and the name.
+tolerance_px = 20
+
+[[pairs]]
+name = "avatar"
+ours = ".user-avatar"
+theirs = ".user-avatar"
+anchor = "center"
+
+[[pairs]]
+name = "user name"
+ours = ".user-widget-label"
+theirs = ".user-widget-label"
+anchor = "center"
+# As wide as the name it shows, and the scene's is another.
+tolerance_px = 200
+
+[[pairs]]
+name = "input well"
+ours = ".login-dialog-input-well"
+theirs = ".login-dialog-input-well"
+anchor = "center"
+
+[[pairs]]
+name = "button box"
+ours = ".login-dialog-button-box"
+theirs = ".login-dialog-button-box"
+anchor = "center"
+
+[[pairs]]
+name = "entry area"
+ours = ".login-dialog-prompt-entry-area"
+theirs = ".login-dialog-prompt-entry-area"
+anchor = "center"
+
+[[pairs]]
+name = "entry"
+ours = ".login-dialog-prompt-entry"
+theirs = ".login-dialog-prompt-entry"
+anchor = "center"
+
+[[pairs]]
+name = "entry text"
+ours = ".login-dialog-prompt-entry GtkText"
+theirs = ".login-dialog-prompt-entry ClutterText"
+anchor = "left"
+
+[[pairs]]
+name = "peek icon"
+ours = ".peek-password"
+theirs = ".peek-password"
+anchor = "right"
+
+[[pairs]]
+name = "button well"
+ours = ".login-dialog-default-button-well"
+theirs = ".login-dialog-default-button-well"
+anchor = "right"
+
+[[pairs]]
+name = "next icon"
+ours = ".next-button GtkImage"
+theirs = ".next-button StIcon"
+anchor = "right"
+
+[[pairs]]
+name = "message"
+ours = ".login-dialog-message"
+theirs = ".login-dialog-message"
+anchor = "center"
+# Ours spans the prompt; GNOME's, empty, is a pixel wide.
+tolerance_px = 440

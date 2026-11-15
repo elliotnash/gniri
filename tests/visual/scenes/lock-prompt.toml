@@ -1,0 +1,6 @@
+# The lock screen's password prompt, where a key press on the clock leads.
+
+extends = "lock"
+
+[fixture]
+lock = { password = "open sesame", preview = true, prompt = true }

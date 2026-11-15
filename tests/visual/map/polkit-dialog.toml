@@ -1,0 +1,161 @@
+# The authentication dialog: gniri's widgets against GNOME Shell's actors.
+# Read by `cargo xtask diff polkit-dialog` (crates/xtask/src/diff.rs).
+#
+# The user's picture and name are blacked out of the reference and are not
+# compared. The scene's user has another name; the label's box spans the
+# dialog whatever it says.
+
+surface = "gniri-dialog"
+root = ".modal-dialog"
+# It sits in the middle of the screen.
+attach = "center"
+vertical = "center"
+# The shade around it, and its shadow.
+margin = 24
+wallpaper = "/usr/share/backgrounds/f45/default/f45-01-night.jxl"
+# What differs is the dialog's one-pixel border, all the way round. It is
+# brighter against its surroundings than any other edge gniri has, and St
+# snaps it to whole physical pixels where GTK draws it a quarter pixel
+# off (docs/FIDELITY.md, "Edges at fractional scale"): about 0.5% of the
+# crop's pixels, on the pass mark for everything else.
+flat_differing_percent = 0.75
+
+[[states]]
+scene = "polkit-dialog"
+reference = "polkit-dialog"
+
+[[regions]]
+name = "dialog"
+anchor = "stretch"
+
+[[pairs]]
+name = "content box"
+ours = ".modal-dialog-content-box"
+theirs = ".modal-dialog-content-box"
+anchor = "center"
+
+[[pairs]]
+name = "header"
+ours = ".message-dialog-content:0"
+theirs = ".message-dialog-content:0"
+anchor = "center"
+
+[[pairs]]
+name = "title"
+ours = ".message-dialog-title"
+theirs = ".message-dialog-title"
+anchor = "center"
+
+[[pairs]]
+name = "title text"
+ours = ".message-dialog-title"
+ours_box = "text"
+theirs = ".message-dialog-title ClutterText"
+anchor = "center"
+# St reports the label's box for its text; ours is the ink's line box.
+tolerance_px = 200
+
+[[pairs]]
+name = "description"
+ours = ".message-dialog-description"
+theirs = ".message-dialog-description"
+anchor = "center"
+
+[[pairs]]
+name = "body"
+ours = ".message-dialog-content:1"
+theirs = ".message-dialog-content:1"
+anchor = "center"
+
+[[pairs]]
+name = "user layout"
+ours = ".polkit-dialog-user-layout"
+theirs = ".polkit-dialog-user-layout"
+anchor = "center"
+
+[[pairs]]
+name = "avatar"
+ours = ".user-avatar"
+theirs = ".user-avatar"
+anchor = "center"
+
+[[pairs]]
+name = "user name"
+ours = ".polkit-dialog-user-label"
+theirs = ".polkit-dialog-user-label"
+anchor = "center"
+# Ours is as wide as its text, GNOME's as the dialog.
+tolerance_px = 200
+
+[[pairs]]
+name = "password layout"
+ours = ".prompt-dialog-password-layout"
+theirs = ".prompt-dialog-password-layout"
+anchor = "center"
+
+[[pairs]]
+name = "entry"
+ours = ".prompt-dialog-password-entry"
+theirs = ".prompt-dialog-password-entry"
+anchor = "center"
+
+[[pairs]]
+name = "entry text"
+ours = ".prompt-dialog-password-entry GtkText"
+theirs = ".prompt-dialog-password-entry ClutterText"
+anchor = "left"
+
+[[pairs]]
+name = "entry hint"
+ours = ".prompt-dialog-password-entry GtkLabel"
+ours_box = "text"
+theirs = ".prompt-dialog-password-entry .hint-text ClutterText"
+anchor = "left"
+# Pango's line is a pixel shorter than St's.
+tolerance_px = 1
+
+[[pairs]]
+name = "peek icon"
+ours = ".peek-password"
+theirs = ".peek-password"
+anchor = "right"
+
+[[pairs]]
+name = "message"
+ours = ".prompt-dialog-null-label"
+theirs = ".prompt-dialog-null-label"
+anchor = "center"
+
+[[pairs]]
+name = "button box"
+ours = ".modal-dialog-button-box"
+theirs = ".modal-dialog-button-box"
+anchor = "center"
+
+[[pairs]]
+name = "cancel button"
+ours = ".modal-dialog-button:0"
+theirs = ".modal-dialog-button:0"
+anchor = "left"
+
+[[pairs]]
+name = "authenticate button"
+ours = ".modal-dialog-button:1"
+theirs = ".modal-dialog-button:1"
+anchor = "right"
+
+[[pairs]]
+name = "cancel label"
+ours = ".modal-dialog-button:0 GtkLabel"
+ours_box = "text"
+theirs = ".modal-dialog-button:0 ClutterText"
+anchor = "left"
+tolerance_px = 1.5
+
+[[pairs]]
+name = "authenticate label"
+ours = ".modal-dialog-button:1 GtkLabel"
+ours_box = "text"
+theirs = ".modal-dialog-button:1 ClutterText"
+anchor = "right"
+tolerance_px = 1.5

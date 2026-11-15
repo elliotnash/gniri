@@ -60,6 +60,8 @@ enum Vertical {
     #[default]
     Top,
     Bottom,
+    /// In the middle of the screen (a dialog, the lock screen's clock).
+    Center,
 }
 
 #[derive(Deserialize)]
@@ -87,6 +89,14 @@ struct Map {
     margin: f64,
     /// The wallpaper image the real-wallpaper reference was taken over.
     wallpaper: PathBuf,
+    /// Whether the reference has captures over flat wallpapers. GNOME's
+    /// own lock screen was only captured over the real one.
+    #[serde(default = "yes")]
+    flat: bool,
+    /// Tier 2: the share of differing pixels this component may have,
+    /// where `flat_differing_percent` in thresholds.toml cannot hold. The
+    /// map says why.
+    flat_differing_percent: Option<f64>,
     states: Vec<State>,
     regions: Vec<Region>,
     pairs: Vec<Pair>,
@@ -94,6 +104,10 @@ struct Map {
 
 fn attach_left() -> Anchor {
     Anchor::Left
+}
+
+fn yes() -> bool {
+    true
 }
 
 #[derive(Deserialize)]
@@ -291,11 +305,17 @@ impl Side<'_> {
     /// A tree-coordinate box in physical pixels relative to `crop`, grown
     /// by one pixel for antialiasing.
     fn mask(&self, [x, y, width, height]: [f64; 4], crop: &PixelRect) -> PixelRect {
+        // From the pixel the box starts in to the pixel it ends in: a box
+        // that starts part way into a pixel reaches a pixel further than
+        // its size alone says.
+        let low = |start: f64| (start * self.scale).floor() as i64 - 1;
+        let high = |end: f64| (end * self.scale).ceil() as i64 + 1;
+        let (left, top) = (low(x + self.in_picture.0), low(y + self.in_picture.1));
         PixelRect {
-            x: ((x + self.in_picture.0) * self.scale).floor() as i64 - crop.x - 1,
-            y: ((y + self.in_picture.1) * self.scale).floor() as i64 - crop.y - 1,
-            width: (width * self.scale).ceil() as i64 + 2,
-            height: (height * self.scale).ceil() as i64 + 2,
+            x: left - crop.x,
+            y: top - crop.y,
+            width: high(x + width + self.in_picture.0) - left,
+            height: high(y + height + self.in_picture.1) - top,
         }
     }
 
@@ -624,6 +644,7 @@ fn check_layout(
         let vertical = match map.vertical {
             Vertical::Top => y,
             Vertical::Bottom => side.screen.1 - (y + height),
+            Vertical::Center => y + height / 2.0 - side.screen.1 / 2.0,
         };
         (horizontal, vertical)
     };
@@ -836,7 +857,18 @@ fn check_state(context: &Job, state: &State, checks: &mut Vec<Check>) -> Result<
 
     // Tier 2: flat wallpapers, one run each.
     let mut output_size = None;
-    for (wallpaper, colour) in FLAT_WALLPAPERS {
+    let flat_wallpapers: &[(&str, &str)] = if map.flat { &FLAT_WALLPAPERS } else { &[] };
+    if !map.flat {
+        // The size of the nested output is still needed below.
+        let run = format!("{component}-{}-size", state.scene);
+        let capture = scene.capture(&run, None, "#808080")?;
+        let ours = our_side(map, &capture.dump)?;
+        output_size = Some((
+            (ours.screen.0 * ours.scale).round() as i64,
+            (ours.screen.1 * ours.scale).round() as i64,
+        ));
+    }
+    for &(wallpaper, colour) in flat_wallpapers {
         let run = format!("{component}-{}-{wallpaper}", state.scene);
         let capture = scene.capture(&run, Some(wallpaper), colour)?;
         let ours = match our_side(map, &capture.dump) {
@@ -878,7 +910,10 @@ fn check_state(context: &Job, state: &State, checks: &mut Vec<Check>) -> Result<
                 tier: "flat",
                 subject: format!("{}: {} on {wallpaper}", state.scene, region.name),
                 detail: format!("{share:.2}% of pixels differ"),
-                pass: share <= thresholds.flat_differing_percent,
+                pass: share
+                    <= map
+                        .flat_differing_percent
+                        .unwrap_or(thresholds.flat_differing_percent),
                 montage: Some(picture),
             });
         }
@@ -912,6 +947,7 @@ fn check_state(context: &Job, state: &State, checks: &mut Vec<Check>) -> Result<
         let window_y = match map.vertical {
             Vertical::Top => 0,
             Vertical::Bottom => reference_size.1 - output_height,
+            Vertical::Center => (reference_size.1 - output_height) / 2,
         };
         let window = work.join(format!("wallpaper-{}.png", region.name));
         magick_ok(&[

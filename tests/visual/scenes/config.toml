@@ -7,3 +7,13 @@ format = "12h"
 
 [panel]
 show_battery_percentage = true
+
+# A nested session counts its own idle time: the nested window not being
+# touched, while its user works beside it. Nothing may dim the real screen
+# or lock the real session for that, in the runs that have no fixture.
+[idle]
+blank_after = 0
+
+[lock]
+automatic = false
+on_suspend = false

@@ -46,7 +46,11 @@ enum Command {
     /// Diff every component and write target/visual/report/index.html.
     Report,
     /// Check how the shell behaves in a live nested session.
-    Check,
+    Check {
+        /// Only this part: panel, quick-settings, notifications,
+        /// notifications-bus, session, lock or polkit.
+        part: Option<String>,
+    },
 }
 
 #[derive(clap::Args)]
@@ -118,7 +122,7 @@ fn run() -> Result<bool> {
             Ok(diff::print(&component, &checks))
         }
         Command::Report => report::run(),
-        Command::Check => check::run(),
+        Command::Check { part } => check::run(part.as_deref()),
     }
 }
 
