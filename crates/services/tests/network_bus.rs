@@ -37,6 +37,8 @@ const FULL: u32 = 4;
 
 /// WPA2 with a password: CCMP ciphers and PSK key management.
 const WPA2: u32 = 0x188;
+/// WPA2 with a user's own credentials: 802.1X key management.
+const WPA2_ENTERPRISE: u32 = 0x288;
 
 fn path(path: &str) -> Variant<'_> {
     Variant::from(ObjectPath::try_from(path).expect("a valid object path"))
@@ -344,16 +346,18 @@ fn a_known_network_is_joined_and_left_by_command() {
 }
 
 #[test]
-fn an_open_network_is_joined_and_a_locked_one_is_not() {
+fn a_network_is_joined_unless_it_needs_setting_up() {
     let Some(bus) = start() else { return };
     let device = neighbourhood(&bus);
     access_point(&bus, &device, "library", "library", 30, WPA2);
+    access_point(&bus, &device, "campus", "campus", 20, WPA2_ENTERPRISE);
     let mut network = follow(&bus);
-    network.wait("the networks", |state| ssids(state).len() == 3);
+    network.wait("the networks", |state| ssids(state).len() == 4);
 
-    // No password dialog yet: nothing is asked of NetworkManager. The scan
-    // after it shows the command has been dealt with.
-    network.send(Command::ConnectWifi("library".to_owned()));
+    // A user name, a certificate: nothing a password dialog can ask for,
+    // so nothing is asked of NetworkManager. The scan after it shows the
+    // command has been dealt with.
+    network.send(Command::ConnectWifi("campus".to_owned()));
     network.send(Command::ScanWifi);
     network.wait("the scan", |state| state.wifi.as_ref().unwrap().scanning);
     assert_eq!(calls(&bus, &device, "RequestScan").len(), 1);
@@ -386,6 +390,23 @@ fn an_open_network_is_joined_and_a_locked_one_is_not() {
     network.wait("the cafe known", |state| {
         state.wifi.as_ref().unwrap().current().unwrap().known
     });
+
+    // One with a password is joined the same way: NetworkManager makes
+    // the profile and asks its secret agent for the password.
+    network.send(Command::ConnectWifi("library".to_owned()));
+    network.wait("the library joined", |state| {
+        state
+            .wifi
+            .as_ref()
+            .and_then(|wifi| wifi.current())
+            .is_some_and(|current| current.ssid == "library")
+    });
+    let joins = calls(&bus, MANAGER, "AddAndActivateConnection");
+    assert_eq!(joins.len(), 2);
+    assert_eq!(
+        text(&joins[1][2]),
+        "/org/freedesktop/NetworkManager/AccessPoint/library"
+    );
 }
 
 #[test]

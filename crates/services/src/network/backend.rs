@@ -333,8 +333,9 @@ impl Backend {
                     .await?;
             }
             // Port of `WirelessNetwork.activate`: NetworkManager fills the
-            // profile in from the access point. Someone who may not change
-            // settings for everybody gets a profile of their own.
+            // profile in from the access point, and asks the secret agent
+            // for a password it turns out to need. Someone who may not
+            // change settings for everybody gets a profile of their own.
             Request::Join {
                 device,
                 access_point,

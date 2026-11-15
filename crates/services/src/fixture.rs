@@ -44,6 +44,10 @@ pub struct Fixture {
     pub lock: Lock,
     /// For `gniri polkit`: the request its dialog shows.
     pub polkit: polkit::State,
+    /// What NetworkManager's secret agent is asking: a Wi-Fi password.
+    pub network_agent: network::agent::State,
+    /// What the Bluetooth pairing agent is asking.
+    pub bluetooth_agent: bluetooth::agent::State,
 }
 
 /// The lock screen of a scene.

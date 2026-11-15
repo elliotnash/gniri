@@ -128,7 +128,8 @@ pub enum Request {
         profile: String,
         device: String,
     },
-    /// Join an open network that has no profile yet.
+    /// Join a network that has no profile yet. NetworkManager makes one,
+    /// and asks its secret agent for the password if the network has one.
     Join {
         device: String,
         access_point: String,
@@ -500,10 +501,6 @@ impl System {
                     Err(format!(
                         "{ssid:?} needs enterprise credentials, which gniri cannot set up"
                     ))
-                } else if group.security.is_secure() {
-                    Err(format!(
-                        "{ssid:?} needs a password, and gniri cannot ask for one yet"
-                    ))
                 } else {
                     Ok(Some(Request::Join {
                         device,
@@ -756,6 +753,7 @@ impl System {
                     ssid: group.name.clone(),
                     strength: group.strength,
                     secure: group.security.is_secure(),
+                    enterprise: !group.security.can_autoconnect(),
                     known: !group.profiles.is_empty(),
                     status: if group.active {
                         link.status
@@ -967,6 +965,7 @@ mod tests {
                 // Of the nearer of its two access points.
                 strength: 62,
                 secure: true,
+                enterprise: false,
                 known: true,
                 status: Status::Idle,
             }
@@ -977,6 +976,7 @@ mod tests {
                 ssid: text("cafe"),
                 strength: 80,
                 secure: false,
+                enterprise: false,
                 known: false,
                 status: Status::Idle,
             }
@@ -1015,8 +1015,13 @@ mod tests {
         assert_eq!((cafe.strength, cafe.secure), (85, true));
 
         // Joining goes by the row that is listed.
-        let plan = system.plan(&Command::ConnectWifi(text("cafe")));
-        assert!(plan.unwrap_err().contains("password"));
+        assert_eq!(
+            system.plan(&Command::ConnectWifi(text("cafe"))),
+            Ok(Some(Request::Join {
+                device: text(WLAN),
+                access_point: text("/ap/cafe-locked"),
+            }))
+        );
     }
 
     #[test]
@@ -1323,15 +1328,29 @@ mod tests {
                 access_point: text("/ap/cafe"),
             }))
         );
-        assert!(join("office").unwrap_err().contains("password"));
+        // A password is asked for by NetworkManager, through the agent.
+        assert_eq!(
+            join("office"),
+            Ok(Some(Request::Join {
+                device: text(WLAN),
+                access_point: text("/ap/office"),
+            }))
+        );
         assert!(join("nowhere").unwrap_err().contains("not in range"));
 
         let mut system = neighbourhood();
         add_access_point(&mut system, "/ap/campus", "campus", 50, WPA2_ENTERPRISE);
         let plan = system.plan(&Command::ConnectWifi(text("campus")));
         assert!(plan.unwrap_err().contains("enterprise"));
+        let campus = |system: &System| {
+            let wifi = wifi(system);
+            let row = wifi.networks.iter().find(|row| row.ssid == "campus");
+            row.cloned().unwrap()
+        };
+        assert!(campus(&system).enterprise && !campus(&system).can_connect());
         // With a profile it is a network like any other.
         add_profile(&mut system, "/profile/campus", "campus");
+        assert!(campus(&system).can_connect());
         assert!(matches!(
             system.plan(&Command::ConnectWifi(text("campus"))),
             Ok(Some(Request::Activate { .. }))

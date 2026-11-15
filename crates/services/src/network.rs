@@ -3,6 +3,7 @@
 //! The state and what widgets derive from it, ported from GNOME Shell's
 //! `js/ui/status/network.js`. [`backend`] fills it in from NetworkManager.
 
+pub mod agent;
 pub mod backend;
 mod security;
 mod system;
@@ -115,6 +116,9 @@ pub struct Network {
     pub strength: u8,
     /// It asks for a password or other credentials.
     pub secure: bool,
+    /// It asks for more than a password: a user name, a certificate. Only
+    /// the settings application can set such a network up.
+    pub enterprise: bool,
     /// There is a saved connection for it, so no password is needed.
     pub known: bool,
     pub status: Status,
@@ -147,8 +151,9 @@ pub enum Event {
 #[derive(Clone, Debug, PartialEq)]
 pub enum Command {
     SetWifiEnabled(bool),
-    /// Connect to the network with this SSID. Only networks that are known
-    /// or open can be joined until the password dialog exists (M6).
+    /// Connect to the network with this SSID. NetworkManager asks its
+    /// secret agent ([`agent`]) for a password it does not have. A network
+    /// that wants more than a password must be known already.
     ConnectWifi(String),
     /// Take the Wi-Fi adapter off its network, or stop its hotspot.
     DisconnectWifi,
@@ -223,9 +228,10 @@ impl Network {
         self.status != Status::Idle
     }
 
-    /// [`Command::ConnectWifi`] can join it without asking for anything.
+    /// [`Command::ConnectWifi`] can join it: it is set up already, or a
+    /// password is all it takes. Port of `WirelessNetwork.canAutoconnect`.
     pub fn can_connect(&self) -> bool {
-        self.known || !self.secure
+        self.known || !self.enterprise
     }
 
     /// Port of `WirelessNetwork.compare`: known networks first, then the
@@ -456,6 +462,7 @@ mod tests {
             ssid: ssid.to_owned(),
             strength: 70,
             secure: true,
+            enterprise: false,
             known: true,
             status,
         }
@@ -632,6 +639,7 @@ mod tests {
             ssid: ssid.to_owned(),
             strength,
             secure,
+            enterprise: false,
             known,
             status: Status::Idle,
         }
@@ -733,6 +741,11 @@ mod tests {
                 },
                 Network {
                     known: false,
+                    enterprise: true,
+                    ..network("campus", Status::Idle)
+                },
+                Network {
+                    known: false,
                     secure: false,
                     ..network("open", Status::Idle)
                 },
@@ -756,12 +769,16 @@ mod tests {
 
         state.predict(&Command::ConnectWifi("open".to_owned()));
         assert_eq!(state.wifi.as_ref().unwrap().subtitle(), Some("open"));
+        // One that wants a password is joined too: the password is asked
+        // for on the way.
+        state.predict(&Command::ConnectWifi("locked".to_owned()));
+        assert_eq!(state.wifi.as_ref().unwrap().subtitle(), Some("locked"));
     }
 
     #[test]
-    fn a_network_that_needs_a_password_is_not_predicted_to_connect() {
+    fn a_network_that_needs_setting_up_is_not_predicted_to_connect() {
         let mut state = connected_state();
-        state.predict(&Command::ConnectWifi("locked".to_owned()));
+        state.predict(&Command::ConnectWifi("campus".to_owned()));
         assert_eq!(state, connected_state());
         state.predict(&Command::ConnectWifi("out of range".to_owned()));
         assert_eq!(state, connected_state());
@@ -788,7 +805,7 @@ mod tests {
         assert_eq!(state.primary, None);
         let wifi = state.wifi.as_ref().unwrap();
         assert_eq!(wifi.subtitle(), None);
-        assert_eq!(wifi.networks.len(), 4);
+        assert_eq!(wifi.networks.len(), 5);
 
         let mut state = connected_state();
         state.predict(&Command::ScanWifi);

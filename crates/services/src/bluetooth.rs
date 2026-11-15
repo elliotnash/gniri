@@ -5,6 +5,7 @@
 //! (which devices can be connected to, what state the adapter is in), the
 //! library's rule is ported with it.
 
+pub mod agent;
 pub mod backend;
 
 use std::cmp::Ordering;
