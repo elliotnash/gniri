@@ -180,115 +180,123 @@ pub fn build(services: &Rc<Services>) -> QuickSettings {
     }
 }
 
-/// `OutputStreamSlider` in `status/volume.js`.
-fn output_slider(services: &Rc<Services>, grid: &QuickGrid, subscriptions: &mut Vec<Subscription>) {
-    let row = SliderRow::new("audio-volume-muted-symbolic");
+/// One of the two volume sliders of `status/volume.js`, with its device
+/// menu.
+struct VolumeSlider {
+    icon: &'static str,
+    submenu: Submenu,
+    menu_icon: &'static str,
+    menu_title: &'static str,
+    /// The commands for the slider moving to a value.
+    slide: fn(&audio::State, f64) -> Vec<audio::Command>,
+    /// The commands for a click on the icon.
+    click_icon: fn(&audio::State) -> Vec<audio::Command>,
+    select: fn(String) -> audio::Command,
+    /// Whether the row shows, its icon and where its handle is.
+    row: fn(&audio::State) -> Option<(&'static str, f64)>,
+    devices: fn(&audio::State) -> &[audio::Device],
+}
+
+fn volume_slider(
+    slider: VolumeSlider,
+    services: &Rc<Services>,
+    grid: &QuickGrid,
+    subscriptions: &mut Vec<Subscription>,
+) {
+    let row = SliderRow::new(slider.icon);
     row.slider.connect_changed({
         let services = Rc::clone(services);
-        move |volume| {
-            services.audio.send(audio::Command::SetOutputVolume(volume));
-        }
-    });
-    row.connect_icon_clicked({
-        let services = Rc::clone(services);
-        move || {
-            if let Some(command) = services.audio.state.with(audio::State::toggle_output_mute) {
+        move |value| {
+            let commands = services
+                .audio
+                .state
+                .with(|state| (slider.slide)(state, value));
+            for command in commands {
                 services.audio.send(command);
             }
         }
     });
-    row.connect_menu_clicked(open_submenu(services, Submenu::SoundOutput));
+    row.connect_icon_clicked({
+        let services = Rc::clone(services);
+        move || {
+            for command in services.audio.state.with(slider.click_icon) {
+                services.audio.send(command);
+            }
+        }
+    });
+    row.connect_menu_clicked(open_submenu(services, slider.submenu));
 
-    let menu = ToggleMenu::new("audio-headphones-symbolic", "Sound Output");
+    let menu = ToggleMenu::new(slider.menu_icon, slider.menu_title);
     add_settings_action(services, &menu, "Sound Settings", "sound");
-    follow_submenu(services, Submenu::SoundOutput, &menu, subscriptions);
+    follow_submenu(services, slider.submenu, &menu, subscriptions);
 
     subscriptions.push(services.audio.state.observe({
         let (row, menu, services) = (row.clone(), menu.clone(), Rc::clone(services));
         move |state| {
-            row.root.set_visible(state.output.is_some());
-            if let Some(output) = &state.output {
-                row.set_icon(output.slider_icon_name());
-                // A muted output shows an empty slider, as in GNOME.
-                row.slider.set_value(if output.muted {
-                    0.0
-                } else {
-                    output.volume.min(1.0)
-                });
+            let shown = (slider.row)(state);
+            row.root.set_visible(shown.is_some());
+            if let Some((icon, value)) = shown {
+                row.set_icon(icon);
+                // The slider ends at 100% (over-amplification is a setting
+                // gniri does not have).
+                row.slider.set_value(value.min(1.0));
             }
-            // GNOME offers the device menu only when there is a choice.
-            row.set_menu_enabled(state.outputs.len() > 1);
-            menu.set_entries(&device_entries(&services, &state.outputs, |name| {
-                audio::Command::SelectOutput(name)
-            }));
+            let devices = (slider.devices)(state);
+            // A device menu is offered only when there is a choice.
+            row.set_menu_enabled(devices.len() > 1);
+            let entries: Vec<Entry> = devices
+                .iter()
+                .map(|device| {
+                    let (services, name) = (Rc::clone(&services), device.name.clone());
+                    Entry::new(&device.description, move || {
+                        services.audio.send((slider.select)(name.clone()));
+                        close_submenu(&services);
+                    })
+                    .checked(device.active)
+                })
+                .collect();
+            menu.set_entries(&entries);
         }
     }));
     grid.add(&row.root, COLUMNS, Some(menu.root.upcast_ref()));
+}
+
+/// `OutputStreamSlider` in `status/volume.js`.
+fn output_slider(services: &Rc<Services>, grid: &QuickGrid, subscriptions: &mut Vec<Subscription>) {
+    let slider = VolumeSlider {
+        icon: "audio-volume-muted-symbolic",
+        submenu: Submenu::SoundOutput,
+        menu_icon: "audio-headphones-symbolic",
+        menu_title: "Sound Output",
+        slide: audio::State::slide_output,
+        click_icon: audio::State::click_output_icon,
+        select: audio::Command::SelectOutput,
+        row: |state| {
+            let output = state.output.as_ref()?;
+            Some((output.slider_icon_name(), output.slider_value()))
+        },
+        devices: |state| &state.outputs,
+    };
+    volume_slider(slider, services, grid, subscriptions);
 }
 
 /// `InputStreamSlider` in `status/volume.js`: only while something records.
 fn input_slider(services: &Rc<Services>, grid: &QuickGrid, subscriptions: &mut Vec<Subscription>) {
-    let row = SliderRow::new("microphone-sensitivity-muted-symbolic");
-    row.slider.connect_changed({
-        let services = Rc::clone(services);
-        move |volume| services.audio.send(audio::Command::SetInputVolume(volume))
-    });
-    row.connect_icon_clicked({
-        let services = Rc::clone(services);
-        move || {
-            let muted = services
-                .audio
-                .state
-                .with(|state| state.input.as_ref().map(|input| input.muted));
-            if let Some(muted) = muted {
-                services.audio.send(audio::Command::SetInputMuted(!muted));
-            }
-        }
-    });
-    row.connect_menu_clicked(open_submenu(services, Submenu::SoundInput));
-
-    let menu = ToggleMenu::new("audio-input-microphone-symbolic", "Sound Input");
-    add_settings_action(services, &menu, "Sound Settings", "sound");
-    follow_submenu(services, Submenu::SoundInput, &menu, subscriptions);
-
-    subscriptions.push(services.audio.state.observe({
-        let (row, menu, services) = (row.clone(), menu.clone(), Rc::clone(services));
-        move |state| {
-            row.root
-                .set_visible(state.recording && state.input.is_some());
-            if let Some(input) = &state.input {
-                row.set_icon(input.icon_name());
-                row.slider.set_value(if input.muted {
-                    0.0
-                } else {
-                    input.volume.min(1.0)
-                });
-            }
-            row.set_menu_enabled(state.inputs.len() > 1);
-            menu.set_entries(&device_entries(&services, &state.inputs, |name| {
-                audio::Command::SelectInput(name)
-            }));
-        }
-    }));
-    grid.add(&row.root, COLUMNS, Some(menu.root.upcast_ref()));
-}
-
-fn device_entries(
-    services: &Rc<Services>,
-    devices: &[audio::Device],
-    select: fn(String) -> audio::Command,
-) -> Vec<Entry> {
-    devices
-        .iter()
-        .map(|device| {
-            let (services, name) = (Rc::clone(services), device.name.clone());
-            Entry::new(&device.description, move || {
-                services.audio.send(select(name.clone()));
-                close_submenu(&services);
-            })
-            .checked(device.active)
-        })
-        .collect()
+    let slider = VolumeSlider {
+        icon: "microphone-sensitivity-muted-symbolic",
+        submenu: Submenu::SoundInput,
+        menu_icon: "audio-input-microphone-symbolic",
+        menu_title: "Sound Input",
+        slide: audio::State::slide_input,
+        click_icon: audio::State::click_input_icon,
+        select: audio::Command::SelectInput,
+        row: |state| {
+            let input = state.input.as_ref().filter(|_| state.shows_input())?;
+            Some((input.icon_name(), input.slider_value()))
+        },
+        devices: |state| &state.inputs,
+    };
+    volume_slider(slider, services, grid, subscriptions);
 }
 
 /// `BrightnessItem` in `status/brightness.js`.
@@ -320,12 +328,10 @@ fn wired_toggle(services: &Rc<Services>, grid: &QuickGrid, subscriptions: &mut V
     toggle.connect_clicked({
         let services = Rc::clone(services);
         move || {
-            let connected = services.network.state.with(|state| {
-                state
-                    .wired
-                    .as_ref()
-                    .is_some_and(|wired| wired.status != network::Status::Idle)
-            });
+            let connected = services
+                .network
+                .state
+                .with(|state| state.wired.as_ref().is_some_and(network::Wired::is_active));
             services
                 .network
                 .send(network::Command::SetWiredConnected(!connected));
@@ -337,11 +343,44 @@ fn wired_toggle(services: &Rc<Services>, grid: &QuickGrid, subscriptions: &mut V
             toggle.set_visible(wired.is_some());
             if let Some(wired) = wired {
                 toggle.set_icon(wired.icon_name());
-                toggle.set_checked(wired.status != network::Status::Idle);
+                toggle.set_checked(wired.is_active());
             }
         }
     }));
     grid.add(&toggle.root, 1, None);
+}
+
+/// One row of the Wi-Fi menu. `NMWirelessNetworkItem` in
+/// `status/network.js`.
+fn network_entry(services: &Rc<Services>, network: &network::Network) -> Entry {
+    let mut entry = Entry::new(&network.ssid, {
+        let (services, network) = (Rc::clone(services), network.clone());
+        move || {
+            if network.is_active() {
+                services.network.send(network::Command::DisconnectWifi);
+            } else if network.can_connect() {
+                services
+                    .network
+                    .send(network::Command::ConnectWifi(network.ssid.clone()));
+            } else {
+                // It wants a password, and the dialog that asks for one
+                // arrives with M6. Until then the settings application
+                // joins it.
+                services.open_settings("wifi");
+                return;
+            }
+            close_submenu(&services);
+        }
+    })
+    .icon(network.icon_name())
+    .checked(network.status == network::Status::Connected);
+    if network.secure {
+        entry.badge = Some("network-wireless-encrypted-symbolic");
+    }
+    if network.status == network::Status::Connecting {
+        entry.detail = Some("Connecting…".to_owned());
+    }
+    entry
 }
 
 /// `NMWirelessToggle` in `status/network.js`.
@@ -383,36 +422,37 @@ fn wifi_toggle(services: &Rc<Services>, grid: &QuickGrid, subscriptions: &mut Ve
             toggle.set_subtitle(wifi.subtitle());
             toggle.set_checked(wifi.enabled);
             menu.set_active(wifi.enabled);
-
             let entries: Vec<Entry> = wifi
-                .networks
+                .visible_networks()
                 .iter()
-                .map(|network| {
-                    let (services, ssid) = (Rc::clone(&services), network.ssid.clone());
-                    let connected = network.status != network::Status::Idle;
-                    let mut entry = Entry::new(&network.ssid, move || {
-                        services.network.send(if connected {
-                            network::Command::DisconnectWifi
-                        } else {
-                            network::Command::ConnectWifi(ssid.clone())
-                        });
-                        close_submenu(&services);
-                    })
-                    .icon(network.icon_name())
-                    .checked(network.status == network::Status::Connected);
-                    if network.secure {
-                        entry.badge = Some("network-wireless-encrypted-symbolic");
-                    }
-                    if network.status == network::Status::Connecting {
-                        entry.detail = Some("Connecting…".to_owned());
-                    }
-                    entry
-                })
+                .map(|network| network_entry(&services, network))
                 .collect();
             menu.set_entries(&entries);
         }
     }));
     grid.add(&toggle.root, 1, Some(menu.root.upcast_ref()));
+}
+
+/// One row of the Bluetooth menu. `BluetoothDeviceItem` in
+/// `status/bluetooth.js`: a click connects or disconnects, and the menu
+/// stays open to show it happen.
+fn device_entry(services: &Rc<Services>, device: &bluetooth::Device) -> Entry {
+    let mut entry = Entry::new(&device.name, {
+        let (services, activated) = (Rc::clone(services), device.activated());
+        move || {
+            if let Some(command) = activated.clone() {
+                services.bluetooth.send(command);
+            }
+        }
+    })
+    .icon(&device.icon_name());
+    // GNOME shows a spinner while a request is under way.
+    entry.detail = Some(match device.status {
+        bluetooth::Status::Connecting => "Connecting…".to_owned(),
+        bluetooth::Status::Disconnecting => "Disconnecting…".to_owned(),
+        _ => device.action_label().to_owned(),
+    });
+    entry
 }
 
 /// `BluetoothToggle` in `status/bluetooth.js`.
@@ -425,10 +465,8 @@ fn bluetooth_toggle(
     toggle.connect_clicked({
         let services = Rc::clone(services);
         move || {
-            let powered = services.bluetooth.state.with(bluetooth::State::powered);
-            services
-                .bluetooth
-                .send(bluetooth::Command::SetPowered(!powered));
+            let command = services.bluetooth.state.with(bluetooth::State::toggled);
+            services.bluetooth.send(command);
         }
     });
     toggle.connect_menu_clicked(open_submenu(services, Submenu::Bluetooth));
@@ -437,51 +475,39 @@ fn bluetooth_toggle(
     add_settings_action(services, &menu, "Bluetooth Settings", "bluetooth");
     follow_submenu(services, Submenu::Bluetooth, &menu, subscriptions);
 
+    // GNOME shows the toggle by the Bluetooth kill switch, not by the
+    // adapter: on some laptops the adapter goes away while it is switched
+    // off, and the toggle is what switches it back on.
+    let update_visible = {
+        let (toggle, services) = (toggle.clone(), Rc::clone(services));
+        move || {
+            let adapter = services
+                .bluetooth
+                .state
+                .with(|state| state.adapter.is_some());
+            let switch = services
+                .rfkill
+                .state
+                .with(rfkill::State::bluetooth_available);
+            toggle.set_visible(adapter || switch);
+        }
+    };
+    subscriptions.push(services.rfkill.state.observe({
+        let update_visible = update_visible.clone();
+        move |_| update_visible()
+    }));
     subscriptions.push(services.bluetooth.state.observe({
         let (toggle, menu, services) = (toggle.clone(), menu.clone(), Rc::clone(services));
         move |state| {
-            toggle.set_visible(state.adapter.is_some());
+            update_visible();
             toggle.set_icon(state.icon_name());
             toggle.set_subtitle(state.subtitle().as_deref());
             toggle.set_checked(state.powered());
             menu.set_active(state.powered());
-            menu.set_placeholder(if state.powered() {
-                "No available or connected devices"
-            } else {
-                "Turn on Bluetooth to connect to devices"
-            });
-
+            menu.set_placeholder(state.placeholder().unwrap_or_default());
             let entries: Vec<Entry> = state
-                .devices
-                .iter()
-                .map(|device| {
-                    let (services, address) = (Rc::clone(&services), device.address.clone());
-                    let status = device.status;
-                    let mut entry = Entry::new(&device.name, move || {
-                        // `BluetoothDeviceItem`: a click connects or
-                        // disconnects, and the menu stays open to show it.
-                        match status {
-                            bluetooth::Status::Disconnected => services
-                                .bluetooth
-                                .send(bluetooth::Command::Connect(address.clone())),
-                            bluetooth::Status::Connected => services
-                                .bluetooth
-                                .send(bluetooth::Command::Disconnect(address.clone())),
-                            bluetooth::Status::Connecting | bluetooth::Status::Disconnecting => {}
-                        }
-                    })
-                    .icon(&device.icon_name());
-                    entry.detail = match status {
-                        bluetooth::Status::Connected => Some(match device.battery {
-                            Some(level) => format!("{level}%"),
-                            None => "Disconnect".to_owned(),
-                        }),
-                        bluetooth::Status::Connecting => Some("Connecting…".to_owned()),
-                        bluetooth::Status::Disconnecting => Some("Disconnecting…".to_owned()),
-                        bluetooth::Status::Disconnected => Some("Connect".to_owned()),
-                    };
-                    entry
-                })
+                .menu_devices()
+                .map(|device| device_entry(&services, device))
                 .collect();
             menu.set_entries(&entries);
         }
@@ -547,8 +573,8 @@ fn airplane_toggle(
     toggle.connect_clicked({
         let services = Rc::clone(services);
         move || {
-            let on = services.rfkill.state.with(|state| state.airplane_mode);
-            services.rfkill.send(rfkill::Command::SetAirplaneMode(!on));
+            let command = services.rfkill.state.with(rfkill::State::toggled);
+            services.rfkill.send(command);
         }
     });
     subscriptions.push(services.rfkill.state.observe({

@@ -112,10 +112,15 @@ pub fn build(
 
     // Indicators that only say something is on.
     let airplane = flag("airplane-mode-symbolic");
-    subscriptions.push(services.rfkill.state.select(|state| state.airplane_mode, {
-        let airplane = airplane.clone();
-        move |on| airplane.set_visible(*on)
-    }));
+    subscriptions.push(
+        services
+            .rfkill
+            .state
+            .select(|state| state.shows_indicator(), {
+                let airplane = airplane.clone();
+                move |on| airplane.set_visible(*on)
+            }),
+    );
     let bluetooth = flag("bluetooth-active-symbolic");
     subscriptions.push(
         services
@@ -146,7 +151,7 @@ pub fn build(
             state
                 .input
                 .as_ref()
-                .filter(|_| state.recording)
+                .filter(|_| state.shows_input())
                 .map(|input| input.icon_name())
         },
         {
