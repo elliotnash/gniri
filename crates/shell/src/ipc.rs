@@ -98,6 +98,53 @@ pub enum Request {
     },
     /// Turn to a page of the app grid.
     Page(usize),
+    /// Ask a Bluetooth pairing question, as if BlueZ had asked the agent.
+    Pairing(Pairing),
+}
+
+/// A question for [`Request::Pairing`].
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, clap::Args)]
+pub struct Pairing {
+    #[arg(value_enum)]
+    pub kind: PairingKind,
+    /// The device's name.
+    #[arg(long, default_value = "Keyboard K380")]
+    pub device: String,
+    /// The PIN to show or to compare.
+    #[arg(long, default_value = "482193")]
+    pub pin: String,
+    /// The device is a keyboard.
+    #[arg(long)]
+    pub keyboard: bool,
+}
+
+/// What BlueZ asks ([`gniri_services::bluetooth::agent::Kind`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, clap::ValueEnum)]
+pub enum PairingKind {
+    EnterPin,
+    EnterPasskey,
+    ShowPin,
+    Confirm,
+    Pair,
+    Connect,
+}
+
+impl Pairing {
+    pub fn request(self) -> gniri_services::bluetooth::agent::Request {
+        use gniri_services::bluetooth::agent::{Kind, Request};
+        Request {
+            device: self.device,
+            keyboard: self.keyboard,
+            kind: match self.kind {
+                PairingKind::EnterPin => Kind::EnterPin,
+                PairingKind::EnterPasskey => Kind::EnterPasskey,
+                PairingKind::ShowPin => Kind::ShowPin(self.pin),
+                PairingKind::Confirm => Kind::Confirm(self.pin),
+                PairingKind::Pair => Kind::Pair,
+                PairingKind::Connect => Kind::Connect,
+            },
+        }
+    }
 }
 
 /// A notification for [`Request::Notify`].

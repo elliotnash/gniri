@@ -8,14 +8,18 @@
 
 pub mod auth;
 pub mod end_session;
+pub mod network;
+pub mod pairing;
 
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::time::Duration;
 
 use adw::prelude::*;
 use gniri_core::Subscription;
-use gtk::{gdk, glib};
+use gniri_services::bluetooth::agent as bluetooth_agent;
+use gniri_services::network::agent as network_agent;
+use gtk::{gdk, gio, glib};
 use gtk4_layer_shell::{KeyboardMode, Layer, LayerShell};
 
 use crate::services::Services;
@@ -205,35 +209,185 @@ pub fn message_content() -> MessageContent {
     }
 }
 
+/// A dialog that is open, and where.
+struct Shown<D> {
+    monitor: gdk::Monitor,
+    dialog: D,
+}
+
+struct Dialogs {
+    app: adw::Application,
+    services: Rc<Services>,
+    end_session: RefCell<Option<Shown<end_session::Dialog>>>,
+    network: RefCell<Option<Shown<network::Dialog>>>,
+    pairing: RefCell<Option<Shown<pairing::Dialog>>>,
+}
+
+impl Dialogs {
+    /// The monitor of the output the user is looking at, unless the
+    /// session is locked: nothing asks from under the lock screen.
+    fn monitor(&self) -> Option<gdk::Monitor> {
+        if self.services.session.state.with(|session| session.locked) {
+            return None;
+        }
+        let output = self.services.niri.with(|niri| niri.focused_output.clone());
+        monitor(output.as_deref())
+    }
+
+    /// Opens the end-session dialog, or with `None` closes it.
+    fn show_end_session(&self, kind: Option<end_session::Kind>) {
+        if let Some(shown) = self.end_session.take() {
+            shown.dialog.close();
+        }
+        let Some(kind) = kind else { return };
+        match self.monitor() {
+            Some(monitor) => {
+                let dialog = end_session::open(&self.app, &monitor, &self.services, kind);
+                self.end_session.replace(Some(Shown { monitor, dialog }));
+            }
+            None => self.services.end_session.update(|open| *open = None),
+        }
+    }
+
+    /// Opens the dialog for what NetworkManager's agent asks, or with
+    /// `None` closes it.
+    fn show_network(&self, request: Option<&network_agent::Request>) {
+        if let Some(shown) = self.network.take() {
+            shown.dialog.close();
+        }
+        let Some(request) = request else { return };
+        match self.monitor() {
+            Some(monitor) => {
+                let dialog = network::open(&self.app, &monitor, &self.services, request);
+                self.network.replace(Some(Shown { monitor, dialog }));
+            }
+            // No screen to ask on: the answer is that nobody answered.
+            None => self
+                .services
+                .network_agent
+                .send(network_agent::Command::Cancel),
+        }
+    }
+
+    /// The same for the Bluetooth pairing agent.
+    fn show_pairing(&self, request: Option<&bluetooth_agent::Request>) {
+        if let Some(shown) = self.pairing.take() {
+            shown.dialog.close();
+        }
+        let Some(request) = request else { return };
+        match self.monitor() {
+            Some(monitor) => {
+                let dialog = pairing::open(&self.app, &monitor, &self.services, request);
+                self.pairing.replace(Some(Shown { monitor, dialog }));
+            }
+            None => self
+                .services
+                .bluetooth_agent
+                .send(bluetooth_agent::Command::Reject),
+        }
+    }
+
+    /// A dialog whose output was unplugged opens again where the user is
+    /// now. (The end-session dialog's minute starts over.)
+    fn monitors_changed(&self, monitors: &gio::ListModel) {
+        let present: Vec<gdk::Monitor> = monitors
+            .iter::<gdk::Monitor>()
+            .filter_map(Result::ok)
+            .collect();
+        let gone = |monitor: &gdk::Monitor| !present.contains(monitor);
+        if self
+            .end_session
+            .borrow()
+            .as_ref()
+            .is_some_and(|shown| gone(&shown.monitor))
+        {
+            self.show_end_session(self.services.end_session.get());
+        }
+        if self
+            .network
+            .borrow()
+            .as_ref()
+            .is_some_and(|shown| gone(&shown.monitor))
+        {
+            let request = self.services.network_agent.state.get().request;
+            self.show_network(request.as_ref());
+        }
+        if self
+            .pairing
+            .borrow()
+            .as_ref()
+            .is_some_and(|shown| gone(&shown.monitor))
+        {
+            let request = self.services.bluetooth_agent.state.get().request;
+            self.show_pairing(request.as_ref());
+        }
+    }
+}
+
 /// Shows the shell's own dialogs when their state says so. Dropping it
 /// stops that.
 pub struct Host {
-    _subscription: Subscription,
+    _subscriptions: Vec<Subscription>,
+    monitors: Option<(gio::ListModel, glib::SignalHandlerId)>,
 }
 
-/// Opens the end-session dialog whenever `Services::end_session` is set,
-/// on the output the user is looking at.
-pub fn host(app: &adw::Application, services: &Rc<Services>) -> Host {
-    let open: std::cell::RefCell<Option<end_session::Dialog>> = std::cell::RefCell::new(None);
-    let subscription = services.end_session.select(|kind| *kind, {
-        let (app, services) = (app.clone(), Rc::clone(services));
-        move |kind| {
-            if let Some(dialog) = open.take() {
-                dialog.close();
-            }
-            let Some(kind) = kind else {
-                return;
-            };
-            let output = services.niri.with(|niri| niri.focused_output.clone());
-            match monitor(output.as_deref()) {
-                Some(monitor) => {
-                    open.replace(Some(end_session::open(&app, &monitor, &services, *kind)));
-                }
-                None => services.end_session.update(|open| *open = None),
-            }
+impl Drop for Host {
+    fn drop(&mut self) {
+        if let Some((monitors, handler)) = self.monitors.take() {
+            monitors.disconnect(handler);
         }
+    }
+}
+
+/// Opens each dialog while its state asks for it, on the output the user
+/// is looking at: the end-session dialog while `Services::end_session` is
+/// set, and the two agents' dialogs while they have a request.
+pub fn host(app: &adw::Application, services: &Rc<Services>) -> Host {
+    let dialogs = Rc::new(Dialogs {
+        app: app.clone(),
+        services: Rc::clone(services),
+        end_session: RefCell::new(None),
+        network: RefCell::new(None),
+        pairing: RefCell::new(None),
+    });
+    let subscriptions = vec![
+        services.end_session.select(|kind| *kind, {
+            let dialogs = Rc::clone(&dialogs);
+            move |kind| dialogs.show_end_session(*kind)
+        }),
+        services
+            .network_agent
+            .state
+            .select(|state| state.request.clone(), {
+                let dialogs = Rc::clone(&dialogs);
+                move |request: &Option<network_agent::Request>| {
+                    dialogs.show_network(request.as_ref())
+                }
+            }),
+        services
+            .bluetooth_agent
+            .state
+            .select(|state| state.request.clone(), {
+                let dialogs = Rc::clone(&dialogs);
+                move |request: &Option<bluetooth_agent::Request>| {
+                    dialogs.show_pairing(request.as_ref())
+                }
+            }),
+    ];
+    let monitors = gdk::Display::default().map(|display| {
+        let monitors = display.monitors();
+        let handler = monitors.connect_items_changed({
+            let dialogs = Rc::downgrade(&dialogs);
+            move |monitors, _, _, _| {
+                if let Some(dialogs) = dialogs.upgrade() {
+                    dialogs.monitors_changed(monitors);
+                }
+            }
+        });
+        (monitors, handler)
     });
     Host {
-        _subscription: subscription,
+        _subscriptions: subscriptions,
+        monitors,
     }
 }

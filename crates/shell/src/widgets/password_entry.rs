@@ -77,6 +77,26 @@ impl PasswordEntry {
         entry
     }
 
+    /// The same frame for a text that is no secret: shown as typed, and
+    /// without the eye. Port of `St.Entry`, beside the password entries of
+    /// a dialog.
+    pub fn plain(class: &str) -> Self {
+        let entry = Self::new(class);
+        entry.set_shown(true);
+        entry.peek.set_visible(false);
+        entry.text.set_input_purpose(gtk::InputPurpose::FreeForm);
+        entry
+    }
+
+    /// Shows a text that cannot be changed or focused: St's entry that is
+    /// not `reactive`.
+    pub fn set_fixed(&self, text: &str) {
+        self.text.set_text(text);
+        self.text.set_editable(false);
+        self.text.set_can_focus(false);
+        self.widget.set_can_target(false);
+    }
+
     /// Shows the text as typed, or as dots. `StPasswordEntry`'s
     /// `password-visible`.
     pub fn set_shown(&self, shown: bool) {

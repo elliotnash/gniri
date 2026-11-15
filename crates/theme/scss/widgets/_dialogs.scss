@@ -168,6 +168,27 @@ $polkit_dialog_avatar_size: 64px;
     }
 }
 
+/* Network and Bluetooth pairing dialogs */
+// The network agent's dialog is a prompt dialog whose entries are
+// children of the message content itself:
+//
+//   box.message-dialog-content
+//     label.message-dialog-title
+//     label.message-dialog-description
+//     box.st-entry.prompt-dialog-password-entry    (one per secret)
+//     label.caps-lock-warning-label
+//
+// The pairing dialog is not GNOME Shell's but gnome-bluetooth's, which
+// GNOME Settings shows as a window of its own. Here it is a prompt dialog
+// too, with the PIN to compare or to type on the device under its text,
+// as large as that dialog has it.
+.pairing-dialog-pin {
+    font-weight: 800;
+    @include fontsize(24pt);
+    font-feature-settings: "tnum";
+    letter-spacing: 0.1em;
+}
+
 // animationUtils.js `wiggle`: a wrong password shakes the entry, 6px to
 // each side, 65ms a leg.
 @keyframes wiggle {

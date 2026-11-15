@@ -1,0 +1,14 @@
+# The dialog that asks whether a Bluetooth device shows the same number.
+# GNOME Shell has none: its wording is gnome-bluetooth's. This scene is for
+# looking at (docs/TESTING.md).
+
+[fixture]
+time = "2026-11-14T08:28:00"
+power = { profile = "performance", battery = { percentage = 91 } }
+network = { primary = { kind = "wifi", strength = 70 } }
+bluetooth = { adapter = { powered = true } }
+user = { name = "user", real_name = "Example User" }
+
+[fixture.bluetooth_agent.request]
+device = "Example Phone"
+kind = { confirm = "482193" }

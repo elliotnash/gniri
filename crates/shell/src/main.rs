@@ -173,6 +173,8 @@ enum DebugRequest {
     },
     /// Turn to a page of the app grid, counting from 0.
     Page { page: usize },
+    /// Ask a Bluetooth pairing question, as if BlueZ had asked.
+    Pairing(ipc::Pairing),
     /// Report an idle timer as passed, as the compositor would after that
     /// long without input.
     Idle {
@@ -210,6 +212,7 @@ impl Message {
                 DebugRequest::ShowApps { off } => ipc::Request::ShowApps(!off),
                 DebugRequest::Search { text, quiet } => ipc::Request::Search { text, quiet },
                 DebugRequest::Page { page } => ipc::Request::Page(page),
+                DebugRequest::Pairing(pairing) => ipc::Request::Pairing(pairing),
             },
         }
     }

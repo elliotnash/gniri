@@ -363,9 +363,9 @@ fn network_entry(services: &Rc<Services>, network: &network::Network) -> Entry {
                     .network
                     .send(network::Command::ConnectWifi(network.ssid.clone()));
             } else {
-                // It wants a password, and the dialog that asks for one
-                // arrives with M6. Until then the settings application
-                // joins it.
+                // It wants more than a password (a user name, a
+                // certificate): only the settings application can set
+                // that up, and GNOME opens it too.
                 services.open_settings("wifi");
                 return;
             }

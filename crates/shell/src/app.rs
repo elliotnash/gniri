@@ -337,6 +337,26 @@ fn activate(
             if *locked {
                 services.menus.update(|menus| menus.close());
                 services.end_session.update(|open| *open = None);
+                // Nor does anything ask from under the lock screen: GNOME
+                // has no agent while it is locked.
+                if services
+                    .network_agent
+                    .state
+                    .with(|state| state.request.is_some())
+                {
+                    services
+                        .network_agent
+                        .send(gniri_services::network::agent::Command::Cancel);
+                }
+                if services
+                    .bluetooth_agent
+                    .state
+                    .with(|state| state.request.is_some())
+                {
+                    services
+                        .bluetooth_agent
+                        .send(gniri_services::bluetooth::agent::Command::Reject);
+                }
             }
         }
     });
@@ -434,6 +454,13 @@ fn handle(
         }
         ipc::Request::CloseDialog => {
             services.end_session.update(|open| *open = None);
+            // The agents' dialogs go as when their request is withdrawn.
+            services
+                .network_agent
+                .inject(gniri_services::network::agent::Event::End);
+            services
+                .bluetooth_agent
+                .inject(gniri_services::bluetooth::agent::Event::End);
             Ok(Value::Null)
         }
         ipc::Request::Idle { timer, resumed } => {
@@ -472,6 +499,13 @@ fn handle(
         }
         ipc::Request::Page(page) => {
             services.overview.update(|overview| overview.page = page);
+            Ok(Value::Null)
+        }
+        ipc::Request::Pairing(pairing) => {
+            use gniri_services::bluetooth::agent::Event;
+            services
+                .bluetooth_agent
+                .inject(Event::Begin(pairing.request()));
             Ok(Value::Null)
         }
         ipc::Request::Brightness(step) => {

@@ -197,22 +197,37 @@ fn surface_origin(session: &Session, surface: &Value) -> Result<(f64, f64)> {
 /// `wlrctl` call is a client of its own, whose requests the compositor may
 /// handle a moment later, and the surface may only just have been mapped.
 fn click_on(session: &Session, namespace: &str, selector: &str) -> Result<()> {
-    // A banner or a menu that was just asked for slides into place; where
-    // its widgets are is only settled once it has been drawn there.
-    session.gniri_msg(&["debug", "sync"])?;
-    let found = surface(session, namespace)?.ok_or_else(|| anyhow!("{namespace} is not mapped"))?;
-    let (left, top) = surface_origin(session, &found)?;
-    let [x, y, width, height] = tree::rect(tree::select(&found["tree"], selector)?, "box")?;
-    hover_at(
-        session,
-        (left + x + width / 2.0).round() as i32,
-        (top + y + height / 2.0).round() as i32,
-        "the widget",
-        || {
+    let target = || -> Result<(i32, i32)> {
+        // A banner or a menu that was just asked for slides into place;
+        // where its widgets are is only settled once it has been drawn
+        // there.
+        session.gniri_msg(&["debug", "sync"])?;
+        let found =
+            surface(session, namespace)?.ok_or_else(|| anyhow!("{namespace} is not mapped"))?;
+        let (left, top) = surface_origin(session, &found)?;
+        let [x, y, width, height] = tree::rect(tree::select(&found["tree"], selector)?, "box")?;
+        Ok((
+            (left + x + width / 2.0).round() as i32,
+            (top + y + height / 2.0).round() as i32,
+        ))
+    };
+    let (mut x, mut y) = target()?;
+    let mut attempts = 0;
+    loop {
+        attempts += 1;
+        let reached = hover_at(session, x, y, "the widget", || {
             Ok(on_surface(session, namespace, selector)?
                 .is_some_and(|widget| has_state(&widget, "hover")))
-        },
-    )?;
+        });
+        match reached {
+            Ok(()) => break,
+            Err(error) if attempts == 2 => return Err(error),
+            // A surface that was mapped a moment ago can still be laid
+            // out anew when the compositor tells it its size: look again
+            // where the widget is.
+            Err(_) => (x, y) = target()?,
+        }
+    }
     pointer(session, &["click", "left"])
 }
 
@@ -532,7 +547,7 @@ fn panel_and_overview() -> Result<(usize, usize)> {
 type Part = fn() -> Result<(usize, usize)>;
 
 /// The parts, by the names `cargo xtask check <part>` takes.
-const PARTS: [(&str, Part); 8] = [
+const PARTS: [(&str, Part); 9] = [
     ("panel", panel_and_overview),
     ("overview", overview),
     ("quick-settings", quick_settings),
@@ -541,6 +556,7 @@ const PARTS: [(&str, Part); 8] = [
     ("session", end_session_and_idle),
     ("lock", lock_screen),
     ("polkit", authentication_dialog),
+    ("agents", agent_dialogs),
 ];
 
 /// Runs every part, or only the one called `only`.
@@ -1535,6 +1551,226 @@ fn authentication_dialog() -> Result<(usize, usize)> {
     checker.expect("and the agent stays for the next request", |session| {
         Ok(session.helper_runs("polkit"))
     });
+
+    let Checker {
+        session,
+        passed,
+        failed,
+    } = checker;
+    session.quit()?;
+    Ok((passed, failed))
+}
+
+/// The dialogs of the two agents the shell is for the system: the one
+/// NetworkManager asks for a Wi-Fi password, and the one BlueZ asks about a
+/// pairing. A fixture stands in for both services, so what the dialogs
+/// answer is read back from the command log.
+fn agent_dialogs() -> Result<(usize, usize)> {
+    const CANCEL: &str = ".modal-dialog-button:0";
+    const CONFIRM: &str = ".modal-dialog-button:1";
+    const TITLE: &str = ".message-dialog-title";
+
+    let session = fixture_session(
+        "check-agents",
+        r#"
+        time = "2026-11-14T08:28:00"
+        user = { name = "user", real_name = "Example User" }
+        rfkill = { available = true }
+        bluetooth = { adapter = { powered = true } }
+
+        [network]
+        primary = { kind = "wifi", strength = 70 }
+        wifi = { enabled = true, networks = [
+            { ssid = "home", strength = 70, secure = true, known = true, status = "connected" },
+            { ssid = "cafe", strength = 60, secure = true },
+            { ssid = "campus", strength = 50, secure = true, enterprise = true },
+        ] }
+
+        [network_agent.request]
+        title = "Authentication required"
+        message = "Passwords or encryption keys are required to access the wireless network “cafe”"
+        fields = [{ label = "Password", key = "psk", password = true, check = "wpa-psk" }]
+        "#,
+    )?;
+    let mut checker = Checker {
+        session,
+        passed: 0,
+        failed: 0,
+    };
+    let dialog = |session: &Session, selector: &str| on_surface(session, "gniri-dialog", selector);
+    let button_is = |session: &Session, selector: &str, sensitive: bool| -> Result<bool> {
+        Ok(dialog(session, selector)?
+            .is_some_and(|button| has_state(&button, "insensitive") != sensitive))
+    };
+    let closed = |session: &Session| Ok(surface(session, "gniri-dialog")?.is_none());
+
+    println!("Wi-Fi password dialog");
+    checker.expect("a request opens the dialog", |session| {
+        let Some(dialog) = dialog(session, ".modal-dialog")? else {
+            return Ok(false);
+        };
+        let texts = texts(&dialog);
+        Ok(
+            texts.first().map(String::as_str) == Some("Authentication required")
+                && texts.iter().any(|text| text.ends_with("network “cafe”"))
+                && texts.iter().any(|text| text == "Password")
+                && texts.iter().any(|text| text == "Connect"),
+        )
+    });
+    checker.expect(
+        "with nothing typed there is nothing to connect with",
+        |session| button_is(session, CONFIRM, false),
+    );
+    if on_path("wtype") {
+        // The dialog was mapped a moment ago; the first keys may come
+        // before it has the keyboard, so one is pressed until it shows.
+        key_until(&checker.session, "s", |session| {
+            Ok(session.gniri_msg(&["debug", "dump-tree"]).is_ok())
+        })?;
+        type_text(&checker.session, "hort")?;
+        std::thread::sleep(std::time::Duration::from_millis(300));
+        checker.expect("nor with too short a password", |session| {
+            button_is(session, CONFIRM, false)
+        });
+        type_text(&checker.session, " but long enough")?;
+        checker.expect("eight characters make Connect available", |session| {
+            button_is(session, CONFIRM, true)
+        });
+        key(&checker.session, "Return")?;
+        checker.expect("Enter sends the answer and closes the dialog", |session| {
+            Ok(sent(session, "network-agent: Respond")? && closed(session)?)
+        });
+        checker.expect("and the password is in no log", |session| {
+            Ok(commands(session)?
+                .iter()
+                .all(|command| !command.contains("long enough")))
+        });
+    } else {
+        println!("  skip wtype is not installed");
+        checker.session.gniri_msg(&["debug", "close-dialog"])?;
+    }
+
+    if on_path("wlrctl") {
+        const NETWORK: &str = ".quick-toggle-menu .popup-menu-section .popup-menu-item";
+        let open_wifi_menu = |session: &Session| -> Result<()> {
+            session.gniri_msg(&["debug", "open-menu", "quick-settings"])?;
+            session
+                .gniri_msg(&["debug", "open-submenu", "wifi"])
+                .map(drop)
+        };
+        open_wifi_menu(&checker.session)?;
+        checker.expect("(the Wi-Fi menu lists three networks)", |session| {
+            count_on_stage(session, "popup-menu-badge").map(|locks| locks == 3)
+        });
+        click(&checker.session, &format!("{NETWORK}:1"))?;
+        checker.expect(
+            "a network that wants a password is joined from the menu",
+            |session| sent(session, "network: ConnectWifi(\"cafe\")"),
+        );
+        checker.session.gniri_msg(&["debug", "close-menu"])?;
+        open_wifi_menu(&checker.session)?;
+        click(&checker.session, &format!("{NETWORK}:2"))?;
+        checker.expect(
+            "one that wants more is left to the settings application",
+            |session| {
+                Ok(
+                    sent(session, "launch: [\"gnome-control-center\", \"wifi\"]")?
+                        && !sent(session, "network: ConnectWifi(\"campus\")")?,
+                )
+            },
+        );
+        checker.session.gniri_msg(&["debug", "close-menu"])?;
+    } else {
+        println!("  skip wlrctl is not installed");
+    }
+
+    println!("Bluetooth pairing dialog");
+    let ask = |session: &Session, arguments: &[&str]| -> Result<()> {
+        let mut command = vec!["debug", "pairing"];
+        command.extend(arguments);
+        session.gniri_msg(&command).map(drop)
+    };
+    let title_is = |session: &Session, title: &str| -> Result<bool> {
+        Ok(dialog(session, TITLE)?.is_some_and(|label| label["text"] == title))
+    };
+    let label_of = |session: &Session, selector: &str| -> Result<Option<String>> {
+        Ok(dialog(session, selector)?.and_then(|button| texts(&button).into_iter().next()))
+    };
+
+    ask(
+        &checker.session,
+        &["confirm", "--device", "Example Phone", "--pin", "482193"],
+    )?;
+    checker.expect(
+        "a number to compare is shown with the device's name",
+        |session| {
+            let Some(dialog) = dialog(session, ".modal-dialog")? else {
+                return Ok(false);
+            };
+            let texts = texts(&dialog);
+            Ok(title_is(session, "Confirm Bluetooth PIN")?
+                && texts.iter().any(|text| text.ends_with("“Example Phone”."))
+                && text_of(&dialog, ".pairing-dialog-pin").as_deref() == Some("482193"))
+        },
+    );
+    if on_path("wlrctl") {
+        click_on(&checker.session, "gniri-dialog", CONFIRM)?;
+        checker.expect("Confirm says yes and closes the dialog", |session| {
+            Ok(sent(session, "bluetooth-agent: Accept")? && closed(session)?)
+        });
+    } else {
+        checker.session.gniri_msg(&["debug", "close-dialog"])?;
+    }
+
+    ask(&checker.session, &["pair", "--device", "Example Phone"])?;
+    checker.expect(
+        "a device that wants to pair is allowed or dismissed",
+        |session| {
+            Ok(title_is(session, "Bluetooth Pairing Request")?
+                && label_of(session, CANCEL)?.as_deref() == Some("Dismiss")
+                && label_of(session, CONFIRM)?.as_deref() == Some("Allow"))
+        },
+    );
+    checker.session.gniri_msg(&["debug", "close-dialog"])?;
+    checker.expect("(the dialog goes when the question is withdrawn)", closed);
+
+    if on_path("wtype") {
+        ask(&checker.session, &["enter-pin"])?;
+        checker.expect("a PIN that is asked for has to be typed first", |session| {
+            Ok(title_is(session, "Confirm Bluetooth PIN")? && button_is(session, CONFIRM, false)?)
+        });
+        key_until(&checker.session, "0", |session| {
+            button_is(session, CONFIRM, true)
+        })?;
+        checker.expect("typing makes Confirm available", |session| {
+            button_is(session, CONFIRM, true)
+        });
+        key(&checker.session, "Return")?;
+        checker.expect("Enter sends what was typed", |session| {
+            Ok(sent(session, "bluetooth-agent: Respond(\"0")? && closed(session)?)
+        });
+
+        ask(&checker.session, &["show-pin", "--keyboard"])?;
+        checker.expect(
+            "a PIN to type on a keyboard can only be given up on",
+            |session| {
+                let Some(dialog) = dialog(session, ".modal-dialog")? else {
+                    return Ok(false);
+                };
+                Ok(title_is(session, "Pairing “Keyboard K380”")?
+                    && texts(&dialog)
+                        .iter()
+                        .any(|text| text.ends_with("Then press “Return” on the keyboard."))
+                    && count_on(session, "gniri-dialog", "", "modal-dialog-button")? == 1)
+            },
+        );
+        key_until(&checker.session, "Escape", closed)?;
+        checker.expect("Escape gives up", |session| {
+            Ok(sent(session, "bluetooth-agent: Reject")? && closed(session)?)
+        });
+    } else {
+        println!("  skip wtype is not installed");
+    }
 
     let Checker {
         session,

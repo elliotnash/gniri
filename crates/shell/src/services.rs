@@ -190,7 +190,11 @@ pub struct Services {
     pub power: Service<power::State>,
     pub audio: Service<audio::State>,
     pub network: Service<network::State>,
+    /// The password NetworkManager is asking for, while it asks.
+    pub network_agent: Service<network::agent::State>,
     pub bluetooth: Service<bluetooth::State>,
+    /// What BlueZ is asking about a pairing, while it asks.
+    pub bluetooth_agent: Service<bluetooth::agent::State>,
     pub brightness: Service<brightness::State>,
     pub rfkill: Service<rfkill::State>,
     pub session: Service<session::State>,
@@ -291,7 +295,19 @@ impl Services {
                     power: Service::fake("power", fixture.power, scheduler, log_ref),
                     audio: Service::fake("audio", fixture.audio, scheduler, log_ref),
                     network: Service::fake("network", fixture.network, scheduler, log_ref),
+                    network_agent: Service::fake(
+                        "network-agent",
+                        fixture.network_agent,
+                        scheduler,
+                        log_ref,
+                    ),
                     bluetooth: Service::fake("bluetooth", fixture.bluetooth, scheduler, log_ref),
+                    bluetooth_agent: Service::fake(
+                        "bluetooth-agent",
+                        fixture.bluetooth_agent,
+                        scheduler,
+                        log_ref,
+                    ),
                     brightness: Service::fake("brightness", fixture.brightness, scheduler, log_ref),
                     rfkill: Service::fake("rfkill", fixture.rfkill, scheduler, log_ref),
                     session: Service::fake("session", fixture.session, scheduler, log_ref),
@@ -325,7 +341,9 @@ impl Services {
                 let mut bus = Bus::system();
                 let power = bus.add("power", power::backend::run);
                 let network = bus.add("network", network::backend::run);
+                let network_agent = bus.add("network agent", network::agent::backend::run);
                 let bluetooth = bus.add("bluetooth", bluetooth::backend::run);
+                let bluetooth_agent = bus.add("bluetooth agent", bluetooth::agent::backend::run);
                 let brightness = bus.add("brightness", brightness::backend::run);
                 let session = bus.add("session", {
                     let options = session::backend::Options {
@@ -386,7 +404,19 @@ impl Services {
                     power: Service::live("power", power, scheduler, log_ref),
                     audio: Service::live("audio", audio::backend::spawn(), scheduler, log_ref),
                     network: Service::live("network", network, scheduler, log_ref),
+                    network_agent: Service::live(
+                        "network-agent",
+                        network_agent,
+                        scheduler,
+                        log_ref,
+                    ),
                     bluetooth: Service::live("bluetooth", bluetooth, scheduler, log_ref),
+                    bluetooth_agent: Service::live(
+                        "bluetooth-agent",
+                        bluetooth_agent,
+                        scheduler,
+                        log_ref,
+                    ),
                     brightness: Service::live("brightness", brightness, scheduler, log_ref),
                     rfkill: Service::live("rfkill", rfkill::backend::spawn(), scheduler, log_ref),
                     session: Service::live("session", session, scheduler, log_ref),
