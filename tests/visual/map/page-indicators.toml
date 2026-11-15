@@ -1,0 +1,45 @@
+# The app grid's page dots: gniri's widgets against GNOME Shell's actors.
+# Read by `cargo xtask diff page-indicators` (crates/xtask/src/diff.rs).
+
+surface = "gniri-overview"
+root = ".page-indicators"
+attach = "center"
+below = "gniri-panel"
+# How far above the dash they are depends on the size of the screen
+# (crates/shell/src/overview/layout.rs).
+placement = false
+margin = 6
+wallpaper = "/usr/share/backgrounds/f45/default/f45-01-night.jxl"
+
+[[states]]
+scene = "app-grid"
+reference = "page-indicators"
+
+[[regions]]
+name = "dots"
+anchor = "stretch"
+
+[[pairs]]
+name = "first page"
+ours = ".page-indicator:0"
+theirs = ".page-indicator:0"
+anchor = "left"
+
+[[pairs]]
+name = "first dot"
+ours = ".page-indicator-icon:0"
+theirs = ".page-indicator-icon:0"
+anchor = "left"
+
+[[pairs]]
+name = "second page"
+ours = ".page-indicator:1"
+theirs = ".page-indicator:1"
+anchor = "right"
+
+# Two thirds of the first, and half as opaque.
+[[pairs]]
+name = "second dot"
+ours = ".page-indicator-icon:1"
+theirs = ".page-indicator-icon:1"
+anchor = "right"

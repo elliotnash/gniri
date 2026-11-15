@@ -1,0 +1,165 @@
+# What one provider found, five results of many: gniri's widgets against
+# GNOME Shell's actors. Read by `cargo xtask diff search-list`
+# (crates/xtask/src/diff.rs).
+#
+# The provider and its results are the scene's own, with the words the
+# capture had. Their icons are blacked out of the reference and never
+# compared; where they are is compared.
+
+root = ".search-section-content:1"
+surface = "gniri-overview"
+attach = "center"
+below = "gniri-panel"
+# How far below the search entry the results start depends on the size
+# of the screen (crates/shell/src/overview/layout.rs).
+placement = false
+wallpaper = "/usr/share/backgrounds/f45/default/f45-01-night.jxl"
+# A whole number of physical pixels at scale 1.25.
+margin = 12
+
+[[states]]
+scene = "search"
+reference = "search-list"
+
+[[regions]]
+name = "results"
+anchor = "stretch"
+
+# Pairs that depend on the size of a piece of text allow one pixel, as in
+# panel.toml. A description follows a name and may have a run of bold in
+# it: it allows for two.
+
+[[pairs]]
+name = "provider"
+ours = ".search-provider-icon"
+theirs = ".search-provider-icon"
+anchor = "left"
+
+[[pairs]]
+name = "provider content"
+ours = ".list-search-provider-content"
+theirs = ".list-search-provider-content"
+anchor = "left"
+
+[[pairs]]
+name = "provider icon"
+ours = ".search-provider-icon GtkImage"
+# The picture itself: its StIcon is as tall as the provider's two lines.
+theirs = ".search-provider-icon StIcon ClutterActor"
+anchor = "left"
+
+[[pairs]]
+name = "provider details"
+ours = ".list-search-provider-details"
+theirs = ".list-search-provider-details"
+anchor = "left"
+
+[[pairs]]
+name = "provider name"
+ours = ".list-search-provider-details GtkLabel:0"
+ours_box = "text"
+theirs = ".list-search-provider-details ClutterText:0"
+anchor = "left"
+tolerance_px = 1.1
+
+[[pairs]]
+name = "more"
+ours = ".list-search-provider-details GtkLabel:1"
+ours_box = "text"
+theirs = ".list-search-provider-details ClutterText:1"
+anchor = "left"
+tolerance_px = 1.1
+
+[[pairs]]
+name = "results"
+ours = ".list-search-results"
+theirs = ".list-search-results"
+anchor = "left"
+
+[[pairs]]
+name = "first result"
+ours = ".list-search-result:0"
+theirs = ".list-search-result:0"
+anchor = "left"
+
+[[pairs]]
+name = "first result content"
+ours = ".list-search-result:0 .list-search-result-content"
+theirs = ".list-search-result:0 .list-search-result-content"
+anchor = "left"
+tolerance_px = 1.1
+
+[[pairs]]
+name = "first result icon"
+ours = ".list-search-result:0 GtkImage"
+theirs = ".list-search-result:0 StIcon"
+anchor = "left"
+
+[[pairs]]
+name = "first result name"
+ours = ".list-search-result:0 .list-search-result-title GtkLabel"
+ours_box = "text"
+theirs = ".list-search-result:0 .list-search-result-title ClutterText"
+anchor = "left"
+tolerance_px = 1.1
+
+[[pairs]]
+name = "first result description"
+ours = ".list-search-result:0 .list-search-result-description"
+ours_box = "text"
+theirs = ".list-search-result:0 .list-search-result-description ClutterText"
+anchor = "left"
+tolerance_px = 2.1
+
+[[pairs]]
+name = "second result"
+ours = ".list-search-result:1"
+theirs = ".list-search-result:1"
+anchor = "left"
+
+[[pairs]]
+name = "third result"
+ours = ".list-search-result:2"
+theirs = ".list-search-result:2"
+anchor = "left"
+
+[[pairs]]
+name = "fourth result"
+ours = ".list-search-result:3"
+theirs = ".list-search-result:3"
+anchor = "left"
+
+[[pairs]]
+name = "fifth result"
+ours = ".list-search-result:4"
+theirs = ".list-search-result:4"
+anchor = "left"
+
+[[pairs]]
+name = "fifth result content"
+ours = ".list-search-result:4 .list-search-result-content"
+theirs = ".list-search-result:4 .list-search-result-content"
+anchor = "left"
+tolerance_px = 1.1
+
+[[pairs]]
+name = "fifth result icon"
+ours = ".list-search-result:4 GtkImage"
+theirs = ".list-search-result:4 StIcon"
+anchor = "left"
+
+[[pairs]]
+name = "fifth result name"
+ours = ".list-search-result:4 .list-search-result-title GtkLabel"
+ours_box = "text"
+theirs = ".list-search-result:4 .list-search-result-title ClutterText"
+anchor = "left"
+tolerance_px = 1.1
+
+[[pairs]]
+name = "fifth result description"
+ours = ".list-search-result:4 .list-search-result-description"
+ours_box = "text"
+theirs = ".list-search-result:4 .list-search-result-description ClutterText"
+anchor = "left"
+tolerance_px = 2.1

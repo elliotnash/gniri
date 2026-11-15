@@ -179,10 +179,11 @@ impl Inner {
     fn provider_info(self: &Rc<Self>, provider: &Provider) -> gtk::Button {
         let image = icon::image(PROVIDER_ICON_SIZE);
         icon::set_app_icon(&image, provider.icon.as_deref());
+        // The details are as tall as the icon; the name is in the middle
+        // of what the line under it leaves.
         let details = gtk::Box::builder()
             .css_classes(["list-search-provider-details"])
             .orientation(gtk::Orientation::Vertical)
-            .valign(gtk::Align::Center)
             .build();
         let label = |text: &str| {
             gtk::Label::builder()
@@ -191,7 +192,10 @@ impl Inner {
                 .ellipsize(pango::EllipsizeMode::End)
                 .build()
         };
-        details.append(&label(&provider.name));
+        let name = label(&provider.name);
+        name.set_vexpand(true);
+        name.set_valign(gtk::Align::Center);
+        details.append(&name);
         if provider.more() > 0 {
             details.append(&label(&format!("{} more", provider.more())));
         }

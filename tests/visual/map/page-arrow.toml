@@ -1,0 +1,29 @@
+# The arrow that turns the app grid's page: gniri's widgets against GNOME
+# Shell's actors. Read by `cargo xtask diff page-arrow`
+# (crates/xtask/src/diff.rs).
+
+surface = "gniri-overview"
+# The arrow to the page before is not shown on the first page.
+root = ".page-navigation-arrow"
+attach = "right"
+below = "gniri-panel"
+# Where it is depends on the size of the screen
+# (crates/shell/src/overview/layout.rs).
+placement = false
+# A whole number of physical pixels at scale 1.25.
+margin = 4
+wallpaper = "/usr/share/backgrounds/f45/default/f45-01-night.jxl"
+
+[[states]]
+scene = "app-grid"
+reference = "page-arrow"
+
+[[regions]]
+name = "arrow"
+anchor = "stretch"
+
+[[pairs]]
+name = "icon"
+ours = "GtkImage"
+theirs = "StIcon"
+anchor = "left"

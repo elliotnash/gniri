@@ -1,0 +1,67 @@
+# The applications a search found: gniri's widgets against GNOME Shell's
+# actors. Read by `cargo xtask diff search-apps` (crates/xtask/src/diff.rs).
+#
+# The applications are the scene's own. Their icons and names are blacked
+# out of the reference and never compared; where they are is compared.
+
+root = ".grid-search-results"
+surface = "gniri-overview"
+attach = "center"
+below = "gniri-panel"
+# How far below the search entry the results start depends on the size
+# of the screen (crates/shell/src/overview/layout.rs).
+placement = false
+wallpaper = "/usr/share/backgrounds/f45/default/f45-01-night.jxl"
+
+# A whole number of physical pixels at scale 1.25.
+margin = 12
+
+[[states]]
+scene = "search"
+reference = "search-apps"
+
+[[regions]]
+name = "applications"
+anchor = "stretch"
+
+[[pairs]]
+name = "first tile"
+ours = ".overview-tile:0"
+theirs = ".overview-tile:0"
+anchor = "left"
+
+[[pairs]]
+name = "first icon box"
+ours = ".overview-icon:0"
+theirs = ".overview-icon:0"
+anchor = "left"
+
+[[pairs]]
+name = "first icon"
+ours = ".overview-tile:0 GtkImage"
+theirs = ".overview-tile:0 StIcon"
+anchor = "left"
+
+[[pairs]]
+name = "first label"
+ours = ".overview-tile:0 GtkLabel"
+theirs = ".overview-tile:0 StLabel"
+anchor = "left"
+
+[[pairs]]
+name = "second tile"
+ours = ".overview-tile:1"
+theirs = ".overview-tile:1"
+anchor = "right"
+
+[[pairs]]
+name = "second icon"
+ours = ".overview-tile:1 GtkImage"
+theirs = ".overview-tile:1 StIcon"
+anchor = "right"
+
+[[pairs]]
+name = "second label"
+ours = ".overview-tile:1 GtkLabel"
+theirs = ".overview-tile:1 StLabel"
+anchor = "right"

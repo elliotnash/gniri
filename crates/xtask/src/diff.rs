@@ -874,6 +874,15 @@ fn check_state(context: &Job, state: &State, checks: &mut Vec<Check>) -> Result<
 
     // Tier 2: flat wallpapers, one run each.
     let mut output_size = None;
+    // Where our root's top left corner is on the nested output, in logical
+    // pixels: the same in every run.
+    let mut our_origin = None;
+    let origin = |ours: &Side| {
+        (
+            ours.root[0] + ours.on_screen.0,
+            ours.root[1] + ours.on_screen.1,
+        )
+    };
     let flat_wallpapers: &[(&str, &str)] = if map.flat { &FLAT_WALLPAPERS } else { &[] };
     if !map.flat {
         // The size of the nested output is still needed below.
@@ -884,6 +893,7 @@ fn check_state(context: &Job, state: &State, checks: &mut Vec<Check>) -> Result<
             (ours.screen.0 * ours.scale).round() as i64,
             (ours.screen.1 * ours.scale).round() as i64,
         ));
+        our_origin = Some(origin(&ours));
     }
     for &(wallpaper, colour) in flat_wallpapers {
         let run = format!("{component}-{}-{wallpaper}", state.scene);
@@ -903,6 +913,7 @@ fn check_state(context: &Job, state: &State, checks: &mut Vec<Check>) -> Result<
             (ours.screen.0 * ours.scale).round() as i64,
             (ours.screen.1 * ours.scale).round() as i64,
         ));
+        our_origin = Some(origin(&ours));
         for region in &regions {
             let area = region_area(map, region, &ours, &theirs);
             let (our_rect, their_rect) = (
@@ -944,6 +955,7 @@ fn check_state(context: &Job, state: &State, checks: &mut Vec<Check>) -> Result<
         (theirs.screen.1 * theirs.scale).round() as i64,
     );
     let wallpaper = reference_wallpaper(map, reference_size, work)?;
+    let theirs_scale = theirs.scale;
     let mut layout_done = false;
     for region in &regions {
         let (Some(wallpaper), Some((output_width, output_height))) = (&wallpaper, output_size)
@@ -965,6 +977,21 @@ fn check_state(context: &Job, state: &State, checks: &mut Vec<Check>) -> Result<
             Vertical::Top => 0,
             Vertical::Bottom => reference_size.1 - output_height,
             Vertical::Center => (reference_size.1 - output_height) / 2,
+        };
+        // A component that is not where GNOME's is on its screen gets
+        // the part of the wallpaper that puts the same pixels behind it,
+        // as far as the reference screen reaches.
+        let (window_x, window_y) = match our_origin {
+            Some(ours) if !map.placement => {
+                let offset = |theirs: f64, ours: f64, room: i64| {
+                    (((theirs - ours) * theirs_scale).round() as i64).clamp(0, room.max(0))
+                };
+                (
+                    offset(theirs.root[0], ours.0, reference_size.0 - output_width),
+                    offset(theirs.root[1], ours.1, reference_size.1 - output_height),
+                )
+            }
+            _ => (window_x, window_y),
         };
         let window = work.join(format!("wallpaper-{}.png", region.name));
         magick_ok(&[

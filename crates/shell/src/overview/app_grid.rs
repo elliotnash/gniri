@@ -436,8 +436,10 @@ impl Inner {
             child = current.next_sibling();
         }
         let pages = self.grid.pages();
-        self.arrows[0].set_visible(page > 0);
-        self.arrows[1].set_visible(page + 1 < pages);
+        // Not hidden outright: the layout counts with an arrow's size
+        // whether or not there is a page for it to turn to.
+        self.arrows[0].set_child_visible(page > 0);
+        self.arrows[1].set_child_visible(page + 1 < pages);
     }
 
     /// Shows which icon the arrow keys are on.
