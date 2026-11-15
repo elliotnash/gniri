@@ -1,0 +1,73 @@
+# A search, as in GNOME's `search` reference capture: "calculator" finds
+# two applications, one result in Characters and many in Software, which
+# shows five. The applications and what the providers find are the
+# scene's own, with the words GNOME's capture had: under a fixture nothing
+# is asked over D-Bus.
+
+[fixture]
+time = "2026-11-14T08:28:00"
+power = { profile = "performance", battery = { percentage = 91 } }
+audio = { output = { volume = 0.3 } }
+network = { primary = { kind = "wifi", strength = 70 } }
+
+[variants.flat-808080]
+time = "2026-11-13T22:09:00"
+power = { profile = "performance", battery = { percentage = 36, charge = "charging" } }
+
+[variants.flat-3584e4]
+time = "2026-11-13T22:09:00"
+power = { profile = "performance", battery = { percentage = 36, charge = "charging" } }
+
+[fixture.apps]
+installed = [
+    { id = "app.zen_browser.zen", name = "Zen Browser", icon = "web-browser" },
+    { id = "org.gnome.Calendar", name = "Calendar", icon = "org.gnome.Calendar" },
+    { id = "org.gnome.Nautilus", name = "Files", icon = "org.gnome.Nautilus" },
+    { id = "org.gnome.Software", name = "Software", icon = "org.gnome.Software" },
+    { id = "org.gnome.TextEditor", name = "Text Editor", icon = "org.gnome.TextEditor" },
+    { id = "org.gnome.Calculator", name = "Calculator", icon = "org.gnome.Calculator" },
+    { id = "com.mitchellh.ghostty", name = "Ghostty", icon = "utilities-terminal" },
+    { id = "org.gnome.Settings", name = "Settings", icon = "org.gnome.Settings" },
+    { id = "org.example.PcbCalculator", name = "KiCad PCB Calculator", icon = "accessories-calculator" },
+]
+
+[[fixture.search.providers]]
+id = "org.gnome.Characters"
+name = "Characters"
+icon = "org.gnome.Characters"
+total = 1
+results = [
+    { id = "pocket-calculator", name = "Pocket Calculator", description = "U+1F5A9", icon = { name = "accessories-character-map" } },
+]
+
+[[fixture.search.providers]]
+id = "org.gnome.Software"
+name = "Software"
+icon = "org.gnome.Software"
+total = 20
+results = [
+    { id = "a", name = "Calculator", description = "A feature rich calculator", icon = { name = "accessories-calculator" } },
+    { id = "b", name = "awesome calculator", description = "AWESOME calculator program", icon = { name = "accessories-calculator" } },
+    { id = "c", name = "BMI Calculator", description = "Calculate your BMI", icon = { name = "accessories-calculator" } },
+    { id = "d", name = "Curo Calculator", description = "Financial calculations simplified", icon = { name = "accessories-calculator" } },
+    { id = "e", name = "Uno Calculator", description = "Linux port of the Microsoft Windows calculator app", icon = { name = "accessories-calculator" } },
+]
+
+[[steps]]
+window = { color = "#f6f5f4", app-id = "app.zen_browser.zen" }
+
+[[steps]]
+window = { color = "#f6f5f4", app-id = "com.mitchellh.ghostty" }
+
+[[steps]]
+window = { color = "#f6f5f4", app-id = "org.gnome.Settings" }
+
+[[steps]]
+action = { FocusWorkspaceDown = {} }
+
+[[steps]]
+action = { OpenOverview = {} }
+
+# As the capture's script did: no key was pressed.
+[[steps]]
+gniri = ["debug", "search", "calculator", "--quiet"]

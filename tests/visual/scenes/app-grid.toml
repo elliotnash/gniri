@@ -1,0 +1,76 @@
+# The app grid, as in GNOME's `app-grid` reference capture: the first of
+# two pages. The applications are the scene's own: the dash's eight, of
+# which Settings runs without being a favourite and so is in the grid with
+# a dot under it, and enough others to need a second page.
+
+[fixture]
+time = "2026-11-14T08:28:00"
+power = { profile = "performance", battery = { percentage = 91 } }
+audio = { output = { volume = 0.3 } }
+network = { primary = { kind = "wifi", strength = 70 } }
+
+[variants.flat-808080]
+time = "2026-11-13T22:09:00"
+power = { profile = "performance", battery = { percentage = 36, charge = "charging" } }
+
+[variants.flat-3584e4]
+time = "2026-11-13T22:09:00"
+power = { profile = "performance", battery = { percentage = 36, charge = "charging" } }
+
+[fixture.apps]
+installed = [
+    { id = "app.zen_browser.zen", name = "Zen Browser", icon = "web-browser" },
+    { id = "org.gnome.Calendar", name = "Calendar", icon = "org.gnome.Calendar" },
+    { id = "org.gnome.Nautilus", name = "Files", icon = "org.gnome.Nautilus" },
+    { id = "org.gnome.Software", name = "Software", icon = "org.gnome.Software" },
+    { id = "org.gnome.TextEditor", name = "Text Editor", icon = "org.gnome.TextEditor" },
+    { id = "org.gnome.Calculator", name = "Calculator", icon = "org.gnome.Calculator" },
+    { id = "com.mitchellh.ghostty", name = "Ghostty", icon = "utilities-terminal" },
+    { id = "org.gnome.Settings", name = "Settings", icon = "org.gnome.Settings" },
+    { id = "org.example.Boxes", name = "Boxes", icon = "application-x-executable" },
+    { id = "org.example.Camera", name = "Camera", icon = "application-x-executable" },
+    { id = "org.example.Characters", name = "Characters", icon = "application-x-executable" },
+    { id = "org.example.Clocks", name = "Clocks", icon = "application-x-executable" },
+    { id = "org.example.Contacts", name = "Contacts", icon = "application-x-executable" },
+    { id = "org.example.DocumentScanner", name = "Document Scanner", icon = "application-x-executable" },
+    { id = "org.example.DocumentViewer", name = "Document Viewer", icon = "application-x-executable" },
+    { id = "org.example.Fonts", name = "Fonts", icon = "application-x-executable" },
+    { id = "org.example.Help", name = "Help", icon = "application-x-executable" },
+    { id = "org.example.ImageViewer", name = "Image Viewer", icon = "application-x-executable" },
+    { id = "org.example.Logs", name = "Logs", icon = "application-x-executable" },
+    { id = "org.example.Maps", name = "Maps", icon = "application-x-executable" },
+    { id = "org.example.Music", name = "Music", icon = "application-x-executable" },
+    { id = "org.example.Notes", name = "Notes", icon = "application-x-executable" },
+    { id = "org.example.Passwords", name = "Passwords", icon = "application-x-executable" },
+    { id = "org.example.Photos", name = "Photos", icon = "application-x-executable" },
+    { id = "org.example.Podcasts", name = "Podcasts", icon = "application-x-executable" },
+    { id = "org.example.Presentations", name = "Presentations", icon = "application-x-executable" },
+    { id = "org.example.Printers", name = "Printers", icon = "application-x-executable" },
+    { id = "org.example.Spreadsheets", name = "Spreadsheets", icon = "application-x-executable" },
+    { id = "org.example.SoundRecorder", name = "Sound Recorder", icon = "application-x-executable" },
+    { id = "org.example.SystemMonitor", name = "System Monitor", icon = "application-x-executable" },
+    { id = "org.example.Tour", name = "Tour", icon = "application-x-executable" },
+    { id = "org.example.Videos", name = "Videos", icon = "application-x-executable" },
+    { id = "org.example.Weather", name = "Weather", icon = "application-x-executable" },
+    { id = "org.example.Web", name = "Web", icon = "application-x-executable" },
+    { id = "org.example.Writer", name = "Writer", icon = "application-x-executable" },
+    { id = "org.example.ZipArchives", name = "Zip Archives", icon = "application-x-executable" },
+]
+
+[[steps]]
+window = { color = "#f6f5f4", app-id = "app.zen_browser.zen" }
+
+[[steps]]
+window = { color = "#f6f5f4", app-id = "com.mitchellh.ghostty" }
+
+[[steps]]
+window = { color = "#f6f5f4", app-id = "org.gnome.Settings" }
+
+[[steps]]
+action = { FocusWorkspaceDown = {} }
+
+[[steps]]
+action = { OpenOverview = {} }
+
+[[steps]]
+gniri = ["debug", "show-apps"]
