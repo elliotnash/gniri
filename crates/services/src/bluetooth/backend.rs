@@ -29,8 +29,8 @@ use zbus::names::BusName;
 use zbus::{OwnedObjectPath, OwnedVariant, Variant};
 
 use super::{Adapter, Command, Device, Event, State, Status};
+use crate::bus::{Wakes, merge};
 use crate::rfkill;
-use crate::system_bus::{Wakes, merge};
 
 const BLUEZ: &str = "org.bluez";
 const ADAPTER: &str = "org.bluez.Adapter1";

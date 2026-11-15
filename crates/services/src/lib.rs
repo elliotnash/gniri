@@ -8,18 +8,21 @@
 pub mod audio;
 pub mod bluetooth;
 pub mod brightness;
+pub mod bus;
+pub mod desktop_entry;
 pub mod fixture;
 pub mod keyboard;
 pub mod model;
+pub mod mpris;
 pub mod network;
 pub mod night_light;
 pub mod niri;
+pub mod notifications;
 pub mod power;
 pub mod rfkill;
 pub mod session;
-pub mod system_bus;
 pub mod toggles;
 
+pub use bus::Bus;
 pub use fixture::Fixture;
 pub use model::{Link, Model};
-pub use system_bus::SystemBus;

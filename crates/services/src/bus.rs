@@ -1,12 +1,14 @@
-//! The D-Bus system bus: one connection and one thread for every backend
-//! that lives on it (UPower, NetworkManager, BlueZ, logind).
+//! D-Bus: one connection and one thread for every backend that lives on the
+//! same bus. UPower, NetworkManager, BlueZ and logind are on the system bus;
+//! notifications and media players on the session bus.
 //!
 //! Each backend is an `async fn run(connection, events, commands)` that only
 //! returns when its channels close or the bus goes away. They all run on the
 //! same thread, interleaved; none of them blocks.
 //!
-//! `DBUS_SYSTEM_BUS_ADDRESS` points the connection somewhere else, which is
-//! how tests put python-dbusmock in place of the real services.
+//! `DBUS_SYSTEM_BUS_ADDRESS` and `DBUS_SESSION_BUS_ADDRESS` point the
+//! connections somewhere else, which is how tests put stand-ins in place of
+//! the real services.
 
 use std::future::Future;
 use std::pin::Pin;
@@ -23,15 +25,31 @@ use crate::model::{Link, Model};
 
 type Task = Box<dyn FnOnce(zbus::Connection) -> Pin<Box<dyn Future<Output = ()>>> + Send>;
 
-/// Collects backends, then starts them together.
-#[derive(Default)]
-pub struct SystemBus {
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Kind {
+    System,
+    Session,
+}
+
+/// Collects the backends of one bus, then starts them together.
+pub struct Bus {
+    kind: Kind,
     tasks: Vec<Task>,
 }
 
-impl SystemBus {
-    pub fn new() -> Self {
-        Self::default()
+impl Bus {
+    pub fn system() -> Self {
+        Self {
+            kind: Kind::System,
+            tasks: Vec::new(),
+        }
+    }
+
+    pub fn session() -> Self {
+        Self {
+            kind: Kind::Session,
+            tasks: Vec::new(),
+        }
     }
 
     /// Adds a backend. `name` prefixes what it prints when it gives up.
@@ -57,14 +75,22 @@ impl SystemBus {
         if self.tasks.is_empty() {
             return;
         }
+        let (name, thread) = match self.kind {
+            Kind::System => ("system", "system-bus"),
+            Kind::Session => ("session", "session-bus"),
+        };
         let spawned = std::thread::Builder::new()
-            .name("system-bus".to_owned())
+            .name(thread.to_owned())
             .spawn(move || {
                 futures_lite::future::block_on(async move {
-                    let connection = match zbus::Connection::system().await {
+                    let connection = match self.kind {
+                        Kind::System => zbus::Connection::system().await,
+                        Kind::Session => zbus::Connection::session().await,
+                    };
+                    let connection = match connection {
                         Ok(connection) => connection,
                         Err(error) => {
-                            eprintln!("gniri: cannot reach the system bus: {error}");
+                            eprintln!("gniri: cannot reach the {name} bus: {error}");
                             return;
                         }
                     };
@@ -79,7 +105,7 @@ impl SystemBus {
                 });
             });
         if let Err(error) = spawned {
-            eprintln!("gniri: cannot start the system bus thread: {error}");
+            eprintln!("gniri: cannot start the {name} bus thread: {error}");
         }
     }
 }

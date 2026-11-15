@@ -24,8 +24,8 @@ use async_channel::{Receiver, Sender};
 use futures_lite::StreamExt;
 
 use super::{Command, Event, State};
+use crate::bus::merge;
 use crate::model::Link;
-use crate::system_bus::merge;
 
 pub const DEVICE: &str = "/dev/rfkill";
 

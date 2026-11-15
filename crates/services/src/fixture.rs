@@ -10,7 +10,9 @@ use std::path::Path;
 use gniri_core::{FixedClock, LocalTime};
 use serde::Deserialize;
 
-use crate::{audio, bluetooth, brightness, network, power, rfkill, session, toggles};
+use crate::{
+    audio, bluetooth, brightness, mpris, network, notifications, power, rfkill, session, toggles,
+};
 
 #[derive(Clone, Debug, Default, PartialEq, Deserialize)]
 #[serde(default, deny_unknown_fields)]
@@ -27,6 +29,8 @@ pub struct Fixture {
     pub dark_style: toggles::State,
     pub night_light: toggles::State,
     pub do_not_disturb: toggles::State,
+    pub notifications: notifications::State,
+    pub mpris: mpris::State,
 }
 
 impl Fixture {

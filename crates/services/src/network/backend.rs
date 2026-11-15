@@ -19,7 +19,7 @@ use zbus::{MatchRule, Message, MessageStream, ObjectPath, OwnedObjectPath, Owned
 
 use super::system::{PROFILE, Profile, Request, System};
 use super::{Command, Event, State};
-use crate::system_bus::{merge, wake};
+use crate::bus::{merge, wake};
 
 const SERVICE: &str = "org.freedesktop.NetworkManager";
 

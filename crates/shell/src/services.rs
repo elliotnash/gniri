@@ -8,8 +8,8 @@ use gniri_config::Config;
 use gniri_core::{Clock, LocalTime, Scheduler, Store};
 use gniri_services::keyboard::LayoutNames;
 use gniri_services::{
-    Fixture, Link, Model, SystemBus, audio, bluetooth, brightness, network, night_light, niri,
-    power, rfkill, session, toggles,
+    Bus, Fixture, Link, Model, audio, bluetooth, brightness, network, night_light, niri, power,
+    rfkill, session, toggles,
 };
 use gtk::glib;
 
@@ -235,7 +235,7 @@ impl Services {
                 layout_names: OnceCell::new(),
             },
             None => {
-                let mut bus = SystemBus::new();
+                let mut bus = Bus::system();
                 let power = bus.add("power", power::backend::run);
                 let network = bus.add("network", network::backend::run);
                 let bluetooth = bus.add("bluetooth", bluetooth::backend::run);

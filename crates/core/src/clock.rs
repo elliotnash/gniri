@@ -5,6 +5,8 @@
 
 use std::fmt;
 
+use crate::calendar::days_in_month;
+
 /// A date and time of day in the user's time zone.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct LocalTime {
@@ -41,15 +43,6 @@ impl fmt::Display for ParseTimeError {
 }
 
 impl std::error::Error for ParseTimeError {}
-
-fn days_in_month(year: i32, month: u8) -> u8 {
-    match month {
-        4 | 6 | 9 | 11 => 30,
-        2 if year % 4 == 0 && (year % 100 != 0 || year % 400 == 0) => 29,
-        2 => 28,
-        _ => 31,
-    }
-}
 
 impl LocalTime {
     /// Parses `YYYY-MM-DDTHH:MM:SS` (a space instead of `T` also works).

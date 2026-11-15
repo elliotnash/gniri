@@ -4,12 +4,12 @@
 //! cargo run -p gniri-services --example watch -- power
 //! ```
 //!
-//! Services: power, network, bluetooth, brightness, audio, rfkill.
+//! Services: power, network, bluetooth, brightness, audio, rfkill, mpris.
 //!
 //! It only listens; it never sends a command.
 
-use gniri_services::{Link, Model, SystemBus};
-use gniri_services::{audio, bluetooth, brightness, network, power, rfkill};
+use gniri_services::{Bus, Link, Model};
+use gniri_services::{audio, bluetooth, brightness, mpris, network, power, rfkill};
 
 fn print<M: Model + std::fmt::Debug + Default>(link: Link<M>) {
     let mut state = M::default();
@@ -22,7 +22,7 @@ fn print<M: Model + std::fmt::Debug + Default>(link: Link<M>) {
 
 fn main() {
     let service = std::env::args().nth(1).unwrap_or_default();
-    let mut bus = SystemBus::new();
+    let mut bus = Bus::system();
     // Starts the bus thread once the chosen backend is on it.
     macro_rules! on_bus {
         ($module:ident) => {{
@@ -38,6 +38,12 @@ fn main() {
         "brightness" => on_bus!(brightness),
         "audio" => print(audio::backend::spawn()),
         "rfkill" => print(rfkill::backend::spawn()),
-        _ => eprintln!("usage: watch power|network|bluetooth|brightness|audio|rfkill"),
+        "mpris" => {
+            let mut bus = Bus::session();
+            let link = bus.add::<mpris::State, _, _>("mpris", mpris::backend::run);
+            bus.start();
+            print(link);
+        }
+        _ => eprintln!("usage: watch power|network|bluetooth|brightness|audio|rfkill|mpris"),
     }
 }

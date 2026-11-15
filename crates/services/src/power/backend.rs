@@ -7,7 +7,7 @@ use futures_lite::StreamExt;
 use zbus::OwnedVariant;
 
 use super::{Battery, Charge, Command, Event, Profile};
-use crate::system_bus::{merge, wake};
+use crate::bus::{merge, wake};
 
 /// The display device is UPower's summary of every battery in the machine.
 #[zbus::proxy(

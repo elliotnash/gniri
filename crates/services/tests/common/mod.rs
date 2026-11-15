@@ -36,6 +36,12 @@ impl MockBus {
             eprintln!("skipped: python3 with the dbusmock module is not installed");
             return None;
         }
+        Self::start_empty()
+    }
+
+    /// A private bus with nothing on it, for a backend that serves a name
+    /// itself. Needs only `dbus-daemon`.
+    pub fn start_empty() -> Option<Self> {
         let daemon = Command::new("dbus-daemon")
             .args(["--session", "--nofork", "--print-address=1"])
             .stdout(Stdio::piped())
@@ -61,6 +67,38 @@ impl MockBus {
         })
     }
 
+    /// Where the bus listens, for programs that are pointed at it through
+    /// `DBUS_SESSION_BUS_ADDRESS`.
+    pub fn address(&self) -> &str {
+        &self.address
+    }
+
+    /// Waits until `bus_name` has an owner.
+    pub fn wait_for_name(&self, bus_name: &str) {
+        let bus = block_on(zbus::fdo::DBusProxy::new(&self.control)).expect("the bus is there");
+        let name = zbus::names::BusName::try_from(bus_name).expect("a valid bus name");
+        let deadline = Instant::now() + TIMEOUT;
+        while !block_on(bus.name_has_owner(name.clone())).unwrap_or(false) {
+            assert!(Instant::now() < deadline, "nothing ever claimed {bus_name}");
+            std::thread::sleep(Duration::from_millis(20));
+        }
+    }
+
+    /// Starts a bare dbusmock object, with no template, and waits until it
+    /// owns `bus_name`. Its properties and methods are added through the
+    /// `org.freedesktop.DBus.Mock` interface.
+    pub fn object(&mut self, bus_name: &str, path: &str, interface: &str) {
+        let mock = Command::new("python3")
+            .args(["-m", "dbusmock", bus_name, path, interface])
+            .env("DBUS_SYSTEM_BUS_ADDRESS", &self.address)
+            .env("DBUS_SESSION_BUS_ADDRESS", &self.address)
+            .stdout(Stdio::null())
+            .spawn()
+            .expect("python3 was found a moment ago");
+        self.mocks.push(mock);
+        self.wait_for_name(bus_name);
+    }
+
     /// Starts a dbusmock template and waits until it owns `bus_name`.
     /// `parameters` is the JSON dictionary the template's `load` receives.
     pub fn template(&mut self, template: &str, bus_name: &str, parameters: &str) {
@@ -75,16 +113,7 @@ impl MockBus {
             .expect("python3 was found a moment ago");
         self.mocks.push(mock);
 
-        let bus = block_on(zbus::fdo::DBusProxy::new(&self.control)).expect("the bus is there");
-        let name = zbus::names::BusName::try_from(bus_name).expect("a valid bus name");
-        let deadline = Instant::now() + TIMEOUT;
-        while !block_on(bus.name_has_owner(name.clone())).unwrap_or(false) {
-            assert!(
-                Instant::now() < deadline,
-                "the {template} template never claimed {bus_name}"
-            );
-            std::thread::sleep(Duration::from_millis(20));
-        }
+        self.wait_for_name(bus_name);
     }
 
     /// Stops every template at once, as when a service crashes: its names
@@ -155,7 +184,7 @@ impl MockBus {
         T::try_from(value).expect("the property has the expected type")
     }
 
-    /// Runs a backend on its own thread, as `SystemBus` would.
+    /// Runs a backend on its own thread, as `Bus` would.
     pub fn run<M, F, Fut>(&self, run: F) -> Link<M>
     where
         M: Model,
