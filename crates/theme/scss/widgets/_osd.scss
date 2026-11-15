@@ -23,7 +23,9 @@ $osd_levelbar_height: 6px;
     font-weight: bold;
     border-spacing: $base_padding * 2;
     padding: ($base_padding * 2) ($base_padding * 3);
-    margin-bottom: 4em;
+    // Upstream: 4em, which is 58.67px; St rounds that to 59px and GTK
+    // would round it down.
+    margin-bottom: to_em(59px);
 
     // `OsdWindow.show` and `_hide`
     opacity: 0;

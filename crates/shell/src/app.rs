@@ -216,6 +216,14 @@ fn handle(
             }
             Ok(Value::Null)
         }
+        ipc::Request::Osd { icon, label, level } => {
+            outputs.show_osd(&crate::surfaces::osd::Content {
+                icon,
+                label,
+                level: level.map(|level| (level, level.max(1.0))),
+            });
+            Ok(Value::Null)
+        }
         ipc::Request::Brightness(step) => {
             let steps = match step {
                 ipc::Step::Up => 1,

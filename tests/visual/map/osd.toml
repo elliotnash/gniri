@@ -1,0 +1,30 @@
+# The on-screen display: gniri's widgets against GNOME Shell's actors.
+# Read by `cargo xtask diff osd` (crates/xtask/src/diff.rs).
+
+surface = "gniri-osd"
+root = ".osd-window"
+# It sits at the bottom centre of the screen.
+attach = "center"
+vertical = "bottom"
+margin = 12
+wallpaper = "/usr/share/backgrounds/f45/default/f45-01-night.jxl"
+
+[[states]]
+scene = "osd"
+reference = "osd"
+
+[[regions]]
+name = "display"
+anchor = "stretch"
+
+[[pairs]]
+name = "icon"
+ours = "GtkImage"
+theirs = "StIcon"
+anchor = "left"
+
+[[pairs]]
+name = "level bar"
+ours = ".level"
+theirs = ".level"
+anchor = "left"

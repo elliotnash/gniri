@@ -95,6 +95,15 @@ enum DebugRequest {
     OpenSubmenu { submenu: menus::Submenu },
     /// Close whatever menu is open.
     CloseMenu,
+    /// Show the on-screen display with a given icon, label and level.
+    Osd {
+        icon: String,
+        #[arg(long)]
+        label: Option<String>,
+        /// 0.0 to 1.0.
+        #[arg(long)]
+        level: Option<f64>,
+    },
 }
 
 impl Message {
@@ -109,6 +118,9 @@ impl Message {
                 DebugRequest::OpenMenu { menu, output } => ipc::Request::OpenMenu { menu, output },
                 DebugRequest::OpenSubmenu { submenu } => ipc::Request::OpenSubmenu(submenu),
                 DebugRequest::CloseMenu => ipc::Request::CloseMenu,
+                DebugRequest::Osd { icon, label, level } => {
+                    ipc::Request::Osd { icon, label, level }
+                }
             },
         }
     }

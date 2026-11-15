@@ -35,6 +35,13 @@ pub enum Request {
     CloseMenu,
     Volume(VolumeKey),
     Brightness(Step),
+    /// Show the on-screen display with exactly this, as GNOME Shell's
+    /// `ShowOSD` D-Bus method does.
+    Osd {
+        icon: String,
+        label: Option<String>,
+        level: Option<f64>,
+    },
 }
 
 /// What a volume key does.
