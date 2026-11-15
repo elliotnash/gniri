@@ -309,7 +309,9 @@ const CONFIG_NOTIFICATION: &str = "config-error";
 fn reload_config(app: &adw::Application, services: &Rc<Services>, path: &std::path::Path) {
     match Config::load(path) {
         Ok(config) => {
-            app.withdraw_notification(CONFIG_NOTIFICATION);
+            if !services.sandboxed {
+                app.withdraw_notification(CONFIG_NOTIFICATION);
+            }
             if services.config.with(|current| *current != config) {
                 eprintln!("gniri: {} changed; settings reloaded", path.display());
                 services.reload(config);
@@ -318,6 +320,11 @@ fn reload_config(app: &adw::Application, services: &Rc<Services>, path: &std::pa
         Err(error) => {
             eprintln!("gniri: {error}");
             eprintln!("gniri: keeping the settings as they were");
+            // A scene has no notification server, and nothing of a scene's
+            // goes to the session's.
+            if services.sandboxed {
+                return;
+            }
             let notification = gio::Notification::new("gniri’s settings were not changed");
             notification.set_body(Some(&error_summary(&error.to_string())));
             notification.set_icon(&gio::ThemedIcon::new("dialog-warning-symbolic"));

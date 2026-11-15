@@ -318,8 +318,10 @@ impl Runner {
             return;
         }
         let info = self.device(&device).await;
-        // A device that was paired is let in without asking, as GNOME's
-        // agent lets it; trusting it for good is left to BlueZ's user.
+        // A device that was paired is let in without asking: it is one
+        // the user set up. (gnome-bluetooth's agent lets in paired input
+        // devices only, and marks them trusted; whether to trust a device
+        // for good is left to the user here.)
         if kind == Kind::Connect && info.paired {
             if let Some(reply) = reply {
                 let _ = reply.send(Ok(Answer::Accepted)).await;

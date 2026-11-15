@@ -7,7 +7,8 @@
 //! GNOME Shell has no such agent. GNOME Settings brings one while its
 //! Bluetooth panel is open (the gnome-bluetooth library), and nothing
 //! answers BlueZ the rest of the time. gniri's is there all the time, and
-//! asks with gnome-bluetooth's words (`lib/bluetooth-pairing-dialog.c`).
+//! asks with the words of gnome-bluetooth's pairing dialog, as the
+//! installed library has them (its source was not at hand).
 //! [`backend`] is the object on the bus.
 
 pub mod backend;
@@ -54,7 +55,7 @@ pub fn passkey_text(passkey: u32) -> String {
 
 impl Request {
     /// The dialog's title. The texts are gnome-bluetooth's
-    /// (`bluetooth_pairing_dialog_set_mode`).
+    /// (`BluetoothPairingDialog`).
     pub fn title(&self) -> String {
         match self.kind {
             Kind::EnterPin | Kind::EnterPasskey | Kind::Confirm(_) => {

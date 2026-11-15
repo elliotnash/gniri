@@ -683,6 +683,107 @@ was unlocked by `loginctl unlock-session`.
   passes can have printed a critical; the logs of a new part are read
   once (`target/visual/logs/*-gniri.log`).
 
+## M6: what the agents, the live settings and the outputs taught
+
+### Looks
+
+- **The network dialog needed no style of its own.** GNOME's puts one
+  entry per secret straight into the dialog's message box, which spaces
+  them; the classes are the authentication dialog's, which is compared
+  with GNOME. The dialog itself was never captured.
+- **The pairing dialog is not GNOME Shell's.** GNOME Shell has none; GNOME
+  Settings shows gnome-bluetooth's, a window of its own. Its sentences
+  were read out of the installed library (`strings` on
+  `libgnome-bluetooth-ui-3.0.so`, and the format strings out of its
+  translations), since its source is not among the clones. They are in
+  the shell's prompt dialog, with the PIN as one large label.
+
+### Structure
+
+- **An agent answers only its service.** Whoever gets an answer from the
+  secret agent gets a password, and any program on the system bus can
+  call it. So a caller's connection is compared with the one that owns
+  NetworkManager's name, as libnm's agent does, and likewise for BlueZ.
+  (The polkit agent's answer holds no secret: the helper tells polkit.)
+- **Joining a locked network is the request for an open one.**
+  NetworkManager makes the profile and asks back for what it lacks. The
+  network backend and the agent never speak to each other.
+- **The two agents are in the shell**, as GNOME's network agent is, not
+  processes of their own like the polkit agent: they share the system
+  bus's thread and connection with the other backends.
+- **Nothing is kept in the keyring.** NetworkManager stores a Wi-Fi
+  password itself unless the connection leaves it to the agent, which is
+  rare. GNOME's agent then uses the keyring; talking to the Secret
+  Service is a piece of work of its own, and was left out. Likewise VPN
+  secrets, which GNOME gets from programs the VPN plugins bring.
+- **An agent, and no search for devices.** The plan asked for the agent.
+  GNOME's Bluetooth menu lists what is set up and leaves finding new
+  devices to GNOME Settings, and gniri's does the same: a menu that
+  listed every device in range would look unlike GNOME's each time it
+  opened. Offering pairing from the menu is an open choice, not a thing
+  that was tried and failed.
+- **In a nested session without a fixture the agents register with the
+  real services**, as the polkit agent tries to. NetworkManager takes
+  several agents; BlueZ asks the one that last asked to be its default.
+  So while such a session runs, a question about the real machine's
+  Bluetooth can come up in the nested window. It is also the way to try
+  both dialogs for real without leaving the session around it.
+- **Settings are state like any other**: a store. A widget that shows a
+  setting subscribes to it (the clock's format, the battery's number). A
+  surface that was built from a setting is built anew, and only that one:
+  `Changes::between` says which. The bar is never among them for a
+  setting it shows, because a bar that goes and comes back moves every
+  window twice.
+- **A backend started with a setting has to be told the next one.** The
+  idle timers, locking before sleep and the search providers got a
+  command each; night light a handle beside its link, since its commands
+  are a plain toggle's. The idle backend has a second thread for that,
+  which shares the event queue's handle with the one that reads.
+- **Watching one file.** GIO's file monitor with `WATCH_MOVES` follows a
+  file that is replaced by renaming another over it, and one that only
+  comes to exist later. A link's target is watched as well. The plan had
+  the watching in the config crate; it is in the shell, where GIO is.
+- **A mistake in the file is told of as an application would**: through
+  `GApplication`'s notification, which reaches gniri's own server (or
+  whichever serves the session). No road of gniri's own into its
+  notification list was built for it.
+- **A callback may own a subscription to the store it is subscribed to.**
+  Dropping the outer subscription then dropped the inner one from inside
+  the store's own list, which was borrowed: a panic, and from a
+  destructor an abort. Nothing had dropped a surface while the shell kept
+  running until a changed setting did; an unplugged output would have
+  been next.
+- **A list is taken out of its cell while its members are built or
+  dropped.** Both run code of other modules, which may ask for the list.
+- **What waits for an output and what does not.** With no output left, a
+  question from an agent waits and is asked when one returns; the
+  end-session dialog is taken as cancelled, so that nothing counts down
+  unseen; a banner's turn is over, or nothing after it would get one.
+- **An installed file names what it starts by its full path.** niri and
+  systemd start programs with whatever `PATH` they were given, which need
+  not be a login shell's. The installer writes the binary's path into the
+  fragment's binds and the unit.
+- **A licence line and no more.** Every source file names its licence in
+  the SPDX form. A copyright line with a name on it is the owner's to
+  add.
+
+### Harness
+
+- **The nested compositor's output cannot be unplugged**: `niri msg
+  output winit off` does nothing there, and no other compositor with
+  layer-shell is installed. `gniri msg debug unplug` enters the shell
+  where GTK's report of the change does. It found nothing new, the fault
+  it was written to look for having shown itself in the config check
+  first; it now keeps that fault from coming back.
+- **A dump can be taken before a surface that was mapped again has its
+  final layout**, `debug sync` notwithstanding: one run in six had a menu
+  entry 168 pixels from where it ended up. A click that does not find its
+  widget under the pointer looks again where the widget is.
+- **Two calls sent from two threads arrive in either order.** A test that
+  needs them in line pauses between them.
+- **The niri fragment is validated by a test**, as written and as
+  installed, where the plan had it as a rule to remember.
+
 ## Standing rules
 
 - Nested niri: never `--session`; find the instance through the `NIRI_SOCKET`

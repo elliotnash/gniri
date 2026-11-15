@@ -3,8 +3,7 @@
 The goal is GNOME Shell 51 with blur-my-shell v78 at default settings, dark
 style. "Identical" means: theme values equal, layout within half a pixel, and
 pixels within the thresholds in `tests/visual/thresholds.toml`. This file
-lists everything known to fall outside that, and why. It grows with each
-milestone.
+lists everything known to fall outside that, and why.
 
 ## Blur
 
@@ -59,12 +58,12 @@ milestone.
 - **Settings.** Entries such as "Power Settings" start GNOME Settings
   (`gnome-control-center`, configurable). Much of it expects
   gnome-settings-daemon and will not work under niri.
-- **Wi-Fi.** A network that needs a password opens the settings application
-  instead of asking (the dialog arrives with M6). A network name is listed
-  once even when its access points differ in security. Hotspot, VPN, modem
-  and Bluetooth-tether toggles are not there.
+- **Wi-Fi.** A network name is listed once even when its access points
+  differ in security. Hotspot, VPN, modem and Bluetooth-tether toggles are
+  not there. See "Network passwords" for the dialog that asks for one.
 - **Bluetooth.** A device that is connecting shows text where GNOME shows a
-  spinner. Pairing is not offered (M6).
+  spinner. As in GNOME, the menu lists the devices that are set up and does
+  not look for new ones: see "Bluetooth pairing".
 - **Sound.** The slider ends at 100%; GNOME's over-amplification setting is
   not supported. The device list is built as GNOME's library builds it, from
   memory of that library rather than its source.
@@ -79,6 +78,56 @@ milestone.
 - **Not ported:** the keyboard backlight item, background apps, screen
   recording and the accessibility, location, Thunderbolt and auto-rotate
   items.
+
+## Network passwords
+
+gniri is NetworkManager's secret agent, as GNOME Shell is: when a
+connection needs a password NetworkManager does not have, gniri's dialog
+asks for it.
+
+- **Not compared.** GNOME's dialog was not captured. gniri's is a port of
+  its source, built from the parts of the authentication dialog, which is
+  compared.
+- **At once.** When NetworkManager asks on its own account (a saved
+  password stopped working), GNOME shows a notification first and opens
+  the dialog on a click. gniri opens the dialog.
+- **One at a time.** Requests for several connections are asked one after
+  the other; GNOME opens a dialog for each.
+- **Nothing is kept in the keyring.** NetworkManager stores a Wi-Fi
+  password itself unless a connection says "for this user only", which
+  leaves it to the agent. GNOME's agent puts such a password in the
+  keyring and finds it there next time. gniri keeps nothing: such a
+  connection asks every time, and does not come up by itself.
+- **No VPN passwords.** GNOME hands a VPN's questions to a program the
+  VPN's plugin brings. gniri answers that it has none; NetworkManager then
+  asks another agent if one runs (`nm-applet`, say).
+- **Enterprise networks** (a user name, a certificate) that are not set up
+  yet open the settings application, as in GNOME, but on its Wi-Fi page
+  rather than on a dialog for that network.
+- **While locked** GNOME has no agent, and a connection that needs a
+  password fails. gniri's agent stays and answers that nobody answered,
+  which comes to the same.
+
+## Bluetooth pairing
+
+GNOME Shell takes no part in pairing: GNOME Settings does it all, and
+answers BlueZ's questions only while its Bluetooth panel is open. gniri is
+BlueZ's agent all the time.
+
+- **The dialog** is gniri's own. Its texts are those of gnome-bluetooth's
+  pairing dialog, which GNOME Settings shows as a window; here they are in
+  the shell's dialog. The count of digits typed so far on a keyboard is
+  not shown.
+- **Finding devices.** gniri does not search for new devices or start a
+  pairing. That is done where GNOME does it, in GNOME Settings, or with
+  `bluetoothctl`. Both bring an agent of their own, which BlueZ asks about
+  a pairing they start. gniri's answers when a device starts the pairing
+  (unless one of those has since made itself the agent to ask), and for a
+  pairing started by a program that has no agent.
+- **A device that connects by itself.** One that is paired is let in
+  without a question; one that is not is asked about. gnome-bluetooth's
+  agent lets in only an input device that is paired or trusted, and turns
+  every other away.
 
 ## Date menu
 
@@ -159,7 +208,10 @@ milestone.
   the pixel comparison: it is brighter against its surroundings than any
   other edge (tests/visual/map/polkit-dialog.toml).
 - **One output.** The dialog opens on the output with the focus, and only
-  that output is dimmed. GNOME dims every monitor.
+  that output is dimmed. GNOME dims every monitor. If that output is
+  unplugged, a password or pairing dialog opens again on another (what was
+  typed is gone), and the end-session dialog starts its minute over; with
+  no output left it is taken as cancelled.
 - **Opening.** The blur behind the dialog and its shade does not fade in
   with them (see "Blur").
 - **End-session dialog: not compared.** GNOME's was not captured. It is
@@ -337,6 +389,17 @@ search results to it and takes none of niri's own away.
   manager) are not heard.
 - **Settings** are in gniri's config file (`[idle]`, `[lock]`), not in
   GNOME Settings.
+
+## Settings
+
+- **One file.** What GNOME keeps in GSettings and shows in GNOME Settings
+  is, as far as gniri has it, in `~/.config/gniri/config.toml`
+  (docs/CONFIG.md). A change to the file takes effect at once. GNOME
+  Settings' own pages for the same things (the dash's favourites, the
+  search providers, blank-screen delay, night light) change nothing in
+  gniri.
+- **The one exception** is the dark style, which is the setting
+  applications read.
 
 ## Compositor-owned
 

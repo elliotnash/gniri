@@ -4,7 +4,7 @@
 cargo test --workspace          # logic, theme values, backends; no display needed
 cargo xtask diff quick-settings # looks: gniri against the GNOME reference
 cargo xtask check               # behaviour: gniri driven in a live session
-cargo xtask check overview      # one part of it (see `cargo xtask check --help`)
+cargo xtask check overview      # one part of it (see "What the checks cover")
 cargo xtask report              # diff every component, write an HTML page
 ```
 
@@ -25,6 +25,11 @@ skips each of these with a note when its tools are not installed:
 
 - **UPower, NetworkManager, BlueZ**: python-dbusmock (`python3-dbusmock`) on
   a private bus (`crates/services/tests/*_bus.rs`).
+- **The two agents** (for Wi-Fi passwords and for Bluetooth pairing): the
+  test itself owns NetworkManager's or BlueZ's name on a private bus and
+  asks the agent what the service would
+  (`crates/services/tests/network_agent_bus.rs`, `bluetooth_agent_bus.rs`).
+  Needs only `dbus-daemon`.
 - **Sound**: a private PipeWire with null devices
   (`crates/services/tests/audio_server.rs`); your own sound server is not
   touched.
@@ -128,7 +133,8 @@ Some scenes have no GNOME capture to compare with and exist to be looked
 at: `cargo xtask shot look --scene date-menu-media --wallpaper '#808080'`
 (a media player's card), `date-menu-group` (an opened group),
 `date-menu-empty`, `quick-settings-busy`, `end-session` (the dialog that
-asks before powering off).
+asks before powering off), `wifi-password` (the one that asks for a
+network's password) and `bluetooth-pairing` (a number to compare).
 
 ### The lock screen and the dialogs
 
@@ -149,6 +155,44 @@ virtual keyboard: a wrong password, the right one, the desktop back.
 GNOME's own lock screen was only captured over the real wallpaper, so
 `lock-clock` and `lock-prompt` have no flat-wallpaper tier. The user's
 name and picture are blacked out of the committed references.
+
+### What the checks cover
+
+`cargo xtask check` runs these parts, each in a session of its own; a
+part's name after `check` runs that one alone.
+
+| Part | What it drives |
+|---|---|
+| `panel` | Workspace dots, the overview's look, fullscreen, with real services |
+| `overview` | The dash, the app grid, the search and its keys |
+| `quick-settings` | The menu, its toggles and sliders, the on-screen display |
+| `notifications` | Banners, the list, do not disturb |
+| `notifications-bus` | The same over D-Bus, with `notify-send` |
+| `session` | The end-session dialog and what idleness does |
+| `lock` | The lock screen, locking the nested session for real |
+| `polkit` | The authentication dialog |
+| `agents` | The Wi-Fi password and Bluetooth pairing dialogs |
+| `config` | The config file changing under a running shell |
+| `outputs` | Outputs going and coming back, and one changing its scale |
+
+Two of them need saying more about.
+
+**`config`** writes a config file of its own and rewrites it step by
+step, moving each version into place as an editor does. With a fixture
+for services, what a backend was told is read from the command log. Its
+last steps run without a fixture, on the nested session's own bus, where
+gniri is the notification server: a file with a mistake in it has to
+produce a banner.
+
+**`outputs`**: the nested compositor has one output, and it cannot be
+unplugged (`niri msg output winit off` does nothing there). So `gniri msg
+debug unplug` has the shell behave as if every output had gone, and
+`--back` as if they had returned. From the moment GTK reports the change
+that is the same code a real unplugging runs: every surface of the output
+is torn down, and built again. What it cannot show is what the
+compositor and GTK do before that moment, and anything that needs two
+outputs at once; those are on the list for the real session below. The
+change of scale in the same part is the compositor's own.
 
 ## Adding a component
 
@@ -191,6 +235,9 @@ gniri msg apps                   # the overview, on the app grid
 gniri msg debug show-apps --off  # back to the windows
 gniri msg debug search calc      # as if typed into the overview
 gniri msg debug page 1           # the app grid's second page
+gniri msg debug pairing confirm --device Phone --pin 482193   # as if BlueZ asked
+gniri msg debug unplug           # as if every output had been unplugged
+gniri msg debug unplug --back
 ```
 
 `debug notify` delivers a notification as if an application had sent it.
@@ -200,14 +247,18 @@ runs there.
 `nest` prints the sockets of the nested session. With `GNIRI_SOCKET` set to
 the `gniri_socket` path in `target/visual/logs/nest.ready`, `gniri msg`
 reaches that shell. Without `--scene` the nested shell uses the real
-services: what you click there happens.
+services: what you click there happens. It is then also an agent of the
+real NetworkManager and BlueZ for as long as it runs: joining a Wi-Fi
+network from its menu asks for the password in its window, and a
+Bluetooth pairing question may come up there.
 
 ## The real session
 
 What no nested session can show, and so what is checked by hand after
 logging in to niri with gniri as the shell: locking with the real password
 and a fingerprint, suspend and lid close, the idle chain on the real
-backlight, `pkexec`, restart, power off and log out.
+backlight, `pkexec`, restart, power off and log out, a real Wi-Fi password
+and a real Bluetooth pairing, and a second monitor.
 
 Before the first try, know the way back in. The lock is the compositor's:
 if the lock screen ever fails to take a password, or dies, the session
@@ -247,4 +298,22 @@ Then, in the session:
 - Super+A: every application, in pages; scrolling and the arrows turn
   them. On a second monitor the same shows, and the keyboard is with the
   output that has the focus.
+- A Wi-Fi network you have never joined, from the Wi-Fi menu: the dialog
+  asks for its password, a wrong one makes NetworkManager ask again, the
+  right one connects, and the network is known afterwards. Cancel leaves
+  it unconnected. (`nmcli connection delete <name>` forgets it for another
+  try.)
+- Bluetooth: put a phone in pairing mode and start the pairing from the
+  phone, with GNOME Settings closed. gniri's dialog shows the number the
+  phone shows; Confirm pairs, Cancel does not. For a device that only
+  takes pairings, `bluetoothctl` with `agent off` and then `pair <address>`
+  leaves the questions to gniri.
+- Change `~/.config/gniri/config.toml` while gniri runs: the clock's
+  format, the wallpaper, the dash's favourites. Each shows at once. Put a
+  mistake in: a banner says where, and nothing changes.
+- With a second monitor: plug it in and out while a menu, the overview
+  and a dialog are open in turn, on either screen. Each output has its
+  bar and wallpaper again when it returns; nothing is left behind on the
+  one that stayed, and gniri keeps running. Close the lid with the
+  external monitor attached, and open it again.
 - `journalctl --user -b | grep gniri` afterwards: nothing unexpected.
