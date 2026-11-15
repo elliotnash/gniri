@@ -574,7 +574,7 @@ mod tests {
                 id: id.to_owned(),
                 name: "Chat".to_owned(),
                 icon: Some("org.example.Chat".to_owned()),
-                exec: None,
+                ..DesktopEntry::default()
             })
         };
         let by_hint = incoming(

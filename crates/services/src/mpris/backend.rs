@@ -339,7 +339,7 @@ mod tests {
                 id: id.to_owned(),
                 name: "Music".to_owned(),
                 icon: Some("org.example.Player".to_owned()),
-                exec: None,
+                ..DesktopEntry::default()
             })
         });
         assert_eq!(installed.name, "Music");

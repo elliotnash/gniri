@@ -69,6 +69,27 @@
 # Lock before the machine sleeps. Default: true.
 # on_suspend = false
 
+[dash]
+# The applications that are always in the dash, in order, by desktop entry
+# (the name of a file in /usr/share/applications or
+# ~/.local/share/applications, with or without ".desktop"). One that is not
+# installed is left out. Default: GNOME's (Firefox, Calendar, Files,
+# Software, Text Editor, Calculator).
+# favorites = ["org.mozilla.firefox", "org.gnome.Nautilus", "org.gnome.Settings"]
+
+# The size of the dash's icons: 16, 22, 24, 32, 48 or 64. Default: the
+# largest that fits the screen, as in GNOME.
+# icon_size = 48
+
+[search]
+# Ask the applications that offer search results (Files, Calculator,
+# Characters, Software and so on) beside finding applications by name.
+# Default: true.
+# providers = false
+
+# Applications that are not asked, by desktop entry.
+# disabled = ["org.gnome.Software", "org.gnome.Boxes"]
+
 [commands]
 # The settings application, started as `<settings> <panel>` by entries such
 # as "Power Settings" (panels: power, wifi, bluetooth, sound). Default:

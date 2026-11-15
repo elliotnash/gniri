@@ -5,6 +5,7 @@
 //! it, and (where it exists yet) the backend that talks to the system. No
 //! GTK here: backends hand events to the main loop over a channel.
 
+pub mod apps;
 pub mod audio;
 pub mod auth;
 pub mod bluetooth;
@@ -24,6 +25,7 @@ pub mod notifications;
 pub mod polkit;
 pub mod power;
 pub mod rfkill;
+pub mod search;
 pub mod session;
 pub mod toggles;
 pub mod user;

@@ -22,6 +22,8 @@ pub struct Config {
     pub night_light: NightLight,
     pub idle: Idle,
     pub lock: Lock,
+    pub dash: Dash,
+    pub search: Search,
     pub commands: Commands,
 }
 
@@ -198,6 +200,61 @@ impl Default for Lock {
     }
 }
 
+/// The dash at the bottom of the overview.
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct Dash {
+    /// The applications that are always in the dash, in order, by desktop
+    /// entry: "org.gnome.Nautilus", with or without ".desktop". One that
+    /// is not installed is left out. The default is GNOME's.
+    pub favorites: Vec<String>,
+    /// The size of the icons, of 16, 22, 24, 32, 48 and 64. Unset, it is
+    /// the largest that fits the screen, as in GNOME.
+    pub icon_size: Option<u32>,
+}
+
+/// dash.js `baseIconSizes`.
+const DASH_ICON_SIZES: [u32; 6] = [16, 22, 24, 32, 48, 64];
+
+impl Default for Dash {
+    fn default() -> Self {
+        // org.gnome.shell's `favorite-apps`.
+        let favorites = [
+            "org.mozilla.firefox",
+            "org.gnome.Calendar",
+            "org.gnome.Nautilus",
+            "org.gnome.Software",
+            "org.gnome.TextEditor",
+            "org.gnome.Calculator",
+        ];
+        Self {
+            favorites: favorites.map(str::to_owned).to_vec(),
+            icon_size: None,
+        }
+    }
+}
+
+/// The overview's search.
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct Search {
+    /// Ask the applications that offer results (Files, Calculator,
+    /// Software and so on), beside finding applications by name. GNOME
+    /// Settings calls these "App Results".
+    pub providers: bool,
+    /// Applications that are not asked, by desktop entry.
+    pub disabled: Vec<String>,
+}
+
+impl Default for Search {
+    fn default() -> Self {
+        Self {
+            providers: true,
+            disabled: Vec::new(),
+        }
+    }
+}
+
 /// Programs gniri starts.
 #[derive(Clone, Debug, PartialEq, Deserialize)]
 #[serde(default, deny_unknown_fields)]
@@ -285,6 +342,24 @@ impl Config {
                 "panel.outputs: an output name cannot be empty".to_owned(),
             ));
         }
+        if let Some(size) = config.dash.icon_size
+            && !DASH_ICON_SIZES.contains(&size)
+        {
+            return Err(Error::Invalid(format!(
+                "dash.icon_size: {size} is not one of 16, 22, 24, 32, 48 and 64"
+            )));
+        }
+        for (key, list) in [
+            ("dash.favorites", &config.dash.favorites),
+            ("search.disabled", &config.search.disabled),
+        ] {
+            if list.iter().any(|id| id.is_empty() || id.contains('/')) {
+                return Err(Error::Invalid(format!(
+                    "{key}: an application is named by its desktop entry, \
+                     such as \"org.gnome.Nautilus\""
+                )));
+            }
+        }
         Ok(config)
     }
 
@@ -340,6 +415,11 @@ mod tests {
         assert_eq!(config.idle.blank_after, 300);
         assert!(config.idle.dim && config.lock.automatic && config.lock.on_suspend);
         assert_eq!(config.lock.delay, 0);
+        // GNOME's favourites, icons as large as fit, every provider asked.
+        assert_eq!(config.dash.favorites.len(), 6);
+        assert_eq!(config.dash.favorites[2], "org.gnome.Nautilus");
+        assert_eq!(config.dash.icon_size, None);
+        assert!(config.search.providers && config.search.disabled.is_empty());
     }
 
     #[test]
@@ -377,11 +457,36 @@ mod tests {
             delay = 30
             on_suspend = false
 
+            [dash]
+            favorites = ["org.gnome.Nautilus.desktop", "firefox"]
+            icon_size = 48
+
+            [search]
+            providers = false
+            disabled = ["org.gnome.Software"]
+
             [commands]
             settings = "my-settings"
             "##,
         )
         .unwrap();
+        assert_eq!(
+            config.dash,
+            Dash {
+                favorites: vec![
+                    "org.gnome.Nautilus.desktop".to_owned(),
+                    "firefox".to_owned()
+                ],
+                icon_size: Some(48),
+            }
+        );
+        assert_eq!(
+            config.search,
+            Search {
+                providers: false,
+                disabled: vec!["org.gnome.Software".to_owned()],
+            }
+        );
         assert_eq!(
             config.wallpaper.image.as_deref(),
             Some(Path::new("/home/someone/Pictures/wall.jxl"))
@@ -472,6 +577,18 @@ mod tests {
         ));
         assert!(matches!(
             Config::from_toml("[wallpaper]\nimage = \"~/a.png\"", None),
+            Err(Error::Invalid(_))
+        ));
+        assert!(matches!(
+            parse("[dash]\nicon_size = 40"),
+            Err(Error::Invalid(_))
+        ));
+        assert!(matches!(
+            parse("[dash]\nfavorites = [\"/usr/share/applications/a.desktop\"]"),
+            Err(Error::Invalid(_))
+        ));
+        assert!(matches!(
+            parse("[search]\ndisabled = [\"\"]"),
             Err(Error::Invalid(_))
         ));
     }

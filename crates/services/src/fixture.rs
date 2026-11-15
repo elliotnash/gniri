@@ -11,8 +11,8 @@ use gniri_core::{FixedClock, LocalTime};
 use serde::Deserialize;
 
 use crate::{
-    audio, bluetooth, brightness, idle, mpris, network, notifications, polkit, power, rfkill,
-    session, toggles, user,
+    apps, audio, bluetooth, brightness, idle, mpris, network, notifications, polkit, power, rfkill,
+    search, session, toggles, user,
 };
 
 #[derive(Clone, Debug, Default, PartialEq, Deserialize)]
@@ -33,6 +33,11 @@ pub struct Fixture {
     pub notifications: notifications::State,
     pub mpris: mpris::State,
     pub idle: idle::State,
+    /// The applications the dash, the app grid and the search show.
+    pub apps: apps::State,
+    /// The search providers, with what each finds whatever is searched
+    /// for: nothing answers a scene's search.
+    pub search: search::State,
     /// Who the lock screen and the authentication dialog show.
     pub user: user::User,
     /// For `gniri lock`.

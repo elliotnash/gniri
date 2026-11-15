@@ -1,4 +1,5 @@
-//! The niri compositor: workspaces, overview, keyboard layouts, screencasts.
+//! The niri compositor: workspaces, windows, overview, keyboard layouts,
+//! screencasts.
 //!
 //! niri's IPC is a Unix socket (`$NIRI_SOCKET`) speaking JSON. One connection
 //! carries the event stream, read on its own thread; requests each open a
@@ -28,6 +29,23 @@ pub struct State {
     pub keyboard_layout: usize,
     /// PipeWire sessions that are sharing the screen or a window right now.
     pub screencast_sessions: Vec<u64>,
+    /// Every open window, oldest first as far as niri's ids tell.
+    pub windows: Vec<Window>,
+}
+
+/// An application's window.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct Window {
+    pub id: u64,
+    /// The Wayland application id, which names the desktop entry of a
+    /// well-behaved application.
+    pub app_id: Option<String>,
+    pub title: Option<String>,
+    pub focused: bool,
+    /// When it last had the focus, on the monotonic clock: seconds and
+    /// nanoseconds. Unset for a window that never had it.
+    pub focus_time: Option<(u64, u32)>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Deserialize)]
@@ -108,6 +126,21 @@ impl Tracker {
         screencast_sessions.sort_unstable();
         screencast_sessions.dedup();
 
+        let mut windows: Vec<Window> = self
+            .raw
+            .windows
+            .windows
+            .values()
+            .map(|window| Window {
+                id: window.id,
+                app_id: window.app_id.clone().filter(|id| !id.is_empty()),
+                title: window.title.clone(),
+                focused: window.is_focused,
+                focus_time: window.focus_timestamp.map(|time| (time.secs, time.nanos)),
+            })
+            .collect();
+        windows.sort_by_key(|window| window.id);
+
         State {
             connected: true,
             workspaces,
@@ -116,6 +149,7 @@ impl Tracker {
             keyboard_layouts,
             keyboard_layout,
             screencast_sessions,
+            windows,
         }
     }
 }
@@ -224,6 +258,17 @@ impl Client {
     pub fn stop_screencast(&self, session_id: u64) -> Result<(), String> {
         self.action(Action::StopCast { session_id })
     }
+
+    /// Starts a program as niri starts the ones its key bindings name: in
+    /// the session's environment, and under systemd in a scope of its own.
+    pub fn spawn(&self, command: Vec<String>) -> Result<(), String> {
+        self.action(Action::Spawn { command })
+    }
+
+    /// Gives a window the keyboard focus, switching to its workspace.
+    pub fn focus_window(&self, id: u64) -> Result<(), String> {
+        self.action(Action::FocusWindow { id })
+    }
 }
 
 #[cfg(test)]
@@ -309,6 +354,55 @@ mod tests {
         assert_eq!(state.keyboard_layouts, ["English (US)", "German"]);
         assert_eq!(state.keyboard_layout, 1);
         assert!(state.overview_open);
+    }
+
+    #[test]
+    fn windows_are_listed_by_id_with_their_application_and_focus() {
+        let window = |id, app_id: &str, is_focused| niri_ipc::Window {
+            id,
+            title: Some(format!("Window {id}")),
+            app_id: Some(app_id.to_owned()),
+            pid: None,
+            workspace_id: Some(1),
+            is_focused,
+            is_floating: false,
+            is_urgent: false,
+            layout: niri_ipc::WindowLayout {
+                pos_in_scrolling_layout: None,
+                tile_size: (0.0, 0.0),
+                window_size: (0, 0),
+                tile_pos_in_workspace_view: None,
+                window_offset_in_tile: (0.0, 0.0),
+            },
+            focus_timestamp: is_focused.then_some(niri_ipc::Timestamp { secs: 5, nanos: 7 }),
+        };
+        let mut tracker = Tracker::default();
+        let state = tracker.apply(Event::WindowsChanged {
+            windows: vec![
+                window(9, "org.example.B", true),
+                window(4, "org.example.A", false),
+                window(6, "", false),
+            ],
+        });
+        let listed: Vec<(u64, Option<&str>, bool)> = state
+            .windows
+            .iter()
+            .map(|window| (window.id, window.app_id.as_deref(), window.focused))
+            .collect();
+        assert_eq!(
+            listed,
+            [
+                (4, Some("org.example.A"), false),
+                (6, None, false),
+                (9, Some("org.example.B"), true),
+            ]
+        );
+        assert_eq!(state.windows[2].focus_time, Some((5, 7)));
+
+        let state = tracker.apply(Event::WindowClosed { id: 4 });
+        assert_eq!(state.windows.len(), 2);
+        let state = tracker.apply(Event::WindowFocusChanged { id: Some(6) });
+        assert!(state.windows[0].focused && !state.windows[1].focused);
     }
 
     #[test]
