@@ -100,6 +100,9 @@ pub enum Request {
     Page(usize),
     /// Ask a Bluetooth pairing question, as if BlueZ had asked the agent.
     Pairing(Pairing),
+    /// Take every output's surfaces away as if all outputs had been
+    /// unplugged (false), or build them again (true).
+    Outputs(bool),
 }
 
 /// A question for [`Request::Pairing`].

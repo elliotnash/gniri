@@ -547,7 +547,7 @@ fn panel_and_overview() -> Result<(usize, usize)> {
 type Part = fn() -> Result<(usize, usize)>;
 
 /// The parts, by the names `cargo xtask check <part>` takes.
-const PARTS: [(&str, Part); 10] = [
+const PARTS: [(&str, Part); 11] = [
     ("panel", panel_and_overview),
     ("overview", overview),
     ("quick-settings", quick_settings),
@@ -558,6 +558,7 @@ const PARTS: [(&str, Part); 10] = [
     ("polkit", authentication_dialog),
     ("agents", agent_dialogs),
     ("config", config_reload),
+    ("outputs", outputs_coming_and_going),
 ];
 
 /// Runs every part, or only the one called `only`.
@@ -2041,6 +2042,213 @@ fn config_reload() -> Result<(usize, usize)> {
     passed += bus_passed;
     failed += bus_failed;
     let _ = fs::remove_file(&config);
+    Ok((passed, failed))
+}
+
+/// Outputs going away and coming back, and one changing its scale.
+///
+/// The nested compositor has one output, which cannot be unplugged. So
+/// `gniri msg debug unplug` has the shell behave as if every output had
+/// gone: it takes the same way through the shell that a real unplugging
+/// does from the moment GTK reports it. The change of scale is the
+/// compositor's own.
+fn outputs_coming_and_going() -> Result<(usize, usize)> {
+    let session = fixture_session(
+        "check-outputs",
+        r#"
+        time = "2026-11-14T08:28:00"
+        power = { battery = { percentage = 91 } }
+        session = { can_power_off = true }
+        network = { primary = { kind = "wifi", strength = 70 }, wifi = { enabled = true } }
+        "#,
+    )?;
+    let mut checker = Checker {
+        session,
+        passed: 0,
+        failed: 0,
+    };
+    let mapped = |session: &Session| -> Result<Vec<String>> {
+        let dump = session.dump_tree()?;
+        let surfaces = dump["surfaces"]
+            .as_array()
+            .ok_or_else(|| anyhow!("the dump has no surfaces"))?;
+        Ok(surfaces
+            .iter()
+            .filter_map(|surface| surface["namespace"].as_str().map(str::to_owned))
+            .collect())
+    };
+    let unplug = |session: &Session| session.gniri_msg(&["debug", "unplug"]).map(drop);
+    let plug = |session: &Session| session.gniri_msg(&["debug", "unplug", "--back"]).map(drop);
+    let desktop = ["gniri-backdrop", "gniri-panel", "gniri-wallpaper"];
+
+    println!("outputs: unplugged and back");
+    checker
+        .session
+        .gniri_msg(&["debug", "open-menu", "quick-settings"])?;
+    checker.expect("(a menu is open)", |session| {
+        Ok(surface(session, "gniri-stage")?.is_some())
+    });
+    unplug(&checker.session)?;
+    checker.expect(
+        "with no output left the shell shows nothing, and runs",
+        |session| Ok(mapped(session)?.is_empty()),
+    );
+    checker.expect("and no menu is still taken to be open", |session| {
+        Ok(session
+            .gniri_msg(&["debug", "open-submenu", "wifi"])
+            .is_err())
+    });
+    plug(&checker.session)?;
+    checker.expect(
+        "an output that comes back gets its panel and wallpaper",
+        |session| Ok(mapped(session)? == desktop),
+    );
+    checker
+        .session
+        .gniri_msg(&["debug", "open-menu", "quick-settings"])?;
+    checker.expect("and menus open on it", |session| {
+        Ok(on_stage(session, ".quick-settings")?.is_some())
+    });
+    checker.session.gniri_msg(&["debug", "close-menu"])?;
+
+    println!("outputs: banners");
+    let notify = |session: &Session, arguments: &[&str]| -> Result<()> {
+        let mut command = vec!["debug", "notify", "--app", "Tester"];
+        command.extend(arguments);
+        session.gniri_msg(&command).map(drop)
+    };
+    let banner_title = |session: &Session| -> Result<Option<String>> {
+        Ok(surface(session, "gniri-banner")?
+            .and_then(|banner| text_of(&banner["tree"], ".message-title")))
+    };
+    // A critical one: it would stay up for good.
+    notify(&checker.session, &["--urgency", "critical", "Stays up"])?;
+    checker.expect("(a banner is up)", |session| {
+        Ok(banner_title(session)?.as_deref() == Some("Stays up"))
+    });
+    unplug(&checker.session)?;
+    notify(&checker.session, &["Sent to nobody"])?;
+    std::thread::sleep(std::time::Duration::from_millis(300));
+    plug(&checker.session)?;
+    checker.expect("a banner that lost its output is over", |session| {
+        Ok(mapped(session)? == desktop)
+    });
+    notify(&checker.session, &["After the return"])?;
+    checker.expect("and the next notification gets one again", |session| {
+        Ok(banner_title(session)?.as_deref() == Some("After the return"))
+    });
+    checker
+        .session
+        .gniri_msg(&["debug", "open-menu", "date-menu"])?;
+    checker.expect("all three are in the list", |session| {
+        let Some(stage) = surface(session, "gniri-stage")? else {
+            return Ok(false);
+        };
+        let texts = texts(&stage["tree"]);
+        Ok(["Stays up", "Sent to nobody", "After the return"]
+            .iter()
+            .all(|title| texts.iter().any(|text| text == title)))
+    });
+    checker.session.gniri_msg(&["debug", "close-menu"])?;
+
+    println!("outputs: dialogs");
+    let dialog_title = |session: &Session| -> Result<Option<String>> {
+        Ok(
+            on_surface(session, "gniri-dialog", ".message-dialog-title")?
+                .and_then(|title| title["text"].as_str().map(str::to_owned)),
+        )
+    };
+    checker
+        .session
+        .gniri_msg(&["debug", "pairing", "pair", "--device", "Example Phone"])?;
+    checker.expect("(a pairing question is asked)", |session| {
+        Ok(dialog_title(session)?.as_deref() == Some("Bluetooth Pairing Request"))
+    });
+    unplug(&checker.session)?;
+    checker.expect("(its dialog goes with the output)", |session| {
+        Ok(mapped(session)?.is_empty())
+    });
+    plug(&checker.session)?;
+    checker.expect("a question waits for an output to be asked on", |session| {
+        Ok(dialog_title(session)?.as_deref() == Some("Bluetooth Pairing Request"))
+    });
+    checker.session.gniri_msg(&["debug", "close-dialog"])?;
+    checker.session.gniri_msg(&["power-off"])?;
+    checker.expect("(the power-off dialog counts down)", |session| {
+        Ok(dialog_title(session)?.as_deref() == Some("Power Off"))
+    });
+    unplug(&checker.session)?;
+    plug(&checker.session)?;
+    checker.expect("powering off is not left counting down unseen", |session| {
+        Ok(mapped(session)? == desktop && !sent(session, "session:")?)
+    });
+
+    println!("outputs: the overview");
+    checker.session.action(Action::OpenOverview {})?;
+    checker.expect("(the overview is dressed)", |session| {
+        Ok(on_surface(session, "gniri-overview", "#dash")?.is_some())
+    });
+    unplug(&checker.session)?;
+    plug(&checker.session)?;
+    checker.expect(
+        "an output that comes back into the overview is dressed too",
+        |session| Ok(on_surface(session, "gniri-overview", "#dash")?.is_some()),
+    );
+    checker.session.action(Action::CloseOverview {})?;
+    checker.expect("(and undressed with it)", |session| {
+        Ok(surface(session, "gniri-overview")?.is_none())
+    });
+
+    println!("outputs: another scale");
+    let geometry = |session: &Session, namespace: &str| -> Result<Option<(i64, i64, f64)>> {
+        Ok(surface(session, namespace)?.and_then(|surface| {
+            Some((
+                surface["width"].as_i64()?,
+                surface["height"].as_i64()?,
+                surface["scale"].as_f64()?,
+            ))
+        }))
+    };
+    let set_scale = |session: &Session, scale: f64| -> Result<()> {
+        session
+            .request(niri_ipc::Request::Output {
+                output: "winit".to_owned(),
+                action: niri_ipc::OutputAction::Scale {
+                    scale: niri_ipc::ScaleToSet::Specific(scale),
+                },
+            })
+            .map(drop)
+    };
+    set_scale(&checker.session, 2.0)?;
+    checker.expect(
+        "the panel and the wallpaper follow the output's scale",
+        |session| {
+            Ok(geometry(session, "gniri-panel")? == Some((800, 32, 2.0))
+                && geometry(session, "gniri-wallpaper")? == Some((800, 500, 2.0)))
+        },
+    );
+    checker
+        .session
+        .gniri_msg(&["debug", "open-menu", "quick-settings"])?;
+    checker.expect("and a menu fits the smaller screen", |session| {
+        let Some(menu) = on_stage(session, ".quick-settings")? else {
+            return Ok(false);
+        };
+        let [x, y, width, height] = tree::rect(&menu, "box")?;
+        Ok(x >= 0.0 && y >= 32.0 && x + width <= 800.0 && y + height <= 500.0)
+    });
+    checker.session.gniri_msg(&["debug", "close-menu"])?;
+    set_scale(&checker.session, 1.25)?;
+    checker.expect("(and back)", |session| {
+        Ok(geometry(session, "gniri-panel")? == Some((1280, 32, 1.25)))
+    });
+
+    let Checker {
+        session,
+        passed,
+        failed,
+    } = checker;
+    session.quit()?;
     Ok((passed, failed))
 }
 

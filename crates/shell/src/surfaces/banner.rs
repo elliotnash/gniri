@@ -269,6 +269,9 @@ impl Inner {
 
     fn show(self: &Rc<Self>, shown: notifications::Banner) {
         let Some(banner) = (self.surface)() else {
+            // No output to show it on. Its turn is over all the same, or
+            // nothing after it would ever get one; it stays in the list.
+            self.services.notifications.send(Command::BannerHidden);
             return;
         };
         let found = self
@@ -437,6 +440,20 @@ impl Inner {
 }
 
 impl Tray {
+    /// To be called when outputs went away: a banner that was up on one of
+    /// them is over, and the next gets its turn elsewhere.
+    pub fn outputs_changed(&self) {
+        let orphaned = self
+            ._inner
+            .showing
+            .borrow()
+            .as_ref()
+            .is_some_and(|showing| !showing.banner.window.is_realized());
+        if orphaned {
+            self._inner.hide(false, true);
+        }
+    }
+
     /// Starts showing banners. `surface` is asked for the output's surface
     /// each time a banner is about to appear.
     pub fn start(services: &Rc<Services>, surface: impl Fn() -> Option<Banner> + 'static) -> Self {

@@ -215,23 +215,36 @@ struct Shown<D> {
     dialog: D,
 }
 
+/// Where a dialog can open.
+enum Place {
+    On(gdk::Monitor),
+    /// The lock screen has the screen: nothing asks from under it.
+    Locked,
+    /// There is no output.
+    Nowhere,
+}
+
 struct Dialogs {
     app: adw::Application,
     services: Rc<Services>,
     end_session: RefCell<Option<Shown<end_session::Dialog>>>,
     network: RefCell<Option<Shown<network::Dialog>>>,
     pairing: RefCell<Option<Shown<pairing::Dialog>>>,
+    /// Set by a test: behave as if every output had been unplugged.
+    unplugged: Cell<bool>,
 }
 
 impl Dialogs {
-    /// The monitor of the output the user is looking at, unless the
-    /// session is locked: nothing asks from under the lock screen.
-    fn monitor(&self) -> Option<gdk::Monitor> {
+    /// The monitor of the output the user is looking at.
+    fn place(&self) -> Place {
         if self.services.session.state.with(|session| session.locked) {
-            return None;
+            return Place::Locked;
+        }
+        if self.unplugged.get() {
+            return Place::Nowhere;
         }
         let output = self.services.niri.with(|niri| niri.focused_output.clone());
-        monitor(output.as_deref())
+        monitor(output.as_deref()).map_or(Place::Nowhere, Place::On)
     }
 
     /// Opens the end-session dialog, or with `None` closes it.
@@ -240,12 +253,17 @@ impl Dialogs {
             shown.dialog.close();
         }
         let Some(kind) = kind else { return };
-        match self.monitor() {
-            Some(monitor) => {
+        match self.place() {
+            Place::On(monitor) => {
                 let dialog = end_session::open(&self.app, &monitor, &self.services, kind);
                 self.end_session.replace(Some(Shown { monitor, dialog }));
             }
-            None => self.services.end_session.update(|open| *open = None),
+            // Nobody is asked whether to power off from a screen that is
+            // locked, and nobody sees a dialog that is nowhere: no minute
+            // counts down unseen.
+            Place::Locked | Place::Nowhere => {
+                self.services.end_session.update(|open| *open = None);
+            }
         }
     }
 
@@ -256,16 +274,19 @@ impl Dialogs {
             shown.dialog.close();
         }
         let Some(request) = request else { return };
-        match self.monitor() {
-            Some(monitor) => {
+        match self.place() {
+            Place::On(monitor) => {
                 let dialog = network::open(&self.app, &monitor, &self.services, request);
                 self.network.replace(Some(Shown { monitor, dialog }));
             }
-            // No screen to ask on: the answer is that nobody answered.
-            None => self
+            // GNOME has no agent while its screen is locked: the answer
+            // is that nobody answered.
+            Place::Locked => self
                 .services
                 .network_agent
                 .send(network_agent::Command::Cancel),
+            // The question waits for an output to ask it on.
+            Place::Nowhere => {}
         }
     }
 
@@ -275,49 +296,50 @@ impl Dialogs {
             shown.dialog.close();
         }
         let Some(request) = request else { return };
-        match self.monitor() {
-            Some(monitor) => {
+        match self.place() {
+            Place::On(monitor) => {
                 let dialog = pairing::open(&self.app, &monitor, &self.services, request);
                 self.pairing.replace(Some(Shown { monitor, dialog }));
             }
-            None => self
+            Place::Locked => self
                 .services
                 .bluetooth_agent
                 .send(bluetooth_agent::Command::Reject),
+            Place::Nowhere => {}
         }
     }
 
-    /// A dialog whose output was unplugged opens again where the user is
-    /// now. (The end-session dialog's minute starts over.)
-    fn monitors_changed(&self, monitors: &gio::ListModel) {
-        let present: Vec<gdk::Monitor> = monitors
-            .iter::<gdk::Monitor>()
-            .filter_map(Result::ok)
-            .collect();
-        let gone = |monitor: &gdk::Monitor| !present.contains(monitor);
-        if self
-            .end_session
-            .borrow()
-            .as_ref()
-            .is_some_and(|shown| gone(&shown.monitor))
-        {
+    /// The outputs there are have changed. A dialog whose output is gone
+    /// opens again where the user is now, and a question that had no
+    /// output to be asked on is asked.
+    fn outputs_changed(&self) {
+        let present: Vec<gdk::Monitor> = if self.unplugged.get() {
+            Vec::new()
+        } else {
+            gdk::Display::default()
+                .map(|display| {
+                    display
+                        .monitors()
+                        .iter::<gdk::Monitor>()
+                        .filter_map(Result::ok)
+                        .collect()
+                })
+                .unwrap_or_default()
+        };
+        // A dialog that is where it can stay is left alone.
+        fn misplaced<D>(slot: &RefCell<Option<Shown<D>>>, present: &[gdk::Monitor]) -> bool {
+            slot.borrow()
+                .as_ref()
+                .is_none_or(|shown| !present.contains(&shown.monitor))
+        }
+        if misplaced(&self.end_session, &present) {
             self.show_end_session(self.services.end_session.get());
         }
-        if self
-            .network
-            .borrow()
-            .as_ref()
-            .is_some_and(|shown| gone(&shown.monitor))
-        {
+        if misplaced(&self.network, &present) {
             let request = self.services.network_agent.state.get().request;
             self.show_network(request.as_ref());
         }
-        if self
-            .pairing
-            .borrow()
-            .as_ref()
-            .is_some_and(|shown| gone(&shown.monitor))
-        {
+        if misplaced(&self.pairing, &present) {
             let request = self.services.bluetooth_agent.state.get().request;
             self.show_pairing(request.as_ref());
         }
@@ -327,8 +349,18 @@ impl Dialogs {
 /// Shows the shell's own dialogs when their state says so. Dropping it
 /// stops that.
 pub struct Host {
+    dialogs: Rc<Dialogs>,
     _subscriptions: Vec<Subscription>,
     monitors: Option<(gio::ListModel, glib::SignalHandlerId)>,
+}
+
+impl Host {
+    /// For tests, with [`crate::outputs::Outputs::set_unplugged`]: behave
+    /// as if every output had been unplugged, or plugged in again.
+    pub fn set_unplugged(&self, unplugged: bool) {
+        self.dialogs.unplugged.set(unplugged);
+        self.dialogs.outputs_changed();
+    }
 }
 
 impl Drop for Host {
@@ -349,6 +381,7 @@ pub fn host(app: &adw::Application, services: &Rc<Services>) -> Host {
         end_session: RefCell::new(None),
         network: RefCell::new(None),
         pairing: RefCell::new(None),
+        unplugged: Cell::new(false),
     });
     let subscriptions = vec![
         services.end_session.select(|kind| *kind, {
@@ -361,7 +394,7 @@ pub fn host(app: &adw::Application, services: &Rc<Services>) -> Host {
             .select(|state| state.request.clone(), {
                 let dialogs = Rc::clone(&dialogs);
                 move |request: &Option<network_agent::Request>| {
-                    dialogs.show_network(request.as_ref())
+                    dialogs.show_network(request.as_ref());
                 }
             }),
         services
@@ -370,7 +403,7 @@ pub fn host(app: &adw::Application, services: &Rc<Services>) -> Host {
             .select(|state| state.request.clone(), {
                 let dialogs = Rc::clone(&dialogs);
                 move |request: &Option<bluetooth_agent::Request>| {
-                    dialogs.show_pairing(request.as_ref())
+                    dialogs.show_pairing(request.as_ref());
                 }
             }),
     ];
@@ -378,15 +411,16 @@ pub fn host(app: &adw::Application, services: &Rc<Services>) -> Host {
         let monitors = display.monitors();
         let handler = monitors.connect_items_changed({
             let dialogs = Rc::downgrade(&dialogs);
-            move |monitors, _, _, _| {
+            move |_, _, _, _| {
                 if let Some(dialogs) = dialogs.upgrade() {
-                    dialogs.monitors_changed(monitors);
+                    dialogs.outputs_changed();
                 }
             }
         });
         (monitors, handler)
     });
     Host {
+        dialogs,
         _subscriptions: subscriptions,
         monitors,
     }

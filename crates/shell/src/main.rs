@@ -175,6 +175,12 @@ enum DebugRequest {
     Page { page: usize },
     /// Ask a Bluetooth pairing question, as if BlueZ had asked.
     Pairing(ipc::Pairing),
+    /// Behave as if every output had been unplugged, or with `--back` as
+    /// if they had been plugged in again.
+    Unplug {
+        #[arg(long)]
+        back: bool,
+    },
     /// Report an idle timer as passed, as the compositor would after that
     /// long without input.
     Idle {
@@ -213,6 +219,7 @@ impl Message {
                 DebugRequest::Search { text, quiet } => ipc::Request::Search { text, quiet },
                 DebugRequest::Page { page } => ipc::Request::Page(page),
                 DebugRequest::Pairing(pairing) => ipc::Request::Pairing(pairing),
+                DebugRequest::Unplug { back } => ipc::Request::Outputs(back),
             },
         }
     }

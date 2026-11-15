@@ -1,7 +1,7 @@
 //! One set of surfaces per output, kept in step with outputs coming and
 //! going and with the settings changing.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use adw::prelude::*;
@@ -134,6 +134,8 @@ pub struct Outputs {
     /// Shows notification banners on the focused output.
     tray: RefCell<Option<Tray>>,
     config: RefCell<Option<Subscription>>,
+    /// Set by a test: behave as if every output had been unplugged.
+    unplugged: Cell<bool>,
 }
 
 impl Outputs {
@@ -156,6 +158,7 @@ impl Outputs {
             outputs: RefCell::new(Vec::new()),
             tray: RefCell::new(None),
             config: RefCell::new(None),
+            unplugged: Cell::new(false),
         });
 
         let monitors = gdk::Display::default()
@@ -193,23 +196,40 @@ impl Outputs {
     }
 
     fn sync(&self, monitors: &gio::ListModel) {
-        let present: Vec<gdk::Monitor> = monitors
-            .iter::<gdk::Monitor>()
-            .filter_map(Result::ok)
-            .collect();
+        let present: Vec<gdk::Monitor> = if self.unplugged.get() {
+            Vec::new()
+        } else {
+            monitors
+                .iter::<gdk::Monitor>()
+                .filter_map(Result::ok)
+                .collect()
+        };
 
-        let mut outputs = self.outputs.borrow_mut();
-        outputs.retain(|output| present.contains(&output.monitor));
+        // The surfaces of an output that went are taken out first and
+        // dropped after: dropping them runs code that may ask for the
+        // outputs there are.
+        let (kept, gone): (Vec<Output>, Vec<Output>) = self
+            .outputs
+            .take()
+            .into_iter()
+            .partition(|output| present.contains(&output.monitor));
+        self.outputs.replace(kept);
+        drop(gone);
         for monitor in present {
-            if outputs.iter().all(|output| output.monitor != monitor) {
-                outputs.push(self.build(monitor));
+            let known = self
+                .outputs
+                .borrow()
+                .iter()
+                .any(|output| output.monitor == monitor);
+            if !known {
+                let output = self.build(monitor);
+                self.outputs.borrow_mut().push(output);
             }
         }
 
         // A menu that was open on an output that is gone has no surface to
         // show on, or to be closed from.
-        let names: Vec<Option<String>> = outputs.iter().map(Output::name).collect();
-        drop(outputs);
+        let names: Vec<Option<String>> = self.outputs.borrow().iter().map(Output::name).collect();
         self.services.menus.update(|menus| {
             if menus
                 .open
@@ -219,6 +239,20 @@ impl Outputs {
                 menus.close();
             }
         });
+        // Nor has a banner that was up there.
+        if let Some(tray) = &*self.tray.borrow() {
+            tray.outputs_changed();
+        }
+    }
+
+    /// For tests, which have one output that cannot be unplugged: with
+    /// `true`, takes every output's surfaces away as if all outputs had
+    /// gone; with `false`, builds them again for the outputs there are.
+    pub fn set_unplugged(&self, unplugged: bool) {
+        self.unplugged.set(unplugged);
+        if let Some(display) = gdk::Display::default() {
+            self.sync(&display.monitors());
+        }
     }
 
     /// Whether the settings give `monitor` a panel. An output without a
@@ -301,8 +335,10 @@ impl Outputs {
             self.services.menus.update(|menus| menus.close());
         }
 
-        let mut outputs = self.outputs.borrow_mut();
-        for output in outputs.iter_mut() {
+        // Taken out while they are worked on: building and dropping
+        // surfaces runs code that may ask for the outputs there are.
+        let mut outputs = self.outputs.take();
+        for output in &mut outputs {
             let monitor = output.monitor.clone();
             if new_wallpaper {
                 output.set_wallpaper(self.build_wallpaper(&monitor));
@@ -322,6 +358,7 @@ impl Outputs {
                 output.set_overview(overview);
             }
         }
+        self.outputs.replace(outputs);
     }
 
     /// Shows `content` on every output's on-screen display, as GNOME does

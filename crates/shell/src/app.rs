@@ -66,7 +66,7 @@ impl Drop for PolkitAgent {
 /// Everything that must live as long as the application.
 struct Running {
     _outputs: Rc<Outputs>,
-    _dialogs: dialogs::Host,
+    _dialogs: Rc<dialogs::Host>,
     _ipc: Option<gio::SocketService>,
     _subscriptions: Vec<gniri_core::Subscription>,
     _polkit: Option<PolkitAgent>,
@@ -381,14 +381,23 @@ fn activate(
     ready.arm();
     let config_watch = watch_config(app, cli, &services);
 
+    let dialogs = Rc::new(dialogs::host(app, &services));
     let ipc = ipc::serve(ipc::Role::Shell, {
         let (app, services, outputs) = (app.clone(), Rc::clone(&services), Rc::clone(&outputs));
+        let dialogs = Rc::clone(&dialogs);
         move |request| -> ipc::Pending {
-            if request == ipc::Request::Sync {
-                return Box::pin(sync(app.clone()));
+            match request {
+                ipc::Request::Sync => Box::pin(sync(app.clone())),
+                ipc::Request::Outputs(plugged) => {
+                    outputs.set_unplugged(!plugged);
+                    dialogs.set_unplugged(!plugged);
+                    Box::pin(async { Ok(serde_json::Value::Null) })
+                }
+                request => {
+                    let reply = handle(&app, &services, &outputs, request);
+                    Box::pin(async move { reply })
+                }
             }
-            let reply = handle(&app, &services, &outputs, request);
-            Box::pin(async move { reply })
         }
     });
 
@@ -468,7 +477,7 @@ fn activate(
 
     Some(Running {
         _outputs: outputs,
-        _dialogs: dialogs::host(app, &services),
+        _dialogs: dialogs,
         _ipc: ipc,
         _subscriptions: subscriptions,
         _polkit: polkit,
@@ -488,8 +497,8 @@ fn handle(
         ipc::Request::DumpTree => {
             serde_json::to_value(debug::dump::dump(app)).map_err(|error| error.to_string())
         }
-        // Answered by `sync`, which has to wait.
-        ipc::Request::Sync => Ok(Value::Null),
+        // Answered by `sync`, which has to wait, and by the caller.
+        ipc::Request::Sync | ipc::Request::Outputs(_) => Ok(Value::Null),
         ipc::Request::Commands => Ok(Value::from(services.commands.entries())),
         ipc::Request::OpenMenu { menu, output } => {
             let output = output.or_else(|| outputs.default_output());
