@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Screen brightness.
 //!
 //! [`backend`] reads the kernel's backlight device and sets it through

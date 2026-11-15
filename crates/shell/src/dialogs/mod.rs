@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Modal dialogs: a shade over the whole output with a dialog in its
 //! middle. Port of `js/ui/modalDialog.js` and `js/ui/dialog.js`.
 //!

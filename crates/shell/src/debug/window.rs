@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! `gniri debug-window`: a plain flat-coloured window.
 //!
 //! Tests need an ordinary application window to give a workspace something

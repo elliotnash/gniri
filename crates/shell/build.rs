@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Compiles the bundled icons into a GResource (needs glib-compile-resources,
 //! from glib2-devel).
 

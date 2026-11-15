@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! A slider row: an icon button, the slider and optionally a menu button.
 //! Port of `QuickSlider` in `js/ui/quickSettings.js`.
 

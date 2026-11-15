@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The date menu: notifications on the left, the calendar on the right.
 //! Port of `DateMenuButton`'s menu in `js/ui/dateMenu.js`.
 

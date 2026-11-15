@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The session backend against python-dbusmock's logind, with a stand-in
 //! for the screen locker.
 

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The secret agent: when NetworkManager needs a password it does not have
 //! (a Wi-Fi network joined for the first time, a password that stopped
 //! working), it asks the session's agent, and the agent asks the user.

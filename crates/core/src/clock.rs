@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Wall-clock time, behind a trait so tests and screenshots can freeze it.
 //!
 //! The shell supplies a clock backed by the system's local time; tests and

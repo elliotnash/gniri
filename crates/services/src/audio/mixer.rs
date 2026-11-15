@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The mixer model: from what the server has to what the shell shows.
 //!
 //! GNOME Shell does not look at the PulseAudio server itself.

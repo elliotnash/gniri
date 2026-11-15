@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Notifications: what applications asked to show, which of them the banner
 //! shows next, and what the list in the date menu holds.
 //!

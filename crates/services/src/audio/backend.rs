@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The PulseAudio backend.
 //!
 //! One thread owns everything: a standard (poll-based) libpulse main loop,

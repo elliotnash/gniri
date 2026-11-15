@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The top bar's contents. Port of `js/ui/panel.js`.
 //!
 //! Layout as in GNOME's user session: activities on the left, the clock in

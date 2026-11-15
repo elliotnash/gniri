@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The pairing agent: when a Bluetooth device is paired, or one that is not
 //! trusted connects, BlueZ asks the session's agent what the user says: to
 //! type a PIN, to compare two numbers, to allow it at all.

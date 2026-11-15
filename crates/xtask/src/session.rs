@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! A nested niri session running gniri, for development and visual tests.
 //!
 //! niri runs as a window inside the current Wayland session (its winit

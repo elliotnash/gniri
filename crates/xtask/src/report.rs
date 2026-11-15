@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! `cargo xtask report`: every component's diff as one HTML page.
 
 use std::fmt::Write as _;

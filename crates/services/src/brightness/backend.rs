@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The backlight backend: `/sys/class/backlight` for reading, logind's
 //! `SetBrightness` for writing.
 

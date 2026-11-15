@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The on-screen display for volume and brightness keys. Port of
 //! `js/ui/osdWindow.js`.
 //!

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Short names for keyboard layouts, as shown in the panel ("en", "de").
 //!
 //! niri reports layouts by their XKB description ("English (US)"). The short

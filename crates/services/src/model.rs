@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The shape every service shares.
 //!
 //! A service is a plain state struct plus two kinds of message:

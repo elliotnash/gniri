@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Loads the compiled theme into GTK.
 
 use gtk::{gdk, gio};

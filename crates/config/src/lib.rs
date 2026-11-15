@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The gniri configuration file.
 //!
 //! One TOML file, `$XDG_CONFIG_HOME/gniri/config.toml`. Every key is

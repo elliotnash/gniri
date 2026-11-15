@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Common setup for layer-shell windows.
 
 use std::sync::atomic::{AtomicBool, Ordering};

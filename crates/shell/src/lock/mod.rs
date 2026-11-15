@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! `gniri lock`: the lock screen, a process of its own. Port of
 //! `js/ui/screenShield.js` and `js/ui/unlockDialog.js`.
 //!

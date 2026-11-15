@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! How long the user has been away, and what follows from it: the screen
 //! dims, then turns off, and the session locks.
 //!

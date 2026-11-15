@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Capture reference metrics and screenshots from the running GNOME Shell.
 
 Requires unsafe mode (Looking Glass: `global.context.unsafe_mode = true`).

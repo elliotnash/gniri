@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The password prompt of the lock screen. Port of `AuthPrompt` in
 //! `js/gdm/authPrompt.js` and `UserWidget` in `js/ui/userWidget.js`, as the
 //! unlock dialog uses them: one user, one password entry.

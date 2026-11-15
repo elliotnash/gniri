@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! What gniri adds to niri's overview: the search entry, the dash, the app
 //! grid and the search results. Port of `ControlsManager`
 //! (overviewControls.js) and `SearchController` (searchController.js).

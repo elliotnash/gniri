@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! A private bus with python-dbusmock services on it, standing in for the
 //! system bus.
 //!

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Network connections: what the panel icon shows, Wi-Fi and wired.
 //!
 //! The state and what widgets derive from it, ported from GNOME Shell's

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Night light through `wlr-gamma-control`, on a Wayland connection of its
 //! own.
 //!

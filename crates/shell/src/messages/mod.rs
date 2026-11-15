@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Messages: notifications and media players, as the banner and the list in
 //! the date menu show them. Port of `js/ui/messageList.js`.
 

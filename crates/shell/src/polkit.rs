@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! `gniri polkit`: the polkit authentication agent, a process of its own,
 //! so that nothing that happens to the shell can interrupt a password
 //! being asked for.

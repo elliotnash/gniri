@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Finding nodes in a widget or actor tree.
 //!
 //! Both gniri's dump (`gniri msg debug dump-tree`) and the GNOME reference

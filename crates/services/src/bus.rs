@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! D-Bus: one connection and one thread for every backend that lives on the
 //! same bus. UPower, NetworkManager, BlueZ and logind are on the system bus;
 //! notifications and media players on the session bus.

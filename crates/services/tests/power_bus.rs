@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The power backend against python-dbusmock's UPower and power-profiles
 //! daemon.
 

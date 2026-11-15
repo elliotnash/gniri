@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The icons the overview is made of. Port of `BaseIcon` (iconGrid.js),
 //! and of `AppIcon` and `AppViewItem` (appDisplay.js) without their menus
 //! and without dragging.

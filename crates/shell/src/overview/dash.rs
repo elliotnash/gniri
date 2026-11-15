@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The dash: the favourite and the running applications in a row at the
 //! bottom of the overview, and the button that opens the app grid. Port of
 //! `Dash` and `ShowAppsIcon` in `js/ui/dash.js`, without dragging and

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! What idleness does: the screen dims, the screens turn off, the session
 //! locks. The idle service says when; this acts on it.
 //!

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Lays the overview's parts out on its surface. Port of
 //! `ControlsManagerLayout` in `js/ui/overviewControls.js`.
 //!

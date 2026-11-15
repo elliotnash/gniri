@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Notification banners: a small overlay surface under the panel of each
 //! output, mapped only while it shows a notification, and the tray that
 //! decides which notification that is and for how long. Port of

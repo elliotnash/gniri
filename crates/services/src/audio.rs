@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Sound: the default output and input, and the devices to choose from.
 //!
 //! [`backend`] talks to the PulseAudio server (pipewire-pulse on Fedora) and

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Tier 0 of the visual checks for the panel: theme tokens against the
 //! values GNOME Shell 51.1 computed for its own panel, as captured in
 //! `tests/visual/reference/gnome-51.1/metrics/`.

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! What gniri shows on top of niri's overview: one surface on each output,
 //! mapped while the overview is open.
 //!

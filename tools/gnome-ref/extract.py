@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Cut the committed, per-component references out of the raw GNOME capture.
 
 The raw set (tools/gnome-ref/capture.py) is git-ignored: its screenshots and

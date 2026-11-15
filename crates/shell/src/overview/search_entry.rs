@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The search entry at the top of the overview. Port of `SearchEntry` in
 //! `js/ui/search.js` and of the entry's part of `SearchController`
 //! (searchController.js).

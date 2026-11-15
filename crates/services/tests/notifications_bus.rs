@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The notification server on a private session bus, talked to the way
 //! applications do: `notify-send`, and calls and signals over the bus.
 

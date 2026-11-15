@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The media player backend against a python-dbusmock object that stands in
 //! for a player.
 

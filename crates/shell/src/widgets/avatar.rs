@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! A user's picture in a circle. Port of `Avatar` in `js/ui/userWidget.js`.
 //!
 //! The theme gives it its size, which differs between the authentication

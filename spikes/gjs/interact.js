@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // Interactive spikes S3, S9, S12 and S17 (docs/DECISIONS.md).
 //
 // Reads one command per line from stdin and prints every input event it sees,

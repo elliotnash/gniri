@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Idle notifications through `ext-idle-notify`, on a Wayland connection
 //! of its own (never GTK's: docs/DECISIONS.md).
 //!

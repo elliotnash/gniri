@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Prints what a backend reports from the real system, for development:
 //!
 //! ```text

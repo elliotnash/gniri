@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Fixture scenes: service state from a TOML file instead of the system.
 //!
 //! `gniri --fixture scene.toml` freezes the clock and fills in the services

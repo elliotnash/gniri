@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The dialog that asks for a password on polkit's behalf. Port of
 //! `AuthenticationDialog` in `js/ui/components/polkitAgent.js`.
 //!

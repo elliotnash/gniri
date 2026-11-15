@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! One output's lock surface: the blurred wallpaper, and on it either the
 //! clock or the password prompt. Port of `UnlockDialog`, `UnlockDialogClock`
 //! and `UnlockDialogLayout` in `js/ui/unlockDialog.js`.

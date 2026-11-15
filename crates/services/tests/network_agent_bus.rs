@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The secret agent against a stand-in for NetworkManager: the test itself
 //! owns NetworkManager's name on a private bus, takes the agent's
 //! registration and asks it for secrets as NetworkManager would.

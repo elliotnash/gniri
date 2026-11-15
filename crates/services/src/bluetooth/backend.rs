@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! BlueZ, over the system bus.
 //!
 //! GNOME goes through the gnome-bluetooth library; this talks to `org.bluez`

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The screen locker as the session backend sees it: something that can be
 //! started and then says when it has locked the screen and when it is gone.
 //!

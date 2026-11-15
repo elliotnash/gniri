@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The overview's arithmetic: where its parts go for a given screen, how
 //! many icons fit a page of the app grid and how large the dash's icons
 //! are. Ports of `ControlsManagerLayout` (overviewControls.js),

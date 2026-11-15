@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! A level bar: a rounded trough filled up to a value. Port of
 //! `js/ui/barLevel.js`.
 //!

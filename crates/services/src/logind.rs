@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Finding this login session in logind.
 //!
 //! logind offers `/org/freedesktop/login1/session/auto` for "the caller's

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! UPower and the power-profiles daemon, over the system bus.
 
 use std::collections::HashMap;

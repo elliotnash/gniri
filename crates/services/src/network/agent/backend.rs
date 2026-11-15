@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The agent on the system bus: registered with NetworkManager, and serving
 //! `org.freedesktop.NetworkManager.SecretAgent`.
 //!

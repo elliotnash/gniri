@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Asks the installed search providers over the session bus. Port of
 //! gnome-shell's `js/ui/remoteSearch.js`.
 //!

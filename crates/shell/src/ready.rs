@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Tells the test harness when the shell has drawn itself.
 //!
 //! The harness cannot screenshot at an arbitrary moment: it needs to know

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Desktop-wide settings gniri reads and writes through `GSettings`.
 //!
 //! The one exception to "direct services only": the colour scheme key is how

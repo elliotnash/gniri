@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Shared building blocks for gniri that depend on no toolkit.
 
 pub mod calendar;

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // Spikes S4 and S10 (docs/DECISIONS.md).
 //
 // S4:  with `background-effect { xray false }` on the stage namespace, does a

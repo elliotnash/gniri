@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Layer-shell surfaces. Each submodule builds one kind of surface.
 
 pub mod banner;

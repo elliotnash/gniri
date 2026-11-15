@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! An entry for a password, with the eye that shows what was typed. Port of
 //! `St.PasswordEntry` and of `CapsLockWarning` in `js/ui/shellEntry.js`.
 

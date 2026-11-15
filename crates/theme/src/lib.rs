@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The gniri stylesheet.
 //!
 //! The SCSS under `scss/` is compiled at build time. `scss/upstream/` holds

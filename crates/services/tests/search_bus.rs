@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The search backend against python-dbusmock objects that stand in for
 //! search providers, with their key files and desktop entries in a
 //! directory of the test's own.

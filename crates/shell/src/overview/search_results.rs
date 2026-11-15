@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! What a search found. Port of `SearchResultsView`, `GridSearchResults`,
 //! `ListSearchResults` and `ProviderInfo` in `js/ui/search.js`.
 //!

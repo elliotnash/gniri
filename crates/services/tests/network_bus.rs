@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The network backend against python-dbusmock's NetworkManager.
 //!
 //! The template leaves out some of what the real service has: the

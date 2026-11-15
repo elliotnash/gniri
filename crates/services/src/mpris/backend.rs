@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! MPRIS players, over the session bus.
 //!
 //! Two halves run side by side. One only drains the bus's signals and the

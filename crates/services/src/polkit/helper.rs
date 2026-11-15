@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! polkit's helper: the privileged program that runs PAM on the agent's
 //! behalf and reports the result to polkit itself.
 //!

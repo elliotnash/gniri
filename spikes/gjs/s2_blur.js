@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // Spike S2 (docs/DECISIONS.md): does CSS `backdrop-filter` on a child widget of
 // a layer-shell surface make GTK 4.24 send a per-widget, rounded blur region
 // to niri?

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! gniri: a GNOME Shell lookalike for the niri compositor.
 
 mod app;

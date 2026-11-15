@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! A container that is as wide as it is tall. Port of `ShellSquareBin`
 //! (src/shell-square-bin.c), which GNOME's `BaseIcon` is: an icon with its
 //! label under it asks for a square as large as its longer side.

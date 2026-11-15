@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The activities button with its workspace dots. Port of `WorkspaceDot`,
 //! `WorkspaceIndicators` and `ActivitiesButton` in `js/ui/panel.js`.
 

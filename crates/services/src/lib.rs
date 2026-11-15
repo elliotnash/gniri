@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! gniri's backends: one module per system service.
 //!
 //! Each module owns a plain state struct that the shell keeps in a

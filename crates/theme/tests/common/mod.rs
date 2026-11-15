@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! What the tier 0 tests share: reading the GNOME reference dumps and the
 //! theme's tokens in comparable forms.
 

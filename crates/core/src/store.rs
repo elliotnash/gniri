@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! A single-threaded observable state container.
 //!
 //! Every service owns one `Store<S>`. Backends change the state through

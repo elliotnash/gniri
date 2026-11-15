@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The polkit authentication agent: when a program asks polkit for a
 //! privilege the user must authenticate for (`pkexec`, mounting a disk,
 //! installing software), polkit asks the session's agent to do the asking.

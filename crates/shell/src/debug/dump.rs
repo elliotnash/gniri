@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! A description of every mapped widget, for the visual tests.
 //!
 //! `gniri msg debug dump-tree` prints it as JSON. `cargo xtask diff` compares

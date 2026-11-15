@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Battery and power profile.
 //!
 //! The battery is UPower's display device; the profile comes from the

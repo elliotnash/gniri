@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Reads the installed applications from their desktop entries, on a thread
 //! of its own: a few hundred small files, which must not hold up a frame.
 

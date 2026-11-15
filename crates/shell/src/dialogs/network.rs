@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The dialog that asks for a network's password on NetworkManager's
 //! behalf. Port of `NetworkSecretDialog` in
 //! `js/ui/components/networkAgent.js`.

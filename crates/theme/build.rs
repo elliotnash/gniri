@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Compiles the SCSS theme and extracts its design tokens.
 //!
 //! Outputs, in OUT_DIR:

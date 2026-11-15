@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! NetworkManager's objects as the backend last saw them, and what the shell
 //! makes of them: the state it shows and the request a command turns into.
 //!

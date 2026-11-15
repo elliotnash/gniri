@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! `cargo xtask diff <component>`: gniri against the GNOME reference.
 //!
 //! A component is described by `tests/visual/map/<component>.toml`: the

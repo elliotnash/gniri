@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! logind, over the system bus, and the screen locker.
 
 use std::time::Duration;

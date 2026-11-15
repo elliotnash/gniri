@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The login session: suspending, restarting, powering off and locking,
 //! through logind.
 //!

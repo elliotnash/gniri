@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The clock in the centre of the panel. Port of `DateMenuButton` and
 //! `MessagesIndicator` in `js/ui/dateMenu.js`. Clicking it opens the date
 //! menu (crates/shell/src/date_menu).

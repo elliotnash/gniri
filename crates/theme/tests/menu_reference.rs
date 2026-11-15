@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Tier 0 of the visual checks for the quick settings menu and the
 //! on-screen display: theme tokens against the values GNOME Shell 51.1
 //! (with blur-my-shell) computed for its own, as captured in

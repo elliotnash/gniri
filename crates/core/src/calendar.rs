@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Dates for the date menu: the month grid, stepping between months and the
 //! texts GNOME Shell writes dates and ages with, in English.
 //!

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The agent on the system bus: registered with polkit for this session,
 //! and serving `org.freedesktop.PolicyKit1.AuthenticationAgent`.
 //!

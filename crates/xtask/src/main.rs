@@ -1,7 +1,10 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! `cargo xtask`: development and visual-test driver for gniri.
 
 mod check;
 mod diff;
+mod install;
 mod report;
 mod scene;
 mod session;
@@ -45,6 +48,28 @@ enum Command {
     Diff { component: String },
     /// Diff every component and write target/visual/report/index.html.
     Report,
+    /// Build gniri for release and install it with its niri fragment,
+    /// systemd unit and documentation. Below a home directory (the
+    /// default, ~/.local) that needs no privileges.
+    Install {
+        /// Where to install. For the system, give /usr or /usr/local
+        /// together with --destdir, and copy the result as root.
+        #[arg(long)]
+        prefix: Option<PathBuf>,
+        /// Install into this directory as if it were `/`.
+        #[arg(long)]
+        destdir: Option<PathBuf>,
+        /// Install the release build there is instead of building.
+        #[arg(long)]
+        no_build: bool,
+    },
+    /// Take away what `install` put there, given the same options.
+    Uninstall {
+        #[arg(long)]
+        prefix: Option<PathBuf>,
+        #[arg(long)]
+        destdir: Option<PathBuf>,
+    },
     /// Check how the shell behaves in a live nested session.
     Check {
         /// Only this part: panel, overview, quick-settings, notifications,
@@ -123,6 +148,22 @@ fn run() -> Result<bool> {
             Ok(diff::print(&component, &checks))
         }
         Command::Report => report::run(),
+        Command::Install {
+            prefix,
+            destdir,
+            no_build,
+        } => install::run(&install::Options {
+            prefix,
+            destdir,
+            no_build,
+            uninstall: false,
+        }),
+        Command::Uninstall { prefix, destdir } => install::run(&install::Options {
+            prefix,
+            destdir,
+            no_build: true,
+            uninstall: true,
+        }),
         Command::Check { part } => check::run(part.as_deref()),
     }
 }
@@ -140,7 +181,54 @@ fn main() -> ExitCode {
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
     use std::process::Command;
+
+    /// Every source file says what licence it is under, in its first
+    /// lines. The files copied unchanged from gnome-shell are left as they
+    /// came; the README beside them says where from and under what.
+    #[test]
+    fn every_source_file_names_its_licence() {
+        const LICENCE: &str = "SPDX-License-Identifier: GPL-3.0-or-later";
+        const UNCHANGED: &str = "crates/theme/scss/upstream";
+
+        fn visit(directory: &Path, root: &Path, missing: &mut Vec<String>) {
+            for entry in std::fs::read_dir(directory).expect("the directory can be read") {
+                let path = entry.expect("its entries too").path();
+                let relative = path.strip_prefix(root).expect("below the root");
+                if path.is_dir() {
+                    let skipped = relative == Path::new(UNCHANGED)
+                        || path.file_name().is_some_and(|name| name == "__pycache__");
+                    if !skipped {
+                        visit(&path, root, missing);
+                    }
+                    continue;
+                }
+                let source = path
+                    .extension()
+                    .and_then(|extension| extension.to_str())
+                    .is_some_and(|extension| ["rs", "scss", "py", "js"].contains(&extension));
+                if !source {
+                    continue;
+                }
+                let text = std::fs::read_to_string(&path).expect("a source file is text");
+                // After a `#!` line, where there is one.
+                if !text.lines().take(2).any(|line| line.ends_with(LICENCE)) {
+                    missing.push(relative.display().to_string());
+                }
+            }
+        }
+
+        let root = crate::session::workspace_root();
+        let mut missing = Vec::new();
+        for directory in ["crates", "tools", "spikes"] {
+            visit(&root.join(directory), &root, &mut missing);
+        }
+        assert!(
+            missing.is_empty(),
+            "no licence line at the top of: {missing:#?}"
+        );
+    }
 
     /// gniri's own code runs on the GLib main loop and a few plain
     /// threads; zbus is used with its default runtime. A crate that pulls

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Which menu is open.
 //!
 //! One piece of state shared by the panel (whose buttons show as pressed

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The dialog that asks what BlueZ wants to know while a Bluetooth device
 //! is paired: a PIN to type, a number to compare, a yes or no.
 //!

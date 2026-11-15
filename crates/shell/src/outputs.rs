@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! One set of surfaces per output, kept in step with outputs coming and
 //! going and with the settings changing.
 

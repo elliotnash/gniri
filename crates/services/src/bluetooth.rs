@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Bluetooth: the default adapter and the devices set up with it.
 //!
 //! [`backend`] talks to BlueZ. What the quick settings show is a port of

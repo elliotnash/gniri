@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Installed applications: what the dash, the app grid and the search
 //! show. Port of the parts of `ShellAppSystem`, `ShellWindowTracker` and
 //! GIO's desktop file index that the overview uses.

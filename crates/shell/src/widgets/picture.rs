@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Showing the pictures notifications and media players come with: an icon
 //! name, an image file, or raw pixels.
 

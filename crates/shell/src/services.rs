@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Every service's state, in one place, for widgets to subscribe to.
 
 use std::cell::{Cell, OnceCell, RefCell};

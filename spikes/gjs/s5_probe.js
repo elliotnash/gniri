@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // Spike S5 probe (docs/DECISIONS.md): a wallpaper with a full-screen blurred
 // surface over it, dimmed to 0.6 like blur-my-shell's overview background.
 // tools/blur-fit/fit.py screenshots this under different niri blur settings.

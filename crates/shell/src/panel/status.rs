@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The system status button at the right end of the panel: network, volume,
 //! power profile and battery. Port of `QuickSettings` in `js/ui/panel.js`
 //! and the indicators under `js/ui/status/`. Clicking it opens the quick

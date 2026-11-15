@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The `/dev/rfkill` backend.
 //!
 //! The kernel lists every kill switch to whoever opens the device (one

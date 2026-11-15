@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The audio backend against a private sound server.
 //!
 //! Each test starts its own `pipewire`, `wireplumber` and `pipewire-pulse`

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Search providers: applications that answer the overview's search over
 //! D-Bus (`org.gnome.Shell.SearchProvider2`), such as Files, Calculator,
 //! Characters and Software. Port of gnome-shell's `js/ui/remoteSearch.js`

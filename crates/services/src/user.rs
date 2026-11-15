@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Who is logged in: the name, the full name and the picture the lock
 //! screen and the authentication dialog show.
 //!

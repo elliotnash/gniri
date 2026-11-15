@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The agent on the system bus: registered with BlueZ as the default
 //! agent, and serving `org.bluez.Agent1`.
 //!

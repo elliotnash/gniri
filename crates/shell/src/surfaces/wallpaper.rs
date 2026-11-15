@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The wallpaper: two surfaces on the background layer.
 //!
 //! - `gniri-wallpaper` is the sharp image. niri zooms background-layer

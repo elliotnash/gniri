@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Checking that the person at the keyboard is the user: PAM.
 //!
 //! PAM blocks while it works (a wrong password costs two seconds on a

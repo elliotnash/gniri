@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! What kind of security an access point asks for.
 //!
 //! GNOME Shell takes the strongest security type that libnm considers valid

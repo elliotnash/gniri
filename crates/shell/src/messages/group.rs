@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! A source's notifications: one card with the edges of up to two more
 //! showing under it, or all of them under a heading. Port of
 //! `NotificationMessageGroup` and `MessageGroupExpanderLayout` in

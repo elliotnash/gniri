@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The month calendar. Port of `Calendar` in `js/ui/calendar.js`, without
 //! events: gniri has no calendar backend.
 

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Media players: what is playing, and the buttons to control it. Port of
 //! gnome-shell's `js/ui/mpris.js`.
 

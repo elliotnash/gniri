@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! NetworkManager, over the system bus.
 //!
 //! NetworkManager exports an object per device, access point and connection,

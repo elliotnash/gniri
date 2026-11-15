@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """Talk to a running GNOME Shell over D-Bus.
 
 Needs `global.context.unsafe_mode = true` (Looking Glass) for Eval and the

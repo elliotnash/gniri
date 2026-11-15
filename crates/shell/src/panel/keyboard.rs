@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The keyboard layout indicator. Port of `InputSourceIndicator` in
 //! `js/ui/status/keyboard.js`: shown only with more than one layout.
 //!

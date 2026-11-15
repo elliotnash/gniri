@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The quick settings menu. Port of `QuickSettings` in `js/ui/panel.js`
 //! and the items under `js/ui/status/`.
 

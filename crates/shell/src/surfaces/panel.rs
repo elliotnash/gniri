@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The top panel's surface.
 
 use std::rc::Rc;

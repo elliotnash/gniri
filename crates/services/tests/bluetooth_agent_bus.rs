@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The pairing agent against a stand-in for BlueZ: the test itself owns
 //! BlueZ's name on a private bus, with an agent manager and one device,
 //! and asks the agent what BlueZ would.

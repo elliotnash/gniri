@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Widgets shared by several parts of the shell.
 
 pub mod avatar;

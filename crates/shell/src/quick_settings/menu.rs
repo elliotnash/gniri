@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The menu a quick settings item opens under its row. Port of
 //! `QuickToggleMenu` in `js/ui/quickSettings.js`, with the few kinds of item
 //! from `js/ui/popupMenu.js` those menus use.

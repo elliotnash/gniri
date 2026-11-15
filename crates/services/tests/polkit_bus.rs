@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The polkit agent against a stand-in for polkit's authority (a bare
 //! python-dbusmock object) and a stand-in for its helper (a shell script).
 

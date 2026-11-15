@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! `org.freedesktop.Notifications`, served on the session bus. Port of
 //! `FdoNotificationDaemon` in gnome-shell's `js/ui/notificationDaemon.js`.
 //!

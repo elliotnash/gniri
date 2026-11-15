@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // Evaluated inside GNOME Shell through org.gnome.Shell.Eval (unsafe mode).
 // capture.py replaces __ROOT__ with a JS expression for the root actor.
 //

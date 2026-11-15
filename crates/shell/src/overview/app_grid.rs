@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The app grid: every installed application, a page at a time. Port of
 //! `AppDisplay`, `BaseAppView` and `AppGrid` (appDisplay.js), `IconGrid`
 //! (iconGrid.js) and `PageIndicators` (pageIndicators.js), without

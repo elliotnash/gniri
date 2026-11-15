@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! What the volume and brightness keys show on the on-screen display.
 //! Port of the `_showOsd`-style helpers gnome-settings-daemon's media-keys
 //! plugin drives GNOME Shell's OSD with.

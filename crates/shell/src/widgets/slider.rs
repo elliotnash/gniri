@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! A slider: a level bar with a round handle that can be dragged. Port of
 //! `js/ui/slider.js`.
 

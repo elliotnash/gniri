@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The quick settings grid. Port of `QuickSettingsLayout` in
 //! `js/ui/quickSettings.js`.
 //!

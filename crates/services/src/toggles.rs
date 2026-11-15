@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The quick settings toggles that are a single on/off value: dark style,
 //! night light and do not disturb.
 //!

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! `gniri msg`: requests to the running shell over a Unix socket.
 //!
 //! One request per connection: the client writes a line of JSON, the shell

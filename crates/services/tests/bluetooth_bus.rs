@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The Bluetooth backend against python-dbusmock's BlueZ.
 //!
 //! Every test runs the backend through `run_with`, with an ordinary file

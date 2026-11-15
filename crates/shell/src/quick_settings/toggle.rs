@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Quick toggles. Port of `QuickToggle` and `QuickMenuToggle` in
 //! `js/ui/quickSettings.js`.
 

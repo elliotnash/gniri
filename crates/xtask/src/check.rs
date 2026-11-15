@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! `cargo xtask check`: behaviour checks in a live nested session.
 //!
 //! Where `diff` asks "does it look like GNOME", this asks "does it react":

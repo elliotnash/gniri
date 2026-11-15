@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The list of messages in the date menu: media players, then one group per
 //! application with notifications. Port of `MessageView` in
 //! `js/ui/messageList.js` and `CalendarMessageList` in `js/ui/calendar.js`.

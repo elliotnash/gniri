@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Application setup: one `adw::Application` owning every surface.
 
 use std::cell::RefCell;

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Desktop entries: the name, icon and command of an installed application.
 //!
 //! A notification or a media player names its application by desktop entry;

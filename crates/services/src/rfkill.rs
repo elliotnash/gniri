@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Airplane mode: every radio switched off at once.
 //!
 //! [`backend`] reads and writes the kernel's `/dev/rfkill`. GNOME has

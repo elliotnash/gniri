@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The dialog that asks before logging out, restarting or powering off,
 //! and does it by itself after a minute. Port of
 //! `js/ui/endSessionDialog.js`.

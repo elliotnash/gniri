@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Night light: a warmer screen in the evening, set through the
 //! compositor's gamma tables.
 //!

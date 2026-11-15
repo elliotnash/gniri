@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Tools for tests and for looking inside the running shell.
 
 pub mod dump;

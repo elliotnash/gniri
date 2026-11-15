@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The text of a notification, made safe to show.
 //!
 //! Applications may send a little markup in a body: `<b>`, `<i>`, `<u>` and

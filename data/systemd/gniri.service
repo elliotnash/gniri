@@ -1,7 +1,9 @@
 # gniri as a systemd user service, for a niri session started the usual
 # way (`niri-session`, or niri from a display manager).
 #
-#     cp data/systemd/gniri.service ~/.config/systemd/user/
+# `cargo xtask install` puts this file where systemd finds it. Then:
+#
+#     systemctl --user daemon-reload
 #     systemctl --user add-wants niri.service gniri.service
 #
 # and take any `spawn-at-startup "gniri"` out of niri's config.
@@ -13,8 +15,8 @@ After=graphical-session.target
 Requisite=graphical-session.target
 
 [Service]
-# systemd looks in /usr/local/bin and /usr/bin, not in your shell's PATH:
-# give the full path if gniri is somewhere else.
+# The installed copy has the full path here. systemd looks only in
+# /usr/local/bin and /usr/bin for a bare name, not in your shell's PATH.
 ExecStart=gniri
 Restart=on-failure
 RestartSec=1

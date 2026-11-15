@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The stage: a full-screen overlay surface that holds whichever menu is
 //! open on its output, and is unmapped while none is.
 //!

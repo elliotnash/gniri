@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The first row of the quick settings menu: battery, screenshot, settings,
 //! lock and the power-off menu. Port of `SystemItem` in
 //! `js/ui/status/system.js`.

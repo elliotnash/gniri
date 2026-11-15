@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Find the blur settings that best match blur-my-shell's default blur.
 
 blur-my-shell's default pipeline is a dual-Kawase blur calibrated to a

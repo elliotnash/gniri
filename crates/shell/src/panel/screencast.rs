@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The screen-sharing indicator. Port of `ScreenSharingIndicator` in
 //! `js/ui/status/remoteAccess.js`: an orange button, shown while something
 //! is capturing the screen, that stops the capture when clicked.

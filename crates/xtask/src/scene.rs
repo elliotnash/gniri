@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Scenes: a fixture for gniri plus the steps that bring the nested session
 //! to the state a screenshot should show.
 //!

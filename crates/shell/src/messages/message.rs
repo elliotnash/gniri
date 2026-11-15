@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! One message: a notification or a media player's card. Port of
 //! `MessageHeader` and `Message` in `js/ui/messageList.js`.
 
