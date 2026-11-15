@@ -18,6 +18,7 @@ pub struct Config {
     pub wallpaper: Wallpaper,
     pub clock: Clock,
     pub panel: Panel,
+    pub date_menu: DateMenu,
     pub night_light: NightLight,
     pub commands: Commands,
 }
@@ -89,6 +90,50 @@ impl Panel {
         match &self.outputs {
             Some(outputs) => outputs.iter().any(|name| name == output),
             None => true,
+        }
+    }
+}
+
+/// The menu under the clock.
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct DateMenu {
+    /// Show the "Add World Clocks…" card. gniri does not show the clocks
+    /// themselves; the card only starts GNOME Clocks.
+    pub world_clocks: bool,
+    /// Show the "Select Weather Location…" card. gniri shows no forecast;
+    /// the card only starts GNOME Weather.
+    pub weather: bool,
+    /// The day a week starts on in the calendar: "sunday", "monday" or
+    /// "saturday".
+    pub week_start: WeekStart,
+}
+
+impl Default for DateMenu {
+    fn default() -> Self {
+        Self {
+            world_clocks: true,
+            weather: true,
+            week_start: WeekStart::Sunday,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum WeekStart {
+    #[default]
+    Sunday,
+    Monday,
+    Saturday,
+}
+
+impl WeekStart {
+    pub fn weekday(self) -> gniri_core::Weekday {
+        match self {
+            Self::Sunday => gniri_core::Weekday::Sunday,
+            Self::Monday => gniri_core::Weekday::Monday,
+            Self::Saturday => gniri_core::Weekday::Saturday,
         }
     }
 }
@@ -266,6 +311,11 @@ mod tests {
             show_battery_percentage = true
             outputs = ["eDP-1"]
 
+            [date_menu]
+            week_start = "monday"
+            world_clocks = false
+            weather = false
+
             [night_light]
             temperature = 3500
 
@@ -293,6 +343,18 @@ mod tests {
         assert!(!config.panel.shows_on("HDMI-A-1"));
         assert_eq!(config.commands.settings, "my-settings");
         assert_eq!(config.night_light.temperature, 3500);
+        assert_eq!(
+            config.date_menu,
+            DateMenu {
+                world_clocks: false,
+                weather: false,
+                week_start: WeekStart::Monday,
+            }
+        );
+        assert_eq!(
+            config.date_menu.week_start.weekday(),
+            gniri_core::Weekday::Monday
+        );
     }
 
     #[test]

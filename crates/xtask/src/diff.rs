@@ -77,6 +77,11 @@ struct Map {
     attach: Anchor,
     #[serde(default)]
     vertical: Vertical,
+    /// Namespace of a surface that reserves the top of the screen, which
+    /// the compositor therefore places ours below (the panel, for a
+    /// surface that is anchored to the top and respects its exclusive
+    /// zone). A widget dump cannot tell where its surface was put.
+    below: Option<String>,
     /// Logical pixels around the root that are compared too (its shadow).
     #[serde(default)]
     margin: f64,
@@ -788,9 +793,16 @@ fn our_side<'a>(map: &Map, dump: &'a Value) -> Result<Side<'a>> {
             (false, true) => screen - surface,
             _ => (screen - surface) / 2.0,
         };
+    let reserved = match &map.below {
+        Some(namespace) => number(
+            &our_surface(dump, namespace)?["height"],
+            "height of the surface above",
+        )?,
+        None => 0.0,
+    };
     let position = (
         place("left", "right", size.0, screen.0),
-        place("top", "bottom", size.1, screen.1),
+        place("top", "bottom", size.1, screen.1) + reserved,
     );
     let tree = match &map.root {
         Some(selector) => tree::select(&surface["tree"], selector)?,

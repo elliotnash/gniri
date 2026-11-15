@@ -1,0 +1,304 @@
+// Message list: notifications and media players in the date menu, and the
+// message itself, which the banner shares. Upstream: widgets/_message-list.scss.
+//
+// Widget tree (crates/shell/src/messages/), with the upstream selector each
+// node stands in for:
+//
+//   box.message-list                             .message-list
+//     box.message-list-placeholder                 .message-list-placeholder
+//     scrolledwindow
+//       box.message-view                           .message-view
+//         GniriMessageGroup.message-notification-group
+//           box.message-group-header                 .message-group-header
+//           box.message                              .message
+//     box.message-list-controls                    .message-list-controls
+//       button.message-list-clear-button.button
+//
+//   box.message                                  .message
+//     box.message-header                           .message-header
+//       image.message-source-icon
+//       box.message-header-content
+//         label.message-source-title
+//         label.event-time
+//       button.message-expand-button.icon-button
+//       button.message-close-button.icon-button
+//     box.message-box                              .message-box
+//       box.message-icon > image                     .message-icon
+//       box.message-content
+//         label.message-title
+//         label.message-body                         .message-body
+//       box.message-media-controls
+//         button.message-media-control
+//     box.message-action-bin                       .message-action-bin
+//       button.notification-button
+
+// Upstream: 29em, which St rounds to 425px.
+$message_list_width: em_at_most(425px);
+// messageList.js MESSAGE_ANIMATION_TIME
+$message_animation_time: 100ms;
+
+// main list
+.message-list {
+    min-width: $message_list_width;
+    border: 0 solid $borders_color;
+
+    // padding and margins to account for scrollbar
+    margin-left: 0;
+    margin-right: $base_margin;
+    padding-right: $base_padding;
+    border-right-width: 1px;
+
+    .message-list-placeholder {
+        @include title_3;
+        color: transparentize($fg_color, .55);
+
+        // icon size and color
+        > image {
+            -gtk-icon-size: 96px; // non-em asset size
+            margin-bottom: $base_margin * 3;
+            -gtk-icon-style: symbolic;
+        }
+    }
+}
+
+.message-view {
+    // to account for scrollbar
+    margin-right: $base_margin * 3;
+
+    .message {
+        margin-bottom: $base_padding * 2;
+        // manually adjust radius to account for popover corners
+        border-radius: $modal_radius + 2px;
+    }
+
+    // `MessageView._highlightGroup`: while a group is open the rest of the
+    // list fades back. GNOME fades it by distance from the group; here it
+    // is one level.
+    > .message-notification-group {
+        transition: opacity $message_animation_time $ease_out_quad;
+
+        &.shaded { opacity: 0.4; }
+    }
+}
+
+// do-not-disturb + clear button
+.message-list-controls {
+    padding: $base_padding * 2;
+    padding-bottom: $base_padding * 1.5;
+    border-spacing: $base_padding;
+    @include heading;
+
+    .message-list-clear-button {
+        border-radius: $forced_circular_radius;
+
+        label { @include st_line_height; }
+    }
+}
+
+// message notification group
+.message-notification-group {
+    .message-group-header {
+        padding: $base_padding;
+
+        .message-group-title {
+            @include title_2;
+            margin: 0 $base_margin;
+        }
+    }
+
+    // close button
+    .message-collapse-button {
+        color: $fg_color;
+        background-color: transparentize($fg_color, 0.8);
+        padding: 4px;
+        border: 4px solid transparent;
+        background-clip: padding-box;
+
+        &:hover { background-color: transparentize($fg_color, 0.7); }
+        &:active { background-color: transparentize($fg_color, 0.8); }
+    }
+
+    // The cards under the first of a closed group show only their lower
+    // edge; what is written on them is not drawn.
+    .message.second-in-stack > *,
+    .message.lower-in-stack > * {
+        opacity: 0;
+    }
+}
+
+// message bubbles
+.message {
+    // %card
+    padding: $base_padding;
+    margin: 0;
+    border: 1px solid $card_shadow_border_color;
+    border-radius: $modal_radius;
+    transition: background-color 150ms $st_transition_easing;
+
+    background-color: lighten($card_bg_color, 5%);
+
+    &.second-in-stack { background-color: darken($card_bg_color, 1%); }
+    &.lower-in-stack { background-color: darken($card_bg_color, 4%); }
+
+    label { @include st_line_height; }
+
+    // message header
+    .message-header {
+        border-spacing: $base_padding;
+        color: $card_insensitive_fg_color;
+        // no padding on the right, to accommodate the close button
+        padding: 0 0 0 $base_padding;
+
+        // header source icon
+        .message-source-icon {
+            -gtk-icon-size: $scalable_icon_size; // 16px
+            -gtk-icon-style: symbolic;
+        }
+
+        // box that contains the source name and timestamp of the message
+        .message-header-content {
+            border-spacing: $base_padding;
+            min-height: em_at_most(24px);
+            padding-bottom: $base_padding;
+
+            // header source title
+            .message-source-title {
+                font-weight: bold;
+            }
+
+            // Time label
+            .event-time {
+                @include caption;
+                color: $card_insensitive_fg_color;
+                // Add bottom padding to align the app name with the time
+                padding-bottom: to_em(1px);
+            }
+        }
+
+        // buttons in the message header
+        .message-expand-button,
+        .message-close-button {
+            border-radius: $forced_circular_radius; // make circular
+            color: $fg_color;
+            padding: $base_padding;
+            transition: background-color 150ms $st_transition_easing;
+        }
+
+        // `Message.expand`: the arrow turns over.
+        .message-expand-button image {
+            transition: -gtk-icon-transform 200ms $ease_out_quad;
+        }
+        .message-expand-button.expanded image {
+            -gtk-icon-transform: rotate(180deg);
+        }
+
+        // add margin to close button to balance it with the expand button
+        .message-close-button {
+            margin: $base_padding * 0.5;
+        }
+    }
+
+    // container for message contents
+    .message-box {
+        padding: $base_padding;
+        margin-top: 0;
+        border-spacing: $base_padding;
+
+        // icon of the message
+        .message-icon {
+            margin-right: $base_padding;
+            min-width: $base_icon_size * 3;
+            min-height: $base_icon_size * 3;
+
+            // icon size and color
+            image { -gtk-icon-size: $base_icon_size * 3; } // 48px
+
+            // a small symbolic icon on a circle background
+            &.message-themed-icon {
+                border-radius: $forced_circular_radius;
+                background-color: transparentize($fg_color, .93);
+
+                image { -gtk-icon-size: $scalable_icon_size; }
+            }
+        }
+
+        // text of the message
+        .message-content {
+            border-spacing: $base_margin;
+
+            // message title
+            .message-title {
+                font-weight: bold;
+            }
+        }
+    }
+
+    // container for message buttons
+    .message-action-bin {
+        padding: $base_margin;
+        // The children's margins: $base_margin on each side between two.
+        border-spacing: $base_margin * 2;
+    }
+}
+
+// URLs in messages
+.message-body link {
+    color: $link_color;
+}
+
+// %notification_button, less its colours (see _bms-popup.scss)
+.notification-button {
+    all: unset;
+    font-weight: bold;
+    padding: $base_padding ($base_padding * 2);
+    border-radius: $base_border_radius;
+    transition: background-color 150ms $st_transition_easing;
+}
+
+/* Media Controls */
+.message-media-control {
+    all: unset;
+    padding: 0 ($base_padding * 3);
+    border-radius: $base_border_radius;
+    color: $fg_color;
+    border: 1px solid transparent;
+    transition: background-color 150ms $st_transition_easing;
+
+    // colors are lightened since the media controls are in a card
+    &:hover { background-color: lighten($hover_bg_color, 5%); }
+    &:active { background-color: lighten($active_bg_color, 5%); }
+    &:disabled { color: lighten($insensitive_fg_color, 5%); }
+
+    image {
+        -gtk-icon-size: $base_icon_size;
+        -gtk-icon-style: symbolic;
+    }
+}
+
+.media-message {
+    // album-art
+    .message-icon {
+        border-radius: $base_border_radius;
+
+        &.message-themed-icon image {
+            -gtk-icon-size: $large_icon_size; // 32px
+        }
+    }
+}
+
+:root {
+    --gniri-message-list-width: #{$message_list_width};
+    --gniri-message-padding: #{$base_padding};
+    --gniri-message-radius: #{$modal_radius};
+    --gniri-message-list-radius: #{$modal_radius + 2px};
+    --gniri-message-list-margin-bottom: #{$base_padding * 2};
+    --gniri-message-header-spacing: #{$base_padding};
+    --gniri-message-header-content-height: #{em_at_most(24px)};
+    --gniri-message-button-padding: #{$base_padding};
+    --gniri-message-close-button-margin: #{$base_padding * 0.5};
+    --gniri-message-box-padding: #{$base_padding};
+    --gniri-message-content-spacing: #{$base_margin};
+    --gniri-message-list-controls-padding: #{$base_padding * 2} #{$base_padding * 2} #{$base_padding * 1.5} #{$base_padding * 2};
+    --gniri-message-list-border-color: #{$borders_color};
+    --gniri-message-view-margin-right: #{$base_margin * 3};
+}

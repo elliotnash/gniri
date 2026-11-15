@@ -1,0 +1,240 @@
+// Date menu and calendar. Upstream: widgets/_calendar.scss.
+//
+// Widget tree (crates/shell/src/date_menu/), with the upstream selector
+// each node stands in for:
+//
+//   box.popup-menu-content.datemenu-popover     .datemenu-popover
+//     box#calendarArea                            #calendarArea
+//       box.message-list                            (see _message-list.scss)
+//       box.datemenu-calendar-column                .datemenu-calendar-column
+//         button.datemenu-today-button                .datemenu-today-button
+//           box > label.day-label, label.date-label
+//         grid.calendar                               .calendar
+//           box.calendar-month-header
+//             button.pager-button.calendar-change-month-back
+//             label.calendar-month-label
+//             button.pager-button.calendar-change-month-forward
+//           label.calendar-day-heading
+//           button.calendar-day
+//         box.datemenu-displays-box                   .datemenu-displays-box
+//           button.events-button
+//             box.events-box > label.events-title, box.events-list
+//           button.world-clocks-button > label.world-clocks-header
+//           button.weather-button > label.weather-header
+
+// Resets come first and alone, so that nothing more specific than a class
+// is needed to style these buttons afterwards (docs/DECISIONS.md, M2).
+.pager-button,
+.calendar-day {
+    all: unset;
+}
+
+// %card_common
+@mixin card_common {
+    border-radius: $base_border_radius * 1.5;
+    padding: $scaled_padding * 2;
+    margin: $base_margin;
+    background-color: $card_bg_color;
+    border: 1px solid $card_shadow_border_color;
+}
+
+// overall menu
+#calendarArea {
+    padding: $base_margin;
+}
+
+.datemenu-popover {
+    border-radius: $base_border_radius * 1.5 + $base_padding * 3;
+}
+
+// calendar menu side column
+.datemenu-calendar-column {
+    border-spacing: $base_padding;
+    margin-left: $base_padding;
+
+    .datemenu-displays-box {
+        border-spacing: $base_padding;
+    }
+}
+
+// today button (the date)
+.datemenu-today-button {
+    all: unset;
+    // %card_flat
+    @include card_common;
+    border: 1px solid transparent;
+    background-color: transparent;
+    padding: $base_padding * 1.5;
+    transition: background-color 150ms $st_transition_easing;
+
+    // weekday label
+    .day-label {
+        font-weight: bold;
+        @include st_line_height;
+    }
+
+    // date label
+    .date-label {
+        @include title_2;
+    }
+}
+
+// the mini calendar
+.calendar {
+    // %card_flat
+    @include card_common;
+    border: 1px solid transparent;
+    background-color: transparent;
+    margin-top: 0;
+    padding: 0;
+
+    // month header
+    .calendar-month-header {
+        // prev/next month icons
+        .pager-button image {
+            -gtk-icon-size: $scalable_icon_size;
+            -gtk-icon-style: symbolic;
+        }
+
+        // month label
+        .calendar-month-label {
+            @include heading;
+            color: $fg_color;
+            // Upstream: 8px above and below. A line of this text is a
+            // pixel shorter here (see st_line_height), so the pixel goes
+            // below it.
+            padding: 8px 0 9px;
+            // Upstream: 10em, which St rounds to 147px.
+            min-width: em_at_most(147px);
+            border-radius: $forced_circular_radius;
+        }
+
+        .pager-button {
+            border-radius: $forced_circular_radius;
+            // Upstream: 2.6em, which St rounds to 38px.
+            min-height: em_at_most(38px);
+            min-width: em_at_most(38px);
+            padding: 0;
+            transition: background-color 150ms $st_transition_easing;
+        }
+    }
+
+    // day style
+    .calendar-day {
+        font-feature-settings: "tnum"; // %numeric
+        @include smaller;
+        border-radius: $forced_circular_radius;
+        // Upstream: 3em of this font, which St rounds to 36px.
+        min-height: 36px;
+        min-width: 36px;
+        margin: 2px;
+        padding: 0;
+        font-weight: bold;
+        transition: background-color 150ms $st_transition_easing;
+
+        &.calendar-weekend {
+            color: $insensitive_fg_color;
+        }
+
+        &.calendar-other-month {
+            color: transparentize($fg_color, 0.5);
+            font-weight: normal;
+        }
+
+        &.calendar-today {
+            // %default_button
+            background-color: st-transparentize(-st-accent-color, 0);
+            // override colors above for when today is a weekend
+            color: st-transparentize(-st-accent-fg-color, 0);
+        }
+    }
+
+    // day of week heading
+    .calendar-day-heading {
+        font-feature-settings: "tnum"; // %numeric
+        @include smaller;
+        font-weight: bold;
+        margin: $base_margin;
+        padding: ($base_padding * 0.5) $base_padding;
+        border-radius: $base_border_radius;
+    }
+}
+
+// common style for the date menu widgets
+.events-button,
+.world-clocks-button,
+.weather-button {
+    all: unset;
+    // %card
+    @include card_common;
+    transition: background-color 150ms $st_transition_easing;
+
+    label { @include st_line_height; }
+}
+
+// events
+.events-button {
+    // event title
+    .events-title {
+        @include heading;
+        color: $card_insensitive_fg_color;
+        padding-bottom: $base_padding + 1px; // and st_line_height
+    }
+
+    // list of events
+    .events-list {
+        border-spacing: $base_padding;
+
+        .event-placeholder {
+            color: $card_insensitive_fg_color;
+            font-style: italic;
+        }
+    }
+}
+
+// world clocks
+.world-clocks-button {
+    // title
+    .world-clocks-header {
+        @include heading;
+        color: $card_insensitive_fg_color;
+
+        // change style when no world clocks are configured
+        &.no-world-clocks { color: $fg_color; }
+    }
+}
+
+// weather
+.weather-button {
+    .weather-header {
+        @include heading;
+        color: $card_insensitive_fg_color;
+
+        // change style when no location is configured
+        &.no-location { color: $fg_color; }
+    }
+}
+
+// The dot beside the panel clock while something has not been seen.
+// Upstream: `.messages-indicator` in widgets/_panel.scss.
+.messages-indicator {
+    -gtk-icon-size: $scalable_icon_size;
+    -gtk-icon-style: symbolic;
+}
+
+:root {
+    --gniri-calendar-area-padding: #{$base_margin};
+    --gniri-datemenu-radius: #{$base_border_radius * 1.5 + $base_padding * 3};
+    --gniri-datemenu-column-spacing: #{$base_padding};
+    --gniri-datemenu-column-margin-left: #{$base_padding};
+    --gniri-card-radius: #{$base_border_radius * 1.5};
+    --gniri-card-padding: #{$scaled_padding * 2};
+    --gniri-card-margin: #{$base_margin};
+    --gniri-today-button-padding: #{$base_padding * 1.5};
+    --gniri-calendar-day-size: 36px;
+    --gniri-calendar-day-margin: 2px;
+    --gniri-calendar-pager-size: #{em_at_most(38px)};
+    --gniri-calendar-month-label-width: #{em_at_most(147px)};
+    --gniri-calendar-heading-margin: #{$base_margin};
+    --gniri-calendar-heading-padding: #{$base_padding * 0.5} #{$base_padding};
+}

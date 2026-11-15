@@ -6,10 +6,11 @@ use std::time::Duration;
 
 use gniri_config::Config;
 use gniri_core::{Clock, LocalTime, Scheduler, Store};
+use gniri_services::desktop_entry::DesktopEntry;
 use gniri_services::keyboard::LayoutNames;
 use gniri_services::{
-    Bus, Fixture, Link, Model, audio, bluetooth, brightness, network, night_light, niri, power,
-    rfkill, session, toggles,
+    Bus, Fixture, Link, Model, audio, bluetooth, brightness, mpris, network, night_light, niri,
+    notifications, power, rfkill, session, toggles,
 };
 use gtk::glib;
 
@@ -142,6 +143,12 @@ impl<M: Model> Service<M> {
     pub fn send(&self, command: M::Command) {
         (self.send)(command);
     }
+
+    /// Folds in an event as if the backend had reported it. For the debug
+    /// interface, which has no system behind it to make things happen.
+    pub fn inject(&self, event: M::Event) {
+        self.state.update(|current| current.apply(event));
+    }
 }
 
 pub struct Services {
@@ -161,6 +168,8 @@ pub struct Services {
     pub dark_style: Service<toggles::State>,
     pub night_light: Service<toggles::State>,
     pub do_not_disturb: Service<toggles::State>,
+    pub notifications: Service<notifications::State>,
+    pub mpris: Service<mpris::State>,
     /// Which menu is open, and where.
     pub menus: Store<Menus>,
     pub commands: CommandLog,
@@ -169,6 +178,8 @@ pub struct Services {
     /// The settings application, if it is configured and installed.
     settings_program: Option<String>,
     layout_names: OnceCell<LayoutNames>,
+    /// Keeps the notification state in step with the Do Not Disturb toggle.
+    _do_not_disturb_link: gniri_core::Subscription,
 }
 
 impl Services {
@@ -208,32 +219,42 @@ impl Services {
         let menus = Store::new(Menus::default(), Rc::clone(&scheduler));
         let (scheduler, log_ref) = (&scheduler, &log);
         let services = match fixture {
-            Some(fixture) => Self {
-                power: Service::fake("power", fixture.power, scheduler, log_ref),
-                audio: Service::fake("audio", fixture.audio, scheduler, log_ref),
-                network: Service::fake("network", fixture.network, scheduler, log_ref),
-                bluetooth: Service::fake("bluetooth", fixture.bluetooth, scheduler, log_ref),
-                brightness: Service::fake("brightness", fixture.brightness, scheduler, log_ref),
-                rfkill: Service::fake("rfkill", fixture.rfkill, scheduler, log_ref),
-                session: Service::fake("session", fixture.session, scheduler, log_ref),
-                dark_style: Service::fake("dark-style", fixture.dark_style, scheduler, log_ref),
-                night_light: Service::fake("night-light", fixture.night_light, scheduler, log_ref),
-                do_not_disturb: Service::fake(
-                    "do-not-disturb",
-                    fixture.do_not_disturb,
-                    scheduler,
-                    log_ref,
-                ),
-                config,
-                time,
-                niri,
-                niri_client: socket.map(niri::Client::new),
-                menus,
-                commands: log.clone(),
-                sandboxed,
-                settings_program,
-                layout_names: OnceCell::new(),
-            },
+            Some(fixture) => {
+                let do_not_disturb =
+                    Service::fake("do-not-disturb", fixture.do_not_disturb, scheduler, log_ref);
+                let notifications =
+                    Service::fake("notifications", fixture.notifications, scheduler, log_ref);
+                let link = link_do_not_disturb(&do_not_disturb, &notifications);
+                Self {
+                    power: Service::fake("power", fixture.power, scheduler, log_ref),
+                    audio: Service::fake("audio", fixture.audio, scheduler, log_ref),
+                    network: Service::fake("network", fixture.network, scheduler, log_ref),
+                    bluetooth: Service::fake("bluetooth", fixture.bluetooth, scheduler, log_ref),
+                    brightness: Service::fake("brightness", fixture.brightness, scheduler, log_ref),
+                    rfkill: Service::fake("rfkill", fixture.rfkill, scheduler, log_ref),
+                    session: Service::fake("session", fixture.session, scheduler, log_ref),
+                    dark_style: Service::fake("dark-style", fixture.dark_style, scheduler, log_ref),
+                    night_light: Service::fake(
+                        "night-light",
+                        fixture.night_light,
+                        scheduler,
+                        log_ref,
+                    ),
+                    do_not_disturb,
+                    notifications,
+                    mpris: Service::fake("mpris", fixture.mpris, scheduler, log_ref),
+                    _do_not_disturb_link: link,
+                    config,
+                    time,
+                    niri,
+                    niri_client: socket.map(niri::Client::new),
+                    menus,
+                    commands: log.clone(),
+                    sandboxed,
+                    settings_program,
+                    layout_names: OnceCell::new(),
+                }
+            }
             None => {
                 let mut bus = Bus::system();
                 let power = bus.add("power", power::backend::run);
@@ -242,6 +263,30 @@ impl Services {
                 let brightness = bus.add("brightness", brightness::backend::run);
                 let session = bus.add("session", session::backend::run);
                 bus.start();
+
+                let mut session_bus = Bus::session();
+                let notifications =
+                    session_bus.add("notifications", |connection, events, commands| {
+                        notifications::backend::run(connection, events, commands, || {
+                            SystemClock.now()
+                        })
+                    });
+                let mpris = session_bus.add("mpris", mpris::backend::run);
+                session_bus.start();
+                let notifications =
+                    Service::live("notifications", notifications, scheduler, log_ref);
+                // GNOME keeps this in a setting; here it lasts until gniri
+                // restarts, like Night Light.
+                let do_not_disturb = Service::fake(
+                    "do-not-disturb",
+                    toggles::State {
+                        available: true,
+                        on: false,
+                    },
+                    scheduler,
+                    log_ref,
+                );
+                let link = link_do_not_disturb(&do_not_disturb, &notifications);
                 Self {
                     power: Service::live("power", power, scheduler, log_ref),
                     audio: Service::live("audio", audio::backend::spawn(), scheduler, log_ref),
@@ -262,17 +307,10 @@ impl Services {
                         scheduler,
                         log_ref,
                     ),
-                    // Until the notification server exists (M3) the toggle
-                    // only remembers its own state.
-                    do_not_disturb: Service::fake(
-                        "do-not-disturb",
-                        toggles::State {
-                            available: true,
-                            on: false,
-                        },
-                        scheduler,
-                        log_ref,
-                    ),
+                    do_not_disturb,
+                    notifications,
+                    mpris: Service::live("mpris", mpris, scheduler, log_ref),
+                    _do_not_disturb_link: link,
                     config,
                     time,
                     niri,
@@ -334,6 +372,28 @@ impl Services {
         }
     }
 
+    /// Starts an installed application by its desktop entry. Returns false
+    /// if there is no such entry or it has no command.
+    pub fn launch_app(&self, id: &str) -> bool {
+        // Under a fixture nothing is started, so nothing need be installed.
+        if self.sandboxed {
+            self.commands.push("launch-app", &id);
+            return true;
+        }
+        let Some(command) = DesktopEntry::find(id).and_then(|entry| entry.command()) else {
+            return false;
+        };
+        let command: Vec<&str> = command.iter().map(String::as_str).collect();
+        self.launch(&command);
+        true
+    }
+
+    /// Whether an application with this desktop entry is installed. Always
+    /// true under a fixture, where it would not be started anyway.
+    pub fn has_app(&self, id: &str) -> bool {
+        self.sandboxed || DesktopEntry::find(id).is_some()
+    }
+
     /// Sends an action to niri, reporting a failure on stderr.
     pub fn niri_action(&self, action: niri_ipc::Action) {
         if let Some(client) = &self.niri_client
@@ -342,6 +402,19 @@ impl Services {
             eprintln!("gniri: niri refused an action: {error}");
         }
     }
+}
+
+/// Makes the notification state follow the Do Not Disturb toggle, from the
+/// toggle's present value on.
+fn link_do_not_disturb(
+    toggle: &Service<toggles::State>,
+    notifications: &Service<notifications::State>,
+) -> gniri_core::Subscription {
+    let notifications = notifications.state.clone();
+    toggle.state.select(
+        |state| state.on,
+        move |on| notifications.update(|state| state.do_not_disturb = *on),
+    )
 }
 
 /// True if `program` is an executable on `PATH` (or a path to one).

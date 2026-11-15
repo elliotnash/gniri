@@ -1,0 +1,51 @@
+// Notification banners. Upstream: widgets/_notifications.scss.
+//
+// Widget tree (crates/shell/src/surfaces/banner.rs):
+//
+//   box.gniri-banner-area              the tray: room for the shadow
+//     box.message.notification-banner    .notification-banner
+
+// messageTray.js ANIMATION_TIME
+$notification_animation_time: 200ms;
+$notification_banner_height: 64px;
+// Upstream: 34em, which St rounds to 499px.
+$notification_banner_width: em_at_most(499px);
+$notification_banner_margin: $base_margin;
+// How far the surface reaches past the banner's margin, so that its shadow
+// is not cut off at the sides and below.
+$notification_banner_shadow_room: 8px;
+
+.gniri-banner-area {
+    padding: 0 $notification_banner_shadow_room $notification_banner_shadow_room;
+}
+
+// Banner notifications
+.notification-banner {
+    min-height: $notification_banner_height;
+    min-width: $notification_banner_width;
+    box-shadow: st-shadow(0, 2px, 4px, $shadow_color, 2px);
+    border-radius: $modal_radius;
+    margin: $notification_banner_margin;
+
+    // `MessageTray._updateShowingNotification` and `_hideNotification`: the
+    // banner fades in while it slides down from behind the panel. GNOME
+    // also scales it from 90%; a blurred widget must not be scaled
+    // (docs/DECISIONS.md, S3).
+    opacity: 0;
+    transform: translateY(-2em);
+    transition: opacity $notification_animation_time $ease_out_quad,
+                transform $notification_animation_time $ease_out_quad;
+
+    &.open {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+:root {
+    --gniri-notification-banner-width: #{$notification_banner_width};
+    --gniri-notification-banner-height: #{$notification_banner_height};
+    --gniri-notification-banner-margin: #{$notification_banner_margin};
+    --gniri-notification-banner-shadow-room: #{$notification_banner_shadow_room};
+    --gniri-notification-animation-time: #{$notification_animation_time};
+}

@@ -169,6 +169,164 @@ $bms_submenu_white: 0.08;
     border-color: $bms_popup_border_color;
 }
 
+// Messages. base.css and dark.css.
+//
+// A banner is a blurred surface of its own, like a menu, and like a menu's
+// its shadow is painted under it too.
+.notification-banner {
+    @include bms-blur;
+    color: $bms_popup_fg_color;
+    background-color: bms-fold($bms_popup_tint, $bms_menu_backdrop);
+    border-color: $bms_popup_border_color;
+    // The extension rounds a banner as the messages in the list are.
+    border-radius: $modal_radius + 2px;
+}
+
+// In the list a message is a sheet of white on the menu.
+$bms_card_color: rgba(255, 255, 255, 0.07);
+$bms_card_border_color: rgba(255, 255, 255, 0.05);
+$bms_card_hover_color: rgba(255, 255, 255, 0.12);
+$bms_card_active_color: rgba(255, 255, 255, 0.15);
+$bms_dim_fg_color: rgba(255, 255, 255, 0.68);
+
+.message-list .message {
+    color: $bms_popup_fg_color;
+    background-color: $bms_card_color;
+    border-color: $bms_card_border_color;
+
+    &:hover { background-color: $bms_card_hover_color; }
+    &:focus-visible, &:active { background-color: $bms_card_active_color; }
+
+    &.second-in-stack { background-color: rgba(255, 255, 255, 0.05); }
+    &.lower-in-stack { background-color: rgba(255, 255, 255, 0.02); }
+}
+
+.message {
+    .message-header,
+    .message-header .message-header-content .event-time,
+    .message-header .message-header-content .message-source-title,
+    .message-header .message-source-icon {
+        color: $bms_dim_fg_color;
+    }
+
+    .message-box .message-content .message-title { color: $bms_popup_fg_color; }
+}
+
+.notification-button,
+.message .message-header .message-expand-button,
+.message .message-header .message-close-button,
+.message-notification-group .message-collapse-button,
+.message-list-controls .message-list-clear-button {
+    @include bms-button(0.1, 0.15, 0.3);
+}
+
+.message-list-controls .message-list-clear-button {
+    @include bms-focus-ring;
+}
+
+.notification-button:disabled,
+.message-list-controls .message-list-clear-button:disabled {
+    color: rgba(255, 255, 255, 0.35);
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.message-media-control {
+    color: $bms_popup_fg_color;
+    background-color: transparent;
+
+    &:hover { background-color: rgba(255, 255, 255, 0.15); }
+    &:active { background-color: rgba(255, 255, 255, 0.3); }
+    &:focus-visible, &:checked { background-color: rgba(255, 255, 255, 0.1); }
+    &:disabled { color: rgba(255, 255, 255, 0.5); }
+}
+
+// The date menu. dark.css.
+.calendar {
+    color: $bms_popup_fg_color;
+    background-color: transparent;
+    border-color: transparent;
+
+    .calendar-month-header .calendar-month-label,
+    .calendar-month-header .pager-button {
+        color: $bms_popup_fg_color;
+        background-color: transparent;
+    }
+
+    .calendar-day-heading,
+    .calendar-day {
+        color: $bms_popup_fg_color;
+        background-color: transparent;
+    }
+
+    .calendar-day-heading { color: $bms_dim_fg_color; }
+    .calendar-day.calendar-weekend { color: $bms_dim_fg_color; }
+    .calendar-day.calendar-other-month { color: rgba(255, 255, 255, 0.5); }
+
+    .calendar-day:hover,
+    .calendar-month-header .pager-button:hover {
+        background-color: rgba(255, 255, 255, 0.13);
+    }
+
+    .calendar-day:focus-visible,
+    .calendar-month-header .pager-button:focus-visible {
+        background-color: rgba(255, 255, 255, 0.1);
+        box-shadow: inset 0 0 0 2px st-transparentize(st-mix(-st-accent-color, rgba(255, 255, 255, 0.9), 60%), 0.2);
+    }
+
+    .calendar-day:selected,
+    .calendar-day:active,
+    .calendar-month-header .pager-button:active {
+        color: $bms_popup_fg_color;
+        background-color: rgba(255, 255, 255, 0.19);
+    }
+
+    .calendar-day:selected:hover,
+    .calendar-day:active:hover {
+        background-color: rgba(255, 255, 255, 0.13);
+    }
+
+    .calendar-day.calendar-today,
+    .calendar-day.calendar-today:selected {
+        color: st-transparentize(-st-accent-fg-color, 0);
+        background-color: st-transparentize(-st-accent-color, 0);
+
+        &:hover { background-color: st-lighten(-st-accent-color, 4%); }
+        &:active { background-color: st-lighten(-st-accent-color, 9%); }
+    }
+}
+
+.datemenu-today-button {
+    background-color: transparent;
+
+    &:hover, &:focus-visible { background-color: rgba(255, 255, 255, 0.15); }
+    &:active { background-color: rgba(255, 255, 255, 0.3); }
+
+    .date-label { color: $bms_popup_fg_color; }
+    .day-label { color: $bms_dim_fg_color; }
+}
+
+.events-button,
+.world-clocks-button,
+.weather-button {
+    background-color: $bms_card_color;
+    border-color: $bms_card_border_color;
+
+    &:hover { background-color: $bms_card_hover_color; }
+    &:focus-visible, &:active { background-color: $bms_card_active_color; }
+}
+
+.events-button .events-title,
+.events-button .events-list .event-placeholder,
+.world-clocks-button .world-clocks-header,
+.weather-button .weather-header {
+    color: $bms_dim_fg_color;
+}
+
+.world-clocks-button .world-clocks-header.no-world-clocks,
+.weather-button .weather-header.no-location {
+    color: $bms_popup_fg_color;
+}
+
 :root {
     --gniri-bms-menu-color: #{bms-fold($bms_popup_tint, $bms_menu_backdrop)};
     --gniri-bms-submenu-color: #{bms-submenu-colour()};
@@ -178,4 +336,10 @@ $bms_submenu_white: 0.08;
     --gniri-bms-popup-button-color: #{rgba(255, 255, 255, 0.1)};
     --gniri-bms-submenu-white: #{rgba(255, 255, 255, $bms_submenu_white)};
     --gniri-bms-osd-radius: 48px;
+    --gniri-bms-card-color: #{$bms_card_color};
+    --gniri-bms-card-border-color: #{$bms_card_border_color};
+    --gniri-bms-second-in-stack-color: #{rgba(255, 255, 255, 0.05)};
+    --gniri-bms-lower-in-stack-color: #{rgba(255, 255, 255, 0.02)};
+    --gniri-bms-dim-fg-color: #{$bms_dim_fg_color};
+    --gniri-bms-banner-radius: #{$modal_radius + 2px};
 }

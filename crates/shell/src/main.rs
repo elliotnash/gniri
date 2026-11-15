@@ -1,10 +1,12 @@
 //! gniri: a GNOME Shell lookalike for the niri compositor.
 
 mod app;
+mod date_menu;
 mod debug;
 mod ipc;
 mod keys;
 mod menus;
+mod messages;
 mod outputs;
 mod panel;
 mod quick_settings;
@@ -104,6 +106,9 @@ enum DebugRequest {
         #[arg(long)]
         level: Option<f64>,
     },
+    /// Deliver a notification as if an application had sent it, and print
+    /// its id.
+    Notify(ipc::Notify),
 }
 
 impl Message {
@@ -121,6 +126,7 @@ impl Message {
                 DebugRequest::Osd { icon, label, level } => {
                     ipc::Request::Osd { icon, label, level }
                 }
+                DebugRequest::Notify(notify) => ipc::Request::Notify(notify),
             },
         }
     }

@@ -10,6 +10,8 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, clap::ValueEnum)]
 pub enum Menu {
     QuickSettings,
+    /// The calendar and the notification list, under the clock.
+    DateMenu,
 }
 
 /// A menu inside the quick settings menu, opened from one of its items.
@@ -125,6 +127,25 @@ mod tests {
         assert_eq!(menus.submenu(), Some(Submenu::PowerMode));
         menus.back();
         assert!(menus.is_open(Menu::QuickSettings, None));
+        assert_eq!(menus.submenu(), None);
+        menus.back();
+        assert_eq!(menus, Menus::default());
+    }
+
+    #[test]
+    fn one_menu_at_a_time_and_only_quick_settings_has_submenus() {
+        let mut menus = Menus::default();
+        menus.toggle(Menu::QuickSettings, None);
+        menus.set_submenu(Some(Submenu::Wifi));
+        menus.toggle(Menu::DateMenu, None);
+        assert!(menus.is_open(Menu::DateMenu, None));
+        assert!(!menus.is_open(Menu::QuickSettings, None));
+        assert_eq!(
+            menus.submenu(),
+            None,
+            "the other menu took its submenu along"
+        );
+        menus.set_submenu(Some(Submenu::Wifi));
         assert_eq!(menus.submenu(), None);
         menus.back();
         assert_eq!(menus, Menus::default());

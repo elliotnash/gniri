@@ -18,6 +18,7 @@ use gtk::{cairo, gdk, glib};
 use gtk4_layer_shell::{KeyboardMode, Layer, LayerShell};
 
 use super::layer::{self, Anchor, Zone};
+use crate::date_menu::{self, DateMenu};
 use crate::menus::Menu;
 use crate::quick_settings::{self, QuickSettings};
 use crate::services::Services;
@@ -38,6 +39,9 @@ struct Inner {
     panel_height: Box<dyn Fn() -> i32>,
     /// Built when first opened, then kept.
     quick_settings: RefCell<Option<QuickSettings>>,
+    date_menu: RefCell<Option<DateMenu>>,
+    /// The menu that is showing.
+    shown: Cell<Option<Menu>>,
     /// Counts opens and closes, so a close that was overtaken by a new open
     /// does not unmap the surface.
     generation: Cell<u64>,
@@ -70,11 +74,64 @@ impl Inner {
         surface.set_input_region(Some(&region));
     }
 
+    /// The widget of `menu`, if it has been built.
+    fn widget(&self, menu: Menu) -> Option<gtk::Box> {
+        match menu {
+            Menu::QuickSettings => self
+                .quick_settings
+                .borrow()
+                .as_ref()
+                .map(|menu| menu.widget.clone()),
+            Menu::DateMenu => self
+                .date_menu
+                .borrow()
+                .as_ref()
+                .map(|menu| menu.widget.clone()),
+        }
+    }
+
+    /// Tells `menu` it is no longer showing.
+    fn closed(&self, menu: Menu) {
+        if menu == Menu::DateMenu
+            && let Some(date_menu) = &*self.date_menu.borrow()
+        {
+            date_menu.closed();
+        }
+    }
+
+    /// What Escape does: close the innermost thing that is open.
+    fn back(&self) {
+        let handled = self.shown.get() == Some(Menu::DateMenu)
+            && self
+                .date_menu
+                .borrow()
+                .as_ref()
+                .is_some_and(|date_menu| date_menu.back());
+        if !handled {
+            self.services.menus.update(|menus| menus.back());
+        }
+    }
+
     fn show(self: &Rc<Self>, menu: Menu) {
         let generation = self.generation.get() + 1;
         self.generation.set(generation);
 
-        let widget = match menu {
+        // Only one menu shows; the other, if it was open, goes at once.
+        let before = self.shown.replace(Some(menu));
+        for other in [Menu::QuickSettings, Menu::DateMenu] {
+            if other == menu {
+                continue;
+            }
+            if let Some(widget) = self.widget(other) {
+                widget.remove_css_class("open");
+                widget.set_visible(false);
+            }
+            if before == Some(other) {
+                self.closed(other);
+            }
+        }
+
+        let (widget, align) = match menu {
             Menu::QuickSettings => {
                 // Something else may have changed the backlight since the
                 // slider last heard of it.
@@ -84,19 +141,29 @@ impl Inner {
                 let mut quick_settings = self.quick_settings.borrow_mut();
                 let quick_settings =
                     quick_settings.get_or_insert_with(|| quick_settings::build(&self.services));
-                quick_settings.widget.clone()
+                // It opens under the status area: the right end of the
+                // panel.
+                (quick_settings.widget.clone(), gtk::Align::End)
+            }
+            Menu::DateMenu => {
+                let mut date_menu = self.date_menu.borrow_mut();
+                let date_menu = date_menu.get_or_insert_with(|| date_menu::build(&self.services));
+                date_menu.opened();
+                // It opens under the clock: the middle of the panel.
+                (date_menu.widget.clone(), gtk::Align::Center)
             }
         };
         if widget.parent().is_none() {
-            // `QuickSettings` opens under the status area: the right end
-            // of the panel.
             widget.set_hexpand(true);
             widget.set_vexpand(true);
-            widget.set_halign(gtk::Align::End);
+            widget.set_halign(align);
             widget.set_valign(gtk::Align::Start);
-            widget.set_margin_end(ARROW_RISE);
+            if align == gtk::Align::End {
+                widget.set_margin_end(ARROW_RISE);
+            }
             self.root.append(&widget);
         }
+        widget.set_visible(true);
         widget.set_margin_top((self.panel_height)() + ARROW_RISE);
 
         self.window.present();
@@ -119,8 +186,12 @@ impl Inner {
         if !self.window.is_visible() {
             return;
         }
-        if let Some(quick_settings) = &*self.quick_settings.borrow() {
-            quick_settings.widget.remove_css_class("open");
+        let shown = self.shown.take();
+        if let Some(widget) = shown.and_then(|menu| self.widget(menu)) {
+            widget.remove_css_class("open");
+        }
+        if let Some(menu) = shown {
+            self.closed(menu);
         }
 
         let unmap = {
@@ -171,6 +242,8 @@ pub fn build(
         services: Rc::clone(services),
         panel_height: Box::new(panel_height),
         quick_settings: RefCell::new(None),
+        date_menu: RefCell::new(None),
+        shown: Cell::new(None),
         generation: Cell::new(0),
     });
 
@@ -210,10 +283,12 @@ pub fn build(
         .propagation_phase(gtk::PropagationPhase::Capture)
         .build();
     keys.connect_key_pressed({
-        let services = Rc::clone(services);
+        let inner = Rc::downgrade(&inner);
         move |_, key, _, _| {
             if key == gdk::Key::Escape {
-                services.menus.update(|menus| menus.back());
+                if let Some(inner) = inner.upgrade() {
+                    inner.back();
+                }
                 glib::Propagation::Stop
             } else {
                 glib::Propagation::Proceed

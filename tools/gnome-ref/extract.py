@@ -37,7 +37,10 @@ WALLPAPERS = ["flat-808080", "flat-3584e4", "real"]
 #   margin     (optional) logical pixels kept around the root's box in the
 #              shots, for its shadow. Cut off at the screen edge.
 #   keep_text  whether its text is kept. Text is replaced by "x" of the same
-#              length unless it is known to be harmless.
+#              length unless it is known to be harmless. Text of an actor
+#              that is fully transparent is replaced either way: nobody
+#              looked at it to see that it is harmless, and the shots do
+#              not show it.
 #   redact     (optional) actors whose text is private even so: each is
 #              {"within": match, "match": match}. Their text is replaced,
 #              their box is blacked out in the shots, and they are marked
@@ -60,6 +63,22 @@ EXTRACTS = {
     "panel-overview": {"state": "overview", "match": {"name": "panel"}, "keep_text": True},
     "quick-settings": {"state": "quick-settings", **QUICK_SETTINGS},
     "quick-settings-submenu": {"state": "quick-settings-submenu", **QUICK_SETTINGS},
+    # The date, the calendar, the reference notification and an update
+    # notice of GNOME Software. The notifications stacked under those two
+    # are not drawn, and their text is not kept.
+    "date-menu": {
+        "state": "date-menu",
+        "match": {"classes": "popup-menu-content datemenu-popover bms-popup-blurred"},
+        "margin": 12,
+        "keep_text": True,
+    },
+    # The reference notification only.
+    "notification-banner": {
+        "state": "notification-banner",
+        "match": {"classes": "message notification-banner bms-popup-blurred"},
+        "margin": 12,
+        "keep_text": True,
+    },
     # No text.
     "osd": {
         "state": "osd",
@@ -98,6 +117,15 @@ def redact(node):
         redact(child)
 
 
+def redact_unseen(node):
+    """Replaces the text of every actor that is fully transparent."""
+    if node.get("opacity") == 0:
+        redact(node)
+        return
+    for child in node.get("children", []):
+        redact_unseen(child)
+
+
 def extract(name, spec):
     dump = json.loads((RAW / "metrics" / f"{spec['state']}.json").read_text())
     path = find_path(dump["tree"], spec["match"])
@@ -112,6 +140,7 @@ def extract(name, spec):
         tree = ancestors[-1]
     if not spec["keep_text"]:
         redact(tree)
+    redact_unseen(tree)
 
     blackout = []
     for rule in spec.get("redact", []):

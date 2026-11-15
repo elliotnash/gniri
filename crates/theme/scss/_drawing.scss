@@ -62,8 +62,8 @@
 // St also paints the shadow under the element itself, which shows through
 // a translucent background; GTK and CSS clip it away there. That part is
 // folded into the background colour where it matters (_bms-popup.scss).
-@function st-shadow($x, $y, $blur, $color) {
-    @return $x $y $blur ($blur * 0.4) $color;
+@function st-shadow($x, $y, $blur, $color, $spread: 0px) {
+    @return $x $y $blur ($spread + $blur * 0.4) $color;
 }
 
 // Upstream panel_button(), restated for GTK.

@@ -20,6 +20,8 @@ pub struct State {
     /// Every workspace on every output, ordered by output then position.
     pub workspaces: Vec<Workspace>,
     pub overview_open: bool,
+    /// Connector name of the output with the focused workspace.
+    pub focused_output: Option<String>,
     /// Names of the configured keyboard layouts, such as "English (US)".
     pub keyboard_layouts: Vec<String>,
     /// Index into `keyboard_layouts` of the layout in use.
@@ -81,6 +83,13 @@ impl Tracker {
             })
             .collect();
         workspaces.sort_by(|a, b| (&a.output, a.index).cmp(&(&b.output, b.index)));
+        let focused_output = self
+            .raw
+            .workspaces
+            .workspaces
+            .values()
+            .find(|workspace| workspace.is_focused)
+            .and_then(|workspace| workspace.output.clone());
 
         let (keyboard_layouts, keyboard_layout) = match &self.raw.keyboard_layouts.keyboard_layouts
         {
@@ -103,6 +112,7 @@ impl Tracker {
             connected: true,
             workspaces,
             overview_open: self.raw.overview.is_open,
+            focused_output,
             keyboard_layouts,
             keyboard_layout,
             screencast_sessions,

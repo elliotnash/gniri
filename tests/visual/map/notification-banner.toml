@@ -1,0 +1,96 @@
+# A notification banner: gniri's widgets against GNOME Shell's actors.
+# Read by `cargo xtask diff notification-banner` (crates/xtask/src/diff.rs).
+
+surface = "gniri-banner"
+root = ".notification-banner"
+# It sits under the middle of the panel, which keeps the top of the screen
+# to itself.
+attach = "center"
+below = "gniri-panel"
+# Its shadow is compared too.
+margin = 12
+wallpaper = "/usr/share/backgrounds/f45/default/f45-01-night.jxl"
+
+[[states]]
+scene = "notification-banner"
+reference = "notification-banner"
+
+[[regions]]
+name = "banner"
+anchor = "stretch"
+
+# Pairs that depend on the size of a piece of text allow one pixel, as in
+# panel.toml.
+
+[[pairs]]
+name = "header"
+ours = ".message-header"
+theirs = ".message-header"
+anchor = "left"
+
+[[pairs]]
+name = "source icon"
+ours = ".message-source-icon"
+theirs = ".message-source-icon"
+anchor = "left"
+
+[[pairs]]
+name = "header content"
+ours = ".message-header-content"
+theirs = ".message-header-content"
+anchor = "left"
+
+[[pairs]]
+name = "source title"
+ours = ".message-source-title"
+ours_box = "text"
+theirs = ".message-source-title ClutterText"
+anchor = "left"
+tolerance_px = 1.1
+
+[[pairs]]
+name = "time"
+ours = ".event-time"
+ours_box = "text"
+theirs = ".event-time ClutterText"
+anchor = "left"
+tolerance_px = 1.1
+
+[[pairs]]
+name = "close button"
+ours = ".message-close-button"
+theirs = ".message-close-button"
+anchor = "right"
+
+[[pairs]]
+name = "close icon"
+ours = ".message-close-button GtkImage"
+theirs = ".message-close-button StIcon"
+anchor = "right"
+
+[[pairs]]
+name = "message box"
+ours = ".message-box"
+theirs = ".message-box"
+anchor = "left"
+
+[[pairs]]
+name = "message content"
+ours = ".message-content"
+theirs = ".message-content"
+anchor = "left"
+
+# GNOME's title label is as wide as the banner, as ours is.
+[[pairs]]
+name = "title"
+ours = ".message-title"
+theirs = ".message-title"
+anchor = "left"
+
+[[pairs]]
+name = "body"
+ours = ".message-body"
+ours_box = "text"
+theirs = ".message-body ClutterText"
+anchor = "left"
+tolerance_px = 1.1

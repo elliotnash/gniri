@@ -31,7 +31,7 @@ pub fn build(services: &Rc<Services>, output: Option<&str>) -> Bar {
     let (left, centre, right) = (side("panelLeft"), side("panelCenter"), side("panelRight"));
 
     left.append(&activities::build(services, output, &mut subscriptions));
-    centre.append(&clock::build(services, &mut subscriptions));
+    centre.append(&clock::build(services, output, &mut subscriptions));
     right.append(&screencast::build(services, &mut subscriptions));
     right.append(&keyboard::build(services, &mut subscriptions));
     right.append(&status::build(services, output, &mut subscriptions));

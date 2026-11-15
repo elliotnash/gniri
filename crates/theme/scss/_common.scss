@@ -37,11 +37,13 @@ $ease_out_quad: cubic-bezier(0.25, 0.46, 0.45, 0.94);
 $st_transition_easing: cubic-bezier(0.455, 0.03, 0.515, 0.955);
 
 // Typography. Upstream: the "Text Styles" block of _common.scss.
+@mixin title_2 { font-weight: 800; @include fontsize(15pt); }
 @mixin title_3 { font-weight: 700; @include fontsize(15pt); }
 @mixin title_4 { font-weight: 700; @include fontsize(13pt); }
 @mixin heading { font-weight: 700; @include fontsize(11pt); }
 @mixin caption_heading { font-weight: 700; @include fontsize(9pt); }
 @mixin caption { font-weight: 400; @include fontsize(9pt); }
+@mixin smaller { font-weight: 400; @include fontsize(9pt); }
 
 // St lays a line of the interface font out one pixel taller than Pango does
 // under GTK (19px against 18px at 11pt; docs/DECISIONS.md, M1) and widgets

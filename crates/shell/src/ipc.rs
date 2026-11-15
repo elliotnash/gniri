@@ -42,6 +42,46 @@ pub enum Request {
         label: Option<String>,
         level: Option<f64>,
     },
+    /// Deliver a notification as if an application had sent it. Answers
+    /// with its id.
+    Notify(Notify),
+}
+
+/// A notification for [`Request::Notify`].
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, clap::Args)]
+pub struct Notify {
+    pub summary: String,
+    #[arg(default_value = "")]
+    pub body: String,
+    /// Name of the application it comes from.
+    #[arg(long, default_value = "")]
+    pub app: String,
+    /// The application's icon: a name or a file.
+    #[arg(long)]
+    pub icon: Option<String>,
+    /// A picture shown beside the text: an icon name or a file.
+    #[arg(long)]
+    pub image: Option<String>,
+    #[arg(long, value_enum, default_value = "normal")]
+    pub urgency: Urgency,
+    /// A button, as KEY=LABEL; "default" as the key makes the notification
+    /// itself clickable. May be given several times.
+    #[arg(long = "action", value_name = "KEY=LABEL")]
+    pub actions: Vec<String>,
+    /// Id of a notification to replace.
+    #[arg(long)]
+    pub replaces: Option<u32>,
+    #[arg(long)]
+    pub transient: bool,
+    #[arg(long)]
+    pub resident: bool,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, clap::ValueEnum)]
+pub enum Urgency {
+    Low,
+    Normal,
+    Critical,
 }
 
 /// What a volume key does.

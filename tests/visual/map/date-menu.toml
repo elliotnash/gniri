@@ -1,0 +1,356 @@
+# The date menu: gniri's widgets against GNOME Shell's actors.
+# Read by `cargo xtask diff date-menu` (crates/xtask/src/diff.rs).
+
+surface = "gniri-stage"
+root = ".datemenu-popover"
+# It hangs from the middle of the panel, under the clock.
+attach = "center"
+# Its shadow is compared too.
+margin = 12
+wallpaper = "/usr/share/backgrounds/f45/default/f45-01-night.jxl"
+
+[[states]]
+scene = "date-menu"
+reference = "date-menu"
+
+[[regions]]
+name = "menu"
+anchor = "stretch"
+
+# Selectors: crates/xtask/src/tree.rs. GNOME lists the groups of the message
+# view in the order it made them, oldest first; gniri in the order they
+# show. So our first group is their second.
+#
+# Pairs that depend on the size of a piece of text allow one pixel, as in
+# panel.toml.
+
+[[pairs]]
+name = "area"
+ours = "#calendarArea"
+theirs = "#calendarArea"
+anchor = "left"
+
+[[pairs]]
+name = "message list"
+ours = ".message-list"
+theirs = ".message-list"
+anchor = "left"
+
+[[pairs]]
+name = "message view"
+ours = ".message-view"
+theirs = ".message-view"
+anchor = "left"
+
+[[pairs]]
+name = "first group"
+ours = ".message-notification-group:0"
+theirs = ".message-notification-group:1"
+anchor = "left"
+
+[[pairs]]
+name = "first message"
+ours = ".message-notification-group:0 .message:0"
+theirs = ".message-notification-group:1 .message:0"
+anchor = "left"
+
+[[pairs]]
+name = "second in stack"
+ours = ".message-notification-group:0 .message:1"
+theirs = ".message-notification-group:1 .message:1"
+anchor = "left"
+
+[[pairs]]
+name = "lower in stack"
+ours = ".message-notification-group:0 .message:2"
+theirs = ".message-notification-group:1 .message:2"
+anchor = "left"
+
+[[pairs]]
+name = "message header"
+ours = ".message-notification-group:0 .message:0 .message-header"
+theirs = ".message-notification-group:1 .message:0 .message-header"
+anchor = "left"
+
+[[pairs]]
+name = "source icon"
+ours = ".message-notification-group:0 .message:0 .message-source-icon"
+theirs = ".message-notification-group:1 .message:0 .message-source-icon"
+anchor = "left"
+
+[[pairs]]
+name = "header content"
+ours = ".message-notification-group:0 .message:0 .message-header-content"
+theirs = ".message-notification-group:1 .message:0 .message-header-content"
+anchor = "left"
+
+[[pairs]]
+name = "source title"
+ours = ".message-notification-group:0 .message:0 .message-source-title"
+ours_box = "text"
+theirs = ".message-notification-group:1 .message:0 .message-source-title ClutterText"
+anchor = "left"
+tolerance_px = 1.1
+
+[[pairs]]
+name = "time"
+ours = ".message-notification-group:0 .message:0 .event-time"
+ours_box = "text"
+theirs = ".message-notification-group:1 .message:0 .event-time ClutterText"
+anchor = "left"
+tolerance_px = 1.1
+
+[[pairs]]
+name = "expand button"
+ours = ".message-notification-group:0 .message:0 .message-expand-button"
+theirs = ".message-notification-group:1 .message:0 .message-expand-button"
+anchor = "left"
+
+[[pairs]]
+name = "close button"
+ours = ".message-notification-group:0 .message:0 .message-close-button"
+theirs = ".message-notification-group:1 .message:0 .message-close-button"
+anchor = "left"
+
+[[pairs]]
+name = "close icon"
+ours = ".message-notification-group:0 .message:0 .message-close-button GtkImage"
+theirs = ".message-notification-group:1 .message:0 .message-close-button StIcon"
+anchor = "left"
+
+[[pairs]]
+name = "message box"
+ours = ".message-notification-group:0 .message:0 .message-box"
+theirs = ".message-notification-group:1 .message:0 .message-box"
+anchor = "left"
+
+[[pairs]]
+name = "message content"
+ours = ".message-notification-group:0 .message:0 .message-content"
+theirs = ".message-notification-group:1 .message:0 .message-content"
+anchor = "left"
+
+# GNOME's title label is as wide as the message; only where the text starts
+# and how tall it is can be compared with the extents of ours.
+[[pairs]]
+name = "message title"
+ours = ".message-notification-group:0 .message:0 .message-title"
+theirs = ".message-notification-group:1 .message:0 .message-title"
+anchor = "left"
+
+[[pairs]]
+name = "message body"
+ours = ".message-notification-group:0 .message:0 .message-body"
+ours_box = "text"
+theirs = ".message-notification-group:1 .message:0 .message-body ClutterText"
+anchor = "left"
+tolerance_px = 1.1
+
+[[pairs]]
+name = "second group"
+ours = ".message-notification-group:1"
+theirs = ".message-notification-group:0"
+anchor = "left"
+
+[[pairs]]
+name = "second group's message"
+ours = ".message-notification-group:1 .message:0"
+theirs = ".message-notification-group:0 .message:0"
+anchor = "left"
+
+[[pairs]]
+name = "second group's stack"
+ours = ".message-notification-group:1 .message:1"
+theirs = ".message-notification-group:0 .message:1"
+anchor = "left"
+
+[[pairs]]
+name = "list controls"
+ours = ".message-list-controls"
+theirs = ".message-list-controls"
+anchor = "left"
+
+[[pairs]]
+name = "clear button"
+ours = ".message-list-clear-button"
+theirs = ".message-list-clear-button"
+anchor = "left"
+tolerance_px = 1.1
+
+[[pairs]]
+name = "clear label"
+ours = ".message-list-clear-button GtkLabel"
+ours_box = "text"
+theirs = ".message-list-clear-button ClutterText"
+anchor = "left"
+tolerance_px = 1.1
+
+# The calendar column.
+
+[[pairs]]
+name = "calendar column"
+ours = ".datemenu-calendar-column"
+theirs = ".datemenu-calendar-column"
+anchor = "right"
+
+[[pairs]]
+name = "today button"
+ours = ".datemenu-today-button"
+theirs = ".datemenu-today-button"
+anchor = "right"
+
+[[pairs]]
+name = "day label"
+ours = ".day-label"
+ours_box = "text"
+theirs = ".day-label ClutterText"
+anchor = "right"
+tolerance_px = 1.1
+
+# GNOME's date label is as wide as the button.
+[[pairs]]
+name = "date label"
+ours = ".datemenu-today-button GtkBox"
+theirs = ".datemenu-today-button StBoxLayout"
+anchor = "right"
+
+[[pairs]]
+name = "calendar"
+ours = ".calendar"
+theirs = ".calendar"
+anchor = "right"
+
+[[pairs]]
+name = "month header"
+ours = ".calendar-month-header"
+theirs = ".calendar-month-header"
+anchor = "right"
+
+[[pairs]]
+name = "previous month button"
+ours = ".calendar-change-month-back"
+theirs = ".calendar-change-month-back"
+anchor = "right"
+
+[[pairs]]
+name = "previous month icon"
+ours = ".calendar-change-month-back GtkImage"
+theirs = ".calendar-change-month-back StIcon"
+anchor = "right"
+
+[[pairs]]
+name = "month label"
+ours = ".calendar-month-label"
+theirs = ".calendar-month-label"
+anchor = "right"
+
+[[pairs]]
+name = "next month button"
+ours = ".calendar-change-month-forward"
+theirs = ".calendar-change-month-forward"
+anchor = "right"
+
+# GNOME adds the headings starting from the weekday it was built on, so
+# its Sunday is not its first.
+[[pairs]]
+name = "first day heading"
+ours = ".calendar-day-heading:0"
+theirs = ".calendar-day-heading:3"
+anchor = "right"
+
+[[pairs]]
+name = "last day heading"
+ours = ".calendar-day-heading:6"
+theirs = ".calendar-day-heading:2"
+anchor = "right"
+
+[[pairs]]
+name = "first day"
+ours = ".calendar-day:0"
+theirs = ".calendar-day:0"
+anchor = "right"
+
+[[pairs]]
+name = "first day's number"
+ours = ".calendar-day:0 GtkLabel"
+ours_box = "text"
+theirs = ".calendar-day:0 ClutterText"
+anchor = "right"
+tolerance_px = 1.1
+
+[[pairs]]
+name = "a weekday"
+ours = ".calendar-day:17"
+theirs = ".calendar-day:17"
+anchor = "right"
+
+[[pairs]]
+name = "today"
+ours = ".calendar-today"
+theirs = ".calendar-today"
+anchor = "right"
+
+[[pairs]]
+name = "last day"
+ours = ".calendar-day:41"
+theirs = ".calendar-day:41"
+anchor = "right"
+
+[[pairs]]
+name = "displays box"
+ours = ".datemenu-displays-box"
+theirs = ".datemenu-displays-box"
+anchor = "right"
+
+[[pairs]]
+name = "events card"
+ours = ".events-button"
+theirs = ".events-button"
+anchor = "right"
+
+[[pairs]]
+name = "events box"
+ours = ".events-box"
+theirs = ".events-box"
+anchor = "right"
+
+# Both labels are as wide as the card on both sides.
+[[pairs]]
+name = "events title"
+ours = ".events-title"
+theirs = ".events-title"
+anchor = "right"
+
+[[pairs]]
+name = "no events"
+ours = ".event-placeholder"
+theirs = ".event-placeholder"
+anchor = "right"
+
+[[pairs]]
+name = "world clocks card"
+ours = ".world-clocks-button"
+theirs = ".world-clocks-button"
+anchor = "right"
+
+[[pairs]]
+name = "world clocks text"
+ours = ".world-clocks-header"
+ours_box = "text"
+theirs = ".world-clocks-header ClutterText"
+anchor = "right"
+tolerance_px = 1.1
+
+[[pairs]]
+name = "weather card"
+ours = ".weather-button"
+theirs = ".weather-button"
+anchor = "right"
+
+[[pairs]]
+name = "weather text"
+ours = ".weather-header"
+ours_box = "text"
+theirs = ".weather-header ClutterText"
+anchor = "right"
+tolerance_px = 1.1

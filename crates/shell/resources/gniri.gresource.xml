@@ -6,5 +6,10 @@
     <file preprocess="xml-stripblanks" alias="scalable/actions/dark-mode-symbolic.svg">icons/scalable/actions/dark-mode-symbolic.svg</file>
     <file preprocess="xml-stripblanks" alias="scalable/actions/ornament-check-symbolic.svg">icons/scalable/actions/ornament-check-symbolic.svg</file>
     <file preprocess="xml-stripblanks" alias="scalable/actions/screenshooter-symbolic.svg">icons/scalable/actions/screenshooter-symbolic.svg</file>
+    <file preprocess="xml-stripblanks" alias="scalable/actions/notification-expand-symbolic.svg">icons/scalable/actions/notification-expand-symbolic.svg</file>
+    <file preprocess="xml-stripblanks" alias="scalable/actions/group-collapse-symbolic.svg">icons/scalable/actions/group-collapse-symbolic.svg</file>
+    <file preprocess="xml-stripblanks" alias="scalable/actions/cog-wheel-symbolic.svg">icons/scalable/actions/cog-wheel-symbolic.svg</file>
+    <file preprocess="xml-stripblanks" alias="scalable/status/message-indicator-symbolic.svg">icons/scalable/status/message-indicator-symbolic.svg</file>
+    <file preprocess="xml-stripblanks" alias="scalable/status/no-notifications-symbolic.svg">icons/scalable/status/no-notifications-symbolic.svg</file>
   </gresource>
 </gresources>

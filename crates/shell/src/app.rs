@@ -236,6 +236,7 @@ fn handle(
             });
             Ok(Value::Null)
         }
+        ipc::Request::Notify(notify) => Ok(Value::from(debug::notify(services, notify))),
         ipc::Request::Brightness(step) => {
             let steps = match step {
                 ipc::Step::Up => 1,

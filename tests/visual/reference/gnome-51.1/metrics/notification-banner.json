@@ -1,0 +1,562 @@
+{
+ "gnome_shell": "51.1",
+ "state": "notification-banner",
+ "stage": [
+  1792,
+  1120
+ ],
+ "pixels_per_unit": 1.25,
+ "root_box": [
+  639,
+  36,
+  513,
+  102
+ ],
+ "shot_box": [
+  626.4,
+  24.0,
+  537.6,
+  126.4
+ ],
+ "tree": {
+  "type": "Gjs_ui_messageList_NotificationMessage",
+  "box": [
+   639,
+   36,
+   513,
+   102
+  ],
+  "opacity": 255,
+  "classes": "message notification-banner bms-popup-blurred",
+  "pseudo": "first-child last-child",
+  "style": {
+   "bg": [
+    30,
+    30,
+    33,
+    128
+   ],
+   "fg": [
+    255,
+    255,
+    255,
+    230
+   ],
+   "radius": [
+    18,
+    18,
+    18,
+    18
+   ],
+   "padding": [
+    6,
+    6,
+    6,
+    6
+   ],
+   "margin": [
+    4,
+    4,
+    4,
+    4
+   ],
+   "border_width": [
+    1,
+    1,
+    1,
+    1
+   ],
+   "font": "Adwaita Sans 14.666px",
+   "border_color": [
+    [
+     255,
+     255,
+     255,
+     15
+    ],
+    [
+     255,
+     255,
+     255,
+     15
+    ],
+    [
+     255,
+     255,
+     255,
+     15
+    ],
+    [
+     255,
+     255,
+     255,
+     15
+    ]
+   ],
+   "width": 499,
+   "height": 64,
+   "min_width": 499,
+   "min_height": 64,
+   "max_width": 499,
+   "box_shadow": {
+    "color": [
+     0,
+     0,
+     0,
+     51
+    ],
+    "blur": 4,
+    "spread": 2,
+    "x": 0,
+    "y": 2,
+    "inset": false
+   }
+  },
+  "inline_style": "border-radius: 18px 18px 18px 18px;",
+  "children": [
+   {
+    "type": "StBoxLayout",
+    "box": [
+     646,
+     43,
+     499,
+     88
+    ],
+    "opacity": 255,
+    "pseudo": "insensitive first-child last-child",
+    "style": {
+     "fg": [
+      255,
+      255,
+      255,
+      230
+     ],
+     "font": "Adwaita Sans 14.666px"
+    },
+    "children": [
+     {
+      "type": "Gjs_ui_messageList_MessageHeader",
+      "box": [
+       646,
+       43,
+       499,
+       34
+      ],
+      "opacity": 255,
+      "classes": "message-header",
+      "pseudo": "insensitive first-child",
+      "style": {
+       "fg": [
+        255,
+        255,
+        255,
+        174
+       ],
+       "padding": [
+        0,
+        0,
+        0,
+        6
+       ],
+       "font": "Adwaita Sans 14.666px",
+       "spacing": 6
+      },
+      "children": [
+       {
+        "type": "StIcon",
+        "box": [
+         652,
+         52,
+         16,
+         16
+        ],
+        "opacity": 255,
+        "classes": "message-source-icon",
+        "pseudo": "insensitive first-child",
+        "style": {
+         "fg": [
+          255,
+          255,
+          255,
+          174
+         ],
+         "font": "Adwaita Sans 14.666px"
+        },
+        "icon": "cog-wheel-symbolic",
+        "icon_size": -1,
+        "effects": [
+         "ClutterDesaturateEffect"
+        ],
+        "children": [
+         {
+          "type": "ClutterActor",
+          "box": [
+           652,
+           52,
+           16,
+           16
+          ],
+          "opacity": 255
+         }
+        ]
+       },
+       {
+        "type": "StBoxLayout",
+        "box": [
+         674,
+         45,
+         431,
+         30
+        ],
+        "opacity": 255,
+        "classes": "message-header-content",
+        "pseudo": "insensitive",
+        "style": {
+         "fg": [
+          255,
+          255,
+          255,
+          174
+         ],
+         "padding": [
+          0,
+          0,
+          6,
+          0
+         ],
+         "font": "Adwaita Sans 14.666px",
+         "spacing": 6,
+         "height": 24,
+         "min_height": 24
+        },
+        "children": [
+         {
+          "type": "StLabel",
+          "box": [
+           674,
+           50,
+           53,
+           19
+          ],
+          "opacity": 255,
+          "classes": "message-source-title",
+          "pseudo": "insensitive first-child",
+          "style": {
+           "fg": [
+            255,
+            255,
+            255,
+            174
+           ],
+           "font": "Adwaita Sans Bold 14.666px"
+          },
+          "text": "System",
+          "children": [
+           {
+            "type": "ClutterText",
+            "box": [
+             674,
+             50,
+             53,
+             19
+            ],
+            "opacity": 255
+           }
+          ]
+         },
+         {
+          "type": "Gjs_ui_messageList_TimeLabel",
+          "box": [
+           733,
+           53,
+           51,
+           16
+          ],
+          "opacity": 255,
+          "classes": "event-time",
+          "pseudo": "insensitive last-child",
+          "style": {
+           "fg": [
+            255,
+            255,
+            255,
+            174
+           ],
+           "padding": [
+            0,
+            0,
+            1,
+            0
+           ],
+           "font": "Adwaita Sans 11.996px"
+          },
+          "text": "Just now",
+          "children": [
+           {
+            "type": "ClutterText",
+            "box": [
+             733,
+             53,
+             51,
+             15
+            ],
+            "opacity": 255
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "type": "StButton",
+        "box": [
+         1114,
+         46,
+         28,
+         28
+        ],
+        "opacity": 255,
+        "classes": "message-close-button",
+        "pseudo": "last-child",
+        "style": {
+         "bg": [
+          255,
+          255,
+          255,
+          25
+         ],
+         "fg": [
+          255,
+          255,
+          255,
+          230
+         ],
+         "radius": [
+          999,
+          999,
+          999,
+          999
+         ],
+         "padding": [
+          6,
+          6,
+          6,
+          6
+         ],
+         "margin": [
+          3,
+          3,
+          3,
+          3
+         ],
+         "font": "Adwaita Sans Bold 14.666px",
+         "height": 16,
+         "min_height": 16
+        },
+        "children": [
+         {
+          "type": "StIcon",
+          "box": [
+           1120,
+           52,
+           16,
+           16
+          ],
+          "opacity": 255,
+          "pseudo": "insensitive first-child last-child",
+          "style": {
+           "fg": [
+            255,
+            255,
+            255,
+            230
+           ],
+           "font": "Adwaita Sans Bold 14.666px"
+          },
+          "icon": "window-close-symbolic",
+          "icon_size": -1,
+          "children": [
+           {
+            "type": "ClutterActor",
+            "box": [
+             1120,
+             52,
+             16,
+             16
+            ],
+            "opacity": 255
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "StBoxLayout",
+      "box": [
+       646,
+       77,
+       499,
+       54
+      ],
+      "opacity": 255,
+      "classes": "message-box",
+      "pseudo": "insensitive last-child",
+      "style": {
+       "fg": [
+        255,
+        255,
+        255,
+        230
+       ],
+       "padding": [
+        6,
+        6,
+        6,
+        6
+       ],
+       "font": "Adwaita Sans 14.666px",
+       "spacing": 6
+      },
+      "children": [
+       {
+        "type": "StBoxLayout",
+        "box": [
+         652,
+         83,
+         481,
+         42
+        ],
+        "opacity": 255,
+        "classes": "message-content",
+        "pseudo": "insensitive first-child",
+        "style": {
+         "fg": [
+          255,
+          255,
+          255,
+          230
+         ],
+         "font": "Adwaita Sans 14.666px",
+         "spacing": 4
+        },
+        "children": [
+         {
+          "type": "StLabel",
+          "box": [
+           652,
+           83,
+           481,
+           19
+          ],
+          "opacity": 255,
+          "classes": "message-title",
+          "pseudo": "insensitive first-child",
+          "style": {
+           "fg": [
+            255,
+            255,
+            255,
+            230
+           ],
+           "font": "Adwaita Sans Bold 14.666px"
+          },
+          "text": "Reference notification",
+          "children": [
+           {
+            "type": "ClutterText",
+            "box": [
+             652,
+             83,
+             481,
+             19
+            ],
+            "opacity": 255
+           }
+          ]
+         },
+         {
+          "type": "StBin",
+          "box": [
+           652,
+           106,
+           481,
+           19
+          ],
+          "opacity": 255,
+          "pseudo": "insensitive last-child",
+          "style": {
+           "fg": [
+            255,
+            255,
+            255,
+            230
+           ],
+           "font": "Adwaita Sans 14.666px"
+          },
+          "children": [
+           {
+            "type": "Gjs_ui_messageList_URLHighlighter",
+            "box": [
+             652,
+             106,
+             252,
+             19
+            ],
+            "opacity": 255,
+            "classes": "url-highlighter message-body",
+            "pseudo": "first-child last-child",
+            "style": {
+             "fg": [
+              255,
+              255,
+              255,
+              230
+             ],
+             "font": "Adwaita Sans 14.666px"
+            },
+            "text": "Body text of the reference notification",
+            "children": [
+             {
+              "type": "ClutterText",
+              "box": [
+               652,
+               106,
+               252,
+               19
+              ],
+              "opacity": 255
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "type": "StBoxLayout",
+        "box": [
+         1139,
+         83,
+         0,
+         42
+        ],
+        "opacity": 255,
+        "pseudo": "insensitive last-child",
+        "style": {
+         "fg": [
+          255,
+          255,
+          255,
+          230
+         ],
+         "font": "Adwaita Sans 14.666px"
+        }
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ }
+}

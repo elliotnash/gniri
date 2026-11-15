@@ -15,6 +15,9 @@ $contrast: 'normal';
 @import 'widgets/slider';
 @import 'widgets/quick-settings';
 @import 'widgets/osd';
+@import 'widgets/message-list';
+@import 'widgets/notifications';
+@import 'widgets/calendar';
 
 // Last, so it overrides the stock look above.
 @import 'bms';

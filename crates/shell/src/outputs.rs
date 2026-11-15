@@ -9,6 +9,7 @@ use gtk::{gdk, gio};
 
 use crate::ready::ReadyTracker;
 use crate::services::Services;
+use crate::surfaces::banner::{self, Banner, Tray};
 use crate::surfaces::osd::{self, Osd};
 use crate::surfaces::panel::{self, Panel};
 use crate::surfaces::stage::{self, Stage};
@@ -23,6 +24,8 @@ struct Output {
     stage: Stage,
     /// Unmapped until a volume or brightness key is pressed.
     osd: Osd,
+    /// Unmapped until a notification asks for a banner.
+    banner: Banner,
 }
 
 impl Output {
@@ -42,6 +45,7 @@ impl Drop for Output {
         }
         self.stage.window.destroy();
         self.osd.window.destroy();
+        self.banner.window.destroy();
     }
 }
 
@@ -50,6 +54,8 @@ pub struct Outputs {
     services: Rc<Services>,
     wallpaper: Option<WallpaperSource>,
     outputs: RefCell<Vec<Output>>,
+    /// Shows notification banners on the focused output.
+    tray: RefCell<Option<Tray>>,
 }
 
 impl Outputs {
@@ -67,6 +73,7 @@ impl Outputs {
             services: Rc::clone(services),
             wallpaper,
             outputs: RefCell::new(Vec::new()),
+            tray: RefCell::new(None),
         });
 
         let monitors = gdk::Display::default()
@@ -78,6 +85,11 @@ impl Outputs {
                 ready.watch(window);
             }
         }
+
+        outputs.tray.replace(Some(Tray::start(services, {
+            let outputs = Rc::downgrade(&outputs);
+            move || outputs.upgrade().and_then(|outputs| outputs.banner())
+        })));
 
         monitors.connect_items_changed({
             let outputs = Rc::downgrade(&outputs);
@@ -123,12 +135,14 @@ impl Outputs {
                 .map_or(0, |window| window.height())
         });
         let osd = osd::build(&self.app, &monitor);
+        let banner = banner::build(&self.app, &monitor);
         Output {
             monitor,
             panel,
             wallpaper,
             stage,
             osd,
+            banner,
         }
     }
 
@@ -138,6 +152,22 @@ impl Outputs {
         for output in self.outputs.borrow().iter() {
             output.osd.show(content);
         }
+    }
+
+    /// The banner surface of the output the user is looking at: the one
+    /// with niri's focused workspace, or else the first with a panel. GNOME
+    /// shows banners on its primary monitor, which niri does not have.
+    fn banner(&self) -> Option<Banner> {
+        let focused = self.services.niri.with(|niri| niri.focused_output.clone());
+        let outputs = self.outputs.borrow();
+        let output = outputs
+            .iter()
+            .find(|output| {
+                focused.is_some() && output.monitor.connector().as_deref() == focused.as_deref()
+            })
+            .or_else(|| outputs.iter().find(|output| output.panel.is_some()))
+            .or(outputs.first())?;
+        Some(output.banner.clone())
     }
 
     /// Connector name of the first output that has a panel: where a menu
