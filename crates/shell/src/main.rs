@@ -11,6 +11,7 @@ mod lock;
 mod menus;
 mod messages;
 mod outputs;
+mod overview;
 mod panel;
 mod polkit;
 mod quick_settings;
@@ -87,6 +88,10 @@ enum Command {
     DebugWindow {
         #[arg(long, default_value = "#f6f5f4")]
         color: String,
+        /// The application the window says it is of, such as
+        /// "org.gnome.Settings".
+        #[arg(long)]
+        app_id: Option<String>,
     },
 }
 
@@ -106,6 +111,9 @@ enum Message {
     Restart,
     /// Ask whether to power off.
     PowerOff,
+    /// Show the app grid, opening the overview for it, or close the
+    /// overview if the grid is showing. GNOME has this on Super+A.
+    Apps,
     /// Inspect or drive the running shell (for tests).
     Debug {
         #[command(subcommand)]
@@ -149,6 +157,22 @@ enum DebugRequest {
     Notify(ipc::Notify),
     /// Close the end-session dialog, as its Cancel button does.
     CloseDialog,
+    /// Show the app grid, or the windows again, in the open overview.
+    ShowApps {
+        /// Go back to the windows.
+        #[arg(long)]
+        off: bool,
+    },
+    /// Search for a text in the open overview, as if it had been typed.
+    Search {
+        text: String,
+        /// As a script of GNOME Shell's would start a search: the entry
+        /// without the keyboard focus, no result highlighted.
+        #[arg(long)]
+        quiet: bool,
+    },
+    /// Turn to a page of the app grid, counting from 0.
+    Page { page: usize },
     /// Report an idle timer as passed, as the compositor would after that
     /// long without input.
     Idle {
@@ -168,6 +192,7 @@ impl Message {
             Self::LogOut => ipc::Request::EndSession(dialogs::end_session::Kind::LogOut),
             Self::Restart => ipc::Request::EndSession(dialogs::end_session::Kind::Restart),
             Self::PowerOff => ipc::Request::EndSession(dialogs::end_session::Kind::PowerOff),
+            Self::Apps => ipc::Request::Apps,
             Self::Debug { request } => match request {
                 DebugRequest::DumpTree => ipc::Request::DumpTree,
                 DebugRequest::Sync => ipc::Request::Sync,
@@ -182,6 +207,9 @@ impl Message {
                 DebugRequest::Notify(notify) => ipc::Request::Notify(notify),
                 DebugRequest::CloseDialog => ipc::Request::CloseDialog,
                 DebugRequest::Idle { timer, resumed } => ipc::Request::Idle { timer, resumed },
+                DebugRequest::ShowApps { off } => ipc::Request::ShowApps(!off),
+                DebugRequest::Search { text, quiet } => ipc::Request::Search { text, quiet },
+                DebugRequest::Page { page } => ipc::Request::Page(page),
             },
         }
     }
@@ -193,7 +221,9 @@ fn main() -> glib::ExitCode {
         None => app::run(cli),
         Some(Command::Lock) => lock::run(cli),
         Some(Command::Polkit) => polkit::run(cli),
-        Some(Command::DebugWindow { color }) => debug::window::run(color),
+        Some(Command::DebugWindow { color, app_id }) => {
+            debug::window::run(color, app_id.as_deref())
+        }
         Some(Command::Msg { to, message }) => match ipc::send(*to, &message.request()) {
             Ok(value) => {
                 if !value.is_null() {

@@ -12,6 +12,9 @@
 //! [[steps]]
 //! window = "#f6f5f4"             # open a debug window of this colour
 //!
+//! [[steps]]                      # the same, as a window of an application
+//! window = { color = "#f6f5f4", app-id = "org.gnome.Settings" }
+//!
 //! [[steps]]
 //! action = { FocusWorkspaceDown = {} }   # any niri action
 //!
@@ -39,8 +42,8 @@ use crate::session::{self, Session, SessionOptions};
 #[derive(Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub enum Step {
-    /// Open a `gniri debug-window` of this colour and wait for it.
-    Window(String),
+    /// Open a `gniri debug-window` and wait for it.
+    Window(Window),
     /// Run a niri action, written as niri's IPC writes it.
     Action(niri_ipc::Action),
     /// Run `gniri msg` with these arguments.
@@ -48,6 +51,22 @@ pub enum Step {
     /// Start one of gniri's helper processes, `lock` or `polkit`, with the
     /// scene's fixture, and wait until it answers.
     Spawn(String),
+}
+
+/// A debug window: its colour alone, or with the application it claims
+/// to be a window of.
+#[derive(Deserialize)]
+#[serde(untagged)]
+pub enum Window {
+    Colour(String),
+    OfApp(AppWindow),
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct AppWindow {
+    color: String,
+    app_id: String,
 }
 
 #[derive(Deserialize, Default)]
@@ -146,7 +165,10 @@ impl Scene {
     pub fn play(&self, session: &Session) -> Result<()> {
         for step in &self.steps {
             match step {
-                Step::Window(colour) => session.spawn_window(colour)?,
+                Step::Window(Window::Colour(colour)) => session.spawn_window(colour)?,
+                Step::Window(Window::OfApp(window)) => {
+                    session.spawn_app_window(&window.color, Some(&window.app_id))?;
+                }
                 Step::Action(action) => session.action(action.clone())?,
                 Step::Gniri(arguments) => {
                     let arguments: Vec<&str> = arguments.iter().map(String::as_str).collect();

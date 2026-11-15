@@ -12,7 +12,9 @@
 //! 5120x5120, 105 MB uncompressed).
 //!
 //! The lock screen shows the blurred copy too ([`backdrop`]): blur-my-shell
-//! blurs the lock screen's background the way it does the overview's.
+//! blurs the lock screen's background the way it does the overview's. So
+//! does the overview's own surface, in front of niri's workspaces, while
+//! the app grid or a search shows ([`Wallpaper::cover`]).
 
 use std::cell::Cell;
 use std::path::{Path, PathBuf};
@@ -52,12 +54,56 @@ impl WallpaperSource {
     }
 }
 
+/// The style class of a cover that is one flat colour.
+const FLAT_COVER_CLASS: &str = "overview-cover-flat";
+
+/// One output's wallpaper.
+pub struct Wallpaper {
+    /// The wallpaper and backdrop surfaces.
+    pub windows: [gtk::ApplicationWindow; 2],
+    /// The backdrop's picture, for an image wallpaper.
+    blurred: Option<gtk::Picture>,
+}
+
+impl Wallpaper {
+    /// A widget that shows what the backdrop surface shows, to be laid out
+    /// at the output's size: the same pixels in the same place, so that
+    /// something drawn over the compositor's workspaces can look as if
+    /// they were not there.
+    pub fn cover(&self) -> gtk::Widget {
+        match &self.blurred {
+            // The same texture, not another copy of it.
+            Some(blurred) => {
+                let cover = picture();
+                blurred
+                    .bind_property("paintable", &cover, "paintable")
+                    .sync_create()
+                    .build();
+                cover.upcast()
+            }
+            None => gtk::Box::builder()
+                .css_classes([FLAT_COVER_CLASS])
+                .build()
+                .upcast(),
+        }
+    }
+}
+
+/// The cover where gniri draws no wallpaper: whatever the compositor has
+/// behind its workspaces, blurred and dimmed by the theme.
+pub fn cover_without_wallpaper() -> gtk::Widget {
+    gtk::Box::builder()
+        .css_classes(["overview-cover-blurred"])
+        .build()
+        .upcast()
+}
+
 /// Builds and maps the wallpaper and backdrop surfaces for `monitor`.
 pub fn build(
     app: &adw::Application,
     monitor: &gdk::Monitor,
     source: &WallpaperSource,
-) -> [gtk::ApplicationWindow; 2] {
+) -> Wallpaper {
     let fill = |name| {
         layer::window(
             app,
@@ -71,7 +117,7 @@ pub fn build(
     let wallpaper = fill("wallpaper");
     let backdrop = fill("backdrop");
 
-    match source {
+    let blurred = match source {
         WallpaperSource::Colour(colour) => {
             // A blurred flat colour is the same colour, so only dim it.
             let dimmed = gdk::RGBA::new(
@@ -82,8 +128,10 @@ pub fn build(
             );
             style::add_rule(&format!(
                 "window.gniri-wallpaper-window {{ background-color: {colour}; }}
-                 window.gniri-backdrop-window {{ background-color: {dimmed}; }}"
+                 window.gniri-backdrop-window {{ background-color: {dimmed}; }}
+                 .{FLAT_COVER_CLASS} {{ background-color: {dimmed}; }}"
             ));
+            None
         }
         WallpaperSource::Image(path) => {
             let sharp = picture();
@@ -96,12 +144,16 @@ pub fn build(
             wallpaper.set_child(Some(&sharp));
             backdrop.set_child(Some(&image.blurred));
             image.follow(&wallpaper);
+            Some(image.blurred.clone())
         }
-    }
+    };
 
     wallpaper.present();
     backdrop.present();
-    [wallpaper, backdrop]
+    Wallpaper {
+        windows: [wallpaper, backdrop],
+        blurred,
+    }
 }
 
 /// A widget that shows the blurred, dimmed wallpaper at the size of

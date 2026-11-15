@@ -1,0 +1,1250 @@
+{
+ "gnome_shell": "51.1",
+ "state": "search",
+ "stage": [
+  1792,
+  1120
+ ],
+ "pixels_per_unit": 1.25,
+ "root_box": [
+  386,
+  376,
+  1020,
+  230
+ ],
+ "shot_box": [
+  373.6,
+  364.0,
+  1044.8,
+  254.4
+ ],
+ "tree": {
+  "type": "StBoxLayout",
+  "box": [
+   386,
+   376,
+   1020,
+   230
+  ],
+  "opacity": 255,
+  "classes": "search-section-content",
+  "pseudo": "insensitive first-child last-child",
+  "style": {
+   "bg": [
+    255,
+    255,
+    255,
+    17
+   ],
+   "fg": [
+    250,
+    250,
+    251,
+    255
+   ],
+   "radius": [
+    24,
+    24,
+    24,
+    24
+   ],
+   "padding": [
+    12,
+    12,
+    12,
+    12
+   ],
+   "margin": [
+    0,
+    12,
+    0,
+    12
+   ],
+   "border_width": [
+    1,
+    1,
+    1,
+    1
+   ],
+   "font": "Adwaita Sans 14.666px",
+   "border_color": [
+    [
+     255,
+     255,
+     255,
+     12
+    ],
+    [
+     255,
+     255,
+     255,
+     12
+    ],
+    [
+     255,
+     255,
+     255,
+     12
+    ],
+    [
+     255,
+     255,
+     255,
+     12
+    ]
+   ]
+  },
+  "children": [
+   {
+    "type": "Gjs_ui_search_ProviderInfo",
+    "box": [
+     399,
+     389,
+     176,
+     50
+    ],
+    "opacity": 255,
+    "classes": "search-provider-icon",
+    "pseudo": "first-child",
+    "style": {
+     "fg": [
+      250,
+      250,
+      251,
+      255
+     ],
+     "radius": [
+      13,
+      13,
+      13,
+      13
+     ],
+     "padding": [
+      6,
+      6,
+      6,
+      6
+     ],
+     "margin": [
+      0,
+      4,
+      0,
+      0
+     ],
+     "font": "Adwaita Sans 14.666px",
+     "transition_ms": 100,
+     "spacing": 6
+    },
+    "children": [
+     {
+      "type": "StBoxLayout",
+      "box": [
+       405,
+       395,
+       164,
+       38
+      ],
+      "opacity": 255,
+      "classes": "list-search-provider-content",
+      "pseudo": "insensitive first-child last-child",
+      "style": {
+       "fg": [
+        250,
+        250,
+        251,
+        255
+       ],
+       "font": "Adwaita Sans 14.666px",
+       "spacing": 12
+      },
+      "children": [
+       {
+        "type": "StIcon",
+        "box": [
+         405,
+         395,
+         32,
+         38
+        ],
+        "opacity": 255,
+        "pseudo": "insensitive first-child",
+        "style": {
+         "fg": [
+          250,
+          250,
+          251,
+          255
+         ],
+         "font": "Adwaita Sans 14.666px"
+        },
+        "icon": "application",
+        "icon_size": 32,
+        "children": [
+         {
+          "type": "ClutterActor",
+          "box": [
+           405,
+           398,
+           32,
+           32
+          ],
+          "opacity": 255
+         }
+        ],
+        "redacted": true
+       },
+       {
+        "type": "StBoxLayout",
+        "box": [
+         449,
+         395,
+         120,
+         38
+        ],
+        "opacity": 255,
+        "classes": "list-search-provider-details",
+        "pseudo": "insensitive last-child",
+        "style": {
+         "fg": [
+          250,
+          250,
+          251,
+          255
+         ],
+         "font": "Adwaita Sans 14.666px",
+         "width": 120,
+         "min_width": 120,
+         "max_width": 120
+        },
+        "children": [
+         {
+          "type": "StLabel",
+          "box": [
+           449,
+           395,
+           60,
+           19
+          ],
+          "opacity": 255,
+          "pseudo": "insensitive first-child",
+          "style": {
+           "fg": [
+            250,
+            250,
+            251,
+            255
+           ],
+           "font": "Adwaita Sans 14.666px"
+          },
+          "text": "Software",
+          "children": [
+           {
+            "type": "ClutterText",
+            "box": [
+             449,
+             395,
+             60,
+             19
+            ],
+            "opacity": 255
+           }
+          ]
+         },
+         {
+          "type": "StLabel",
+          "box": [
+           449,
+           414,
+           52,
+           19
+          ],
+          "opacity": 255,
+          "pseudo": "insensitive last-child",
+          "style": {
+           "fg": [
+            250,
+            250,
+            251,
+            255
+           ],
+           "font": "Adwaita Sans 14.666px"
+          },
+          "text": "15 more",
+          "children": [
+           {
+            "type": "ClutterText",
+            "box": [
+             449,
+             414,
+             52,
+             19
+            ],
+            "opacity": 255
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "type": "StBoxLayout",
+    "box": [
+     579,
+     389,
+     814,
+     204
+    ],
+    "opacity": 255,
+    "classes": "list-search-results",
+    "pseudo": "insensitive last-child",
+    "style": {
+     "fg": [
+      250,
+      250,
+      251,
+      255
+     ],
+     "font": "Adwaita Sans 14.666px",
+     "spacing": 6
+    },
+    "children": [
+     {
+      "type": "Gjs_ui_search_ListSearchResult",
+      "box": [
+       579,
+       389,
+       814,
+       36
+      ],
+      "opacity": 255,
+      "classes": "list-search-result",
+      "pseudo": "first-child",
+      "style": {
+       "fg": [
+        250,
+        250,
+        251,
+        255
+       ],
+       "radius": [
+        13,
+        13,
+        13,
+        13
+       ],
+       "padding": [
+        6,
+        6,
+        6,
+        6
+       ],
+       "font": "Adwaita Sans 14.666px",
+       "transition_ms": 100,
+       "spacing": 6
+      },
+      "children": [
+       {
+        "type": "StBoxLayout",
+        "box": [
+         585,
+         395,
+         277,
+         24
+        ],
+        "opacity": 255,
+        "classes": "list-search-result-content",
+        "pseudo": "insensitive first-child last-child",
+        "style": {
+         "fg": [
+          250,
+          250,
+          251,
+          255
+         ],
+         "font": "Adwaita Sans 14.666px",
+         "spacing": 6
+        },
+        "children": [
+         {
+          "type": "StBoxLayout",
+          "box": [
+           585,
+           395,
+           104,
+           24
+          ],
+          "opacity": 255,
+          "classes": "list-search-result-title",
+          "pseudo": "insensitive first-child",
+          "style": {
+           "fg": [
+            250,
+            250,
+            251,
+            255
+           ],
+           "font": "Adwaita Sans 14.666px",
+           "spacing": 12
+          },
+          "children": [
+           {
+            "type": "StIcon",
+            "box": [
+             585,
+             395,
+             24,
+             24
+            ],
+            "opacity": 255,
+            "pseudo": "insensitive first-child",
+            "style": {
+             "fg": [
+              250,
+              250,
+              251,
+              255
+             ],
+             "font": "Adwaita Sans 14.666px"
+            },
+            "icon": "application",
+            "icon_size": 24,
+            "children": [
+             {
+              "type": "ClutterActor",
+              "box": [
+               585,
+               395,
+               24,
+               24
+              ],
+              "opacity": 255
+             }
+            ],
+            "redacted": true
+           },
+           {
+            "type": "StLabel",
+            "box": [
+             621,
+             397,
+             68,
+             19
+            ],
+            "opacity": 255,
+            "pseudo": "insensitive last-child",
+            "style": {
+             "fg": [
+              250,
+              250,
+              251,
+              255
+             ],
+             "font": "Adwaita Sans 14.666px"
+            },
+            "text": "Calculator",
+            "children": [
+             {
+              "type": "ClutterText",
+              "box": [
+               621,
+               397,
+               68,
+               19
+              ],
+              "opacity": 255
+             }
+            ]
+           }
+          ]
+         },
+         {
+          "type": "StLabel",
+          "box": [
+           695,
+           397,
+           167,
+           19
+          ],
+          "opacity": 255,
+          "classes": "list-search-result-description",
+          "pseudo": "insensitive last-child",
+          "style": {
+           "fg": [
+            255,
+            255,
+            255,
+            128
+           ],
+           "font": "Adwaita Sans 14.666px"
+          },
+          "text": "A feature rich calculator",
+          "children": [
+           {
+            "type": "ClutterText",
+            "box": [
+             695,
+             397,
+             167,
+             19
+            ],
+            "opacity": 255
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "Gjs_ui_search_ListSearchResult",
+      "box": [
+       579,
+       431,
+       814,
+       36
+      ],
+      "opacity": 255,
+      "classes": "list-search-result",
+      "style": {
+       "fg": [
+        250,
+        250,
+        251,
+        255
+       ],
+       "radius": [
+        13,
+        13,
+        13,
+        13
+       ],
+       "padding": [
+        6,
+        6,
+        6,
+        6
+       ],
+       "font": "Adwaita Sans 14.666px",
+       "transition_ms": 100,
+       "spacing": 6
+      },
+      "children": [
+       {
+        "type": "StBoxLayout",
+        "box": [
+         585,
+         437,
+         385,
+         24
+        ],
+        "opacity": 255,
+        "classes": "list-search-result-content",
+        "pseudo": "insensitive first-child last-child",
+        "style": {
+         "fg": [
+          250,
+          250,
+          251,
+          255
+         ],
+         "font": "Adwaita Sans 14.666px",
+         "spacing": 6
+        },
+        "children": [
+         {
+          "type": "StBoxLayout",
+          "box": [
+           585,
+           437,
+           170,
+           24
+          ],
+          "opacity": 255,
+          "classes": "list-search-result-title",
+          "pseudo": "insensitive first-child",
+          "style": {
+           "fg": [
+            250,
+            250,
+            251,
+            255
+           ],
+           "font": "Adwaita Sans 14.666px",
+           "spacing": 12
+          },
+          "children": [
+           {
+            "type": "StIcon",
+            "box": [
+             585,
+             437,
+             24,
+             24
+            ],
+            "opacity": 255,
+            "pseudo": "insensitive first-child",
+            "style": {
+             "fg": [
+              250,
+              250,
+              251,
+              255
+             ],
+             "font": "Adwaita Sans 14.666px"
+            },
+            "icon": "application",
+            "icon_size": 24,
+            "children": [
+             {
+              "type": "ClutterActor",
+              "box": [
+               585,
+               437,
+               24,
+               24
+              ],
+              "opacity": 255
+             }
+            ],
+            "redacted": true
+           },
+           {
+            "type": "StLabel",
+            "box": [
+             621,
+             439,
+             134,
+             19
+            ],
+            "opacity": 255,
+            "pseudo": "insensitive last-child",
+            "style": {
+             "fg": [
+              250,
+              250,
+              251,
+              255
+             ],
+             "font": "Adwaita Sans 14.666px"
+            },
+            "text": "awesome calculator",
+            "children": [
+             {
+              "type": "ClutterText",
+              "box": [
+               621,
+               439,
+               134,
+               19
+              ],
+              "opacity": 255
+             }
+            ]
+           }
+          ]
+         },
+         {
+          "type": "StLabel",
+          "box": [
+           761,
+           439,
+           209,
+           19
+          ],
+          "opacity": 255,
+          "classes": "list-search-result-description",
+          "pseudo": "insensitive last-child",
+          "style": {
+           "fg": [
+            255,
+            255,
+            255,
+            128
+           ],
+           "font": "Adwaita Sans 14.666px"
+          },
+          "text": "AWESOME calculator program",
+          "children": [
+           {
+            "type": "ClutterText",
+            "box": [
+             761,
+             439,
+             209,
+             19
+            ],
+            "opacity": 255
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "Gjs_ui_search_ListSearchResult",
+      "box": [
+       579,
+       473,
+       814,
+       36
+      ],
+      "opacity": 255,
+      "classes": "list-search-result",
+      "style": {
+       "fg": [
+        250,
+        250,
+        251,
+        255
+       ],
+       "radius": [
+        13,
+        13,
+        13,
+        13
+       ],
+       "padding": [
+        6,
+        6,
+        6,
+        6
+       ],
+       "font": "Adwaita Sans 14.666px",
+       "transition_ms": 100,
+       "spacing": 6
+      },
+      "children": [
+       {
+        "type": "StBoxLayout",
+        "box": [
+         585,
+         479,
+         266,
+         24
+        ],
+        "opacity": 255,
+        "classes": "list-search-result-content",
+        "pseudo": "insensitive first-child last-child",
+        "style": {
+         "fg": [
+          250,
+          250,
+          251,
+          255
+         ],
+         "font": "Adwaita Sans 14.666px",
+         "spacing": 6
+        },
+        "children": [
+         {
+          "type": "StBoxLayout",
+          "box": [
+           585,
+           479,
+           134,
+           24
+          ],
+          "opacity": 255,
+          "classes": "list-search-result-title",
+          "pseudo": "insensitive first-child",
+          "style": {
+           "fg": [
+            250,
+            250,
+            251,
+            255
+           ],
+           "font": "Adwaita Sans 14.666px",
+           "spacing": 12
+          },
+          "children": [
+           {
+            "type": "StIcon",
+            "box": [
+             585,
+             479,
+             24,
+             24
+            ],
+            "opacity": 255,
+            "pseudo": "insensitive first-child",
+            "style": {
+             "fg": [
+              250,
+              250,
+              251,
+              255
+             ],
+             "font": "Adwaita Sans 14.666px"
+            },
+            "icon": "application",
+            "icon_size": 24,
+            "children": [
+             {
+              "type": "ClutterActor",
+              "box": [
+               585,
+               479,
+               24,
+               24
+              ],
+              "opacity": 255
+             }
+            ],
+            "redacted": true
+           },
+           {
+            "type": "StLabel",
+            "box": [
+             621,
+             481,
+             98,
+             19
+            ],
+            "opacity": 255,
+            "pseudo": "insensitive last-child",
+            "style": {
+             "fg": [
+              250,
+              250,
+              251,
+              255
+             ],
+             "font": "Adwaita Sans 14.666px"
+            },
+            "text": "BMI Calculator",
+            "children": [
+             {
+              "type": "ClutterText",
+              "box": [
+               621,
+               481,
+               98,
+               19
+              ],
+              "opacity": 255
+             }
+            ]
+           }
+          ]
+         },
+         {
+          "type": "StLabel",
+          "box": [
+           725,
+           481,
+           126,
+           19
+          ],
+          "opacity": 255,
+          "classes": "list-search-result-description",
+          "pseudo": "insensitive last-child",
+          "style": {
+           "fg": [
+            255,
+            255,
+            255,
+            128
+           ],
+           "font": "Adwaita Sans 14.666px"
+          },
+          "text": "Calculate your BMI",
+          "children": [
+           {
+            "type": "ClutterText",
+            "box": [
+             725,
+             481,
+             126,
+             19
+            ],
+            "opacity": 255
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "Gjs_ui_search_ListSearchResult",
+      "box": [
+       579,
+       515,
+       814,
+       36
+      ],
+      "opacity": 255,
+      "classes": "list-search-result",
+      "style": {
+       "fg": [
+        250,
+        250,
+        251,
+        255
+       ],
+       "radius": [
+        13,
+        13,
+        13,
+        13
+       ],
+       "padding": [
+        6,
+        6,
+        6,
+        6
+       ],
+       "font": "Adwaita Sans 14.666px",
+       "transition_ms": 100,
+       "spacing": 6
+      },
+      "children": [
+       {
+        "type": "StBoxLayout",
+        "box": [
+         585,
+         521,
+         359,
+         24
+        ],
+        "opacity": 255,
+        "classes": "list-search-result-content",
+        "pseudo": "insensitive first-child last-child",
+        "style": {
+         "fg": [
+          250,
+          250,
+          251,
+          255
+         ],
+         "font": "Adwaita Sans 14.666px",
+         "spacing": 6
+        },
+        "children": [
+         {
+          "type": "StBoxLayout",
+          "box": [
+           585,
+           521,
+           141,
+           24
+          ],
+          "opacity": 255,
+          "classes": "list-search-result-title",
+          "pseudo": "insensitive first-child",
+          "style": {
+           "fg": [
+            250,
+            250,
+            251,
+            255
+           ],
+           "font": "Adwaita Sans 14.666px",
+           "spacing": 12
+          },
+          "children": [
+           {
+            "type": "StIcon",
+            "box": [
+             585,
+             521,
+             24,
+             24
+            ],
+            "opacity": 255,
+            "pseudo": "insensitive first-child",
+            "style": {
+             "fg": [
+              250,
+              250,
+              251,
+              255
+             ],
+             "font": "Adwaita Sans 14.666px"
+            },
+            "icon": "application",
+            "icon_size": 24,
+            "children": [
+             {
+              "type": "ClutterActor",
+              "box": [
+               585,
+               521,
+               24,
+               24
+              ],
+              "opacity": 255
+             }
+            ],
+            "redacted": true
+           },
+           {
+            "type": "StLabel",
+            "box": [
+             621,
+             523,
+             105,
+             19
+            ],
+            "opacity": 255,
+            "pseudo": "insensitive last-child",
+            "style": {
+             "fg": [
+              250,
+              250,
+              251,
+              255
+             ],
+             "font": "Adwaita Sans 14.666px"
+            },
+            "text": "Curo Calculator",
+            "children": [
+             {
+              "type": "ClutterText",
+              "box": [
+               621,
+               523,
+               105,
+               19
+              ],
+              "opacity": 255
+             }
+            ]
+           }
+          ]
+         },
+         {
+          "type": "StLabel",
+          "box": [
+           732,
+           523,
+           212,
+           19
+          ],
+          "opacity": 255,
+          "classes": "list-search-result-description",
+          "pseudo": "insensitive last-child",
+          "style": {
+           "fg": [
+            255,
+            255,
+            255,
+            128
+           ],
+           "font": "Adwaita Sans 14.666px"
+          },
+          "text": "Financial calculations simplified",
+          "children": [
+           {
+            "type": "ClutterText",
+            "box": [
+             732,
+             523,
+             212,
+             19
+            ],
+            "opacity": 255
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "Gjs_ui_search_ListSearchResult",
+      "box": [
+       579,
+       557,
+       814,
+       36
+      ],
+      "opacity": 255,
+      "classes": "list-search-result",
+      "pseudo": "last-child",
+      "style": {
+       "fg": [
+        250,
+        250,
+        251,
+        255
+       ],
+       "radius": [
+        13,
+        13,
+        13,
+        13
+       ],
+       "padding": [
+        6,
+        6,
+        6,
+        6
+       ],
+       "font": "Adwaita Sans 14.666px",
+       "transition_ms": 100,
+       "spacing": 6
+      },
+      "children": [
+       {
+        "type": "StBoxLayout",
+        "box": [
+         585,
+         563,
+         489,
+         24
+        ],
+        "opacity": 255,
+        "classes": "list-search-result-content",
+        "pseudo": "insensitive first-child last-child",
+        "style": {
+         "fg": [
+          250,
+          250,
+          251,
+          255
+         ],
+         "font": "Adwaita Sans 14.666px",
+         "spacing": 6
+        },
+        "children": [
+         {
+          "type": "StBoxLayout",
+          "box": [
+           585,
+           563,
+           136,
+           24
+          ],
+          "opacity": 255,
+          "classes": "list-search-result-title",
+          "pseudo": "insensitive first-child",
+          "style": {
+           "fg": [
+            250,
+            250,
+            251,
+            255
+           ],
+           "font": "Adwaita Sans 14.666px",
+           "spacing": 12
+          },
+          "children": [
+           {
+            "type": "StIcon",
+            "box": [
+             585,
+             563,
+             24,
+             24
+            ],
+            "opacity": 255,
+            "pseudo": "insensitive first-child",
+            "style": {
+             "fg": [
+              250,
+              250,
+              251,
+              255
+             ],
+             "font": "Adwaita Sans 14.666px"
+            },
+            "icon": "application",
+            "icon_size": 24,
+            "children": [
+             {
+              "type": "ClutterActor",
+              "box": [
+               585,
+               563,
+               24,
+               24
+              ],
+              "opacity": 255
+             }
+            ],
+            "redacted": true
+           },
+           {
+            "type": "StLabel",
+            "box": [
+             621,
+             565,
+             100,
+             19
+            ],
+            "opacity": 255,
+            "pseudo": "insensitive last-child",
+            "style": {
+             "fg": [
+              250,
+              250,
+              251,
+              255
+             ],
+             "font": "Adwaita Sans 14.666px"
+            },
+            "text": "Uno Calculator",
+            "children": [
+             {
+              "type": "ClutterText",
+              "box": [
+               621,
+               565,
+               100,
+               19
+              ],
+              "opacity": 255
+             }
+            ]
+           }
+          ]
+         },
+         {
+          "type": "StLabel",
+          "box": [
+           727,
+           565,
+           347,
+           19
+          ],
+          "opacity": 255,
+          "classes": "list-search-result-description",
+          "pseudo": "insensitive last-child",
+          "style": {
+           "fg": [
+            255,
+            255,
+            255,
+            128
+           ],
+           "font": "Adwaita Sans 14.666px"
+          },
+          "text": "Linux port of the Microsoft Windows calculator app",
+          "children": [
+           {
+            "type": "ClutterText",
+            "box": [
+             727,
+             565,
+             347,
+             19
+            ],
+            "opacity": 255
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ }
+}

@@ -1,0 +1,36 @@
+// The overview's search entry. Upstream: widgets/_search-entry.scss.
+//
+// Widget tree (crates/shell/src/overview/search_entry.rs):
+//
+//   box.st-entry.search-entry           .search-entry
+//     image.search-entry-icon             .search-entry-icon
+//     text                                its ClutterText
+//       placeholder                         StLabel.hint-text
+//     image.search-entry-icon             the icon that clears it
+//
+// The frame, its padding and the text are `.st-entry`'s (_entries.scss).
+// Only the geometry is here; the colours are blur-my-shell's
+// (_bms-overview.scss).
+
+$search_entry_width: 24em;
+
+.search-entry {
+    border-radius: $forced_circular_radius;
+    margin-top: $base_padding * 2;
+    margin-bottom: $base_padding;
+    // Upstream: `width: 24em`, which is 352px; see em_at_most().
+    min-width: em_at_most(352px);
+
+    .search-entry-icon {
+        -gtk-icon-size: $scalable_icon_size;
+        -gtk-icon-style: symbolic;
+        margin-top: 2px; // center vertically
+        padding: 0 $base_margin;
+    }
+}
+
+:root {
+    --gniri-search-entry-margin: #{$base_padding * 2} 0 #{$base_padding} 0;
+    --gniri-search-entry-width: #{$search_entry_width};
+    --gniri-search-entry-icon-padding: 0 #{$base_margin};
+}

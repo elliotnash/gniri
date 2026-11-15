@@ -293,12 +293,31 @@ fn activate(
     // process alive on every platform; hold the application explicitly.
     std::mem::forget(app.hold());
 
-    // Opening the overview closes any menu, as in GNOME.
+    // Opening the overview closes any menu, as in GNOME. It is also when
+    // an application installed since is first wanted; and a closed
+    // overview forgets what it showed.
     let close_menus = services.niri.select(|niri| niri.overview_open, {
         let services = Rc::clone(&services);
         move |open| {
             if *open {
                 services.menus.update(|menus| menus.close());
+                services.apps.send(gniri_services::apps::Command::Refresh);
+            } else {
+                services
+                    .overview
+                    .update(|overview| *overview = crate::overview::Overview::default());
+            }
+        }
+    });
+    // What is typed is asked of the search providers.
+    let search = services.overview.select(crate::overview::Overview::terms, {
+        let services = Rc::clone(&services);
+        move |terms| {
+            // Nothing was being searched for and nothing is: say nothing.
+            if !terms.is_empty() || services.search.state.with(|state| !state.terms.is_empty()) {
+                services
+                    .search
+                    .send(gniri_services::search::Command::Search(terms.clone()));
             }
         }
     });
@@ -321,7 +340,7 @@ fn activate(
             }
         }
     });
-    let mut subscriptions = vec![close_menus, close_menus_for_dialog, close_for_lock];
+    let mut subscriptions = vec![close_menus, close_menus_for_dialog, close_for_lock, search];
     subscriptions.extend(idle::start(&services));
 
     Some(Running {
@@ -425,6 +444,34 @@ fn handle(
             } else {
                 Event::Idle(timer)
             });
+            Ok(Value::Null)
+        }
+        ipc::Request::Apps => {
+            let showing = services.niri.with(|niri| niri.overview_open)
+                && services
+                    .overview
+                    .with(|overview| overview.apps && !overview.searching());
+            if showing {
+                services.close_overview();
+            } else {
+                services.overview.update(|overview| overview.set_apps(true));
+                services.niri_action(niri_ipc::Action::OpenOverview {});
+            }
+            Ok(Value::Null)
+        }
+        ipc::Request::ShowApps(apps) => {
+            services.overview.update(|overview| overview.set_apps(apps));
+            Ok(Value::Null)
+        }
+        ipc::Request::Search { text, quiet } => {
+            services.overview.update(|overview| {
+                overview.set_query(&text);
+                overview.quiet = quiet;
+            });
+            Ok(Value::Null)
+        }
+        ipc::Request::Page(page) => {
+            services.overview.update(|overview| overview.page = page);
             Ok(Value::Null)
         }
         ipc::Request::Brightness(step) => {

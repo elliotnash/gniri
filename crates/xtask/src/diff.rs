@@ -72,6 +72,17 @@ struct Map {
     /// Selector of the widget that corresponds to the reference's root
     /// actor. The surface's own root if unset.
     root: Option<String>,
+    /// Selector of a widget above the root that the pairs' selectors start
+    /// from, for a component whose parts are not all inside its root: the
+    /// dash's items are beside its background, not in it. The root if
+    /// unset.
+    tree: Option<String>,
+    /// Whether the root's place on the screen is compared. False for a
+    /// component that GNOME places by the size of the screen, which the
+    /// nested output does not share with the reference: where such a
+    /// component goes is arithmetic, tested where it is done.
+    #[serde(default = "yes")]
+    placement: bool,
     /// Where on the screen the component is attached: the edge its
     /// placement is measured from, and the part of the reference wallpaper
     /// the nested output is given.
@@ -649,11 +660,11 @@ fn check_layout(
         (horizontal, vertical)
     };
     let (our_place, their_place) = (placement(ours), placement(theirs));
-    let mut differences = vec![
-        ("x", our_place.0 - their_place.0),
-        ("y", our_place.1 - their_place.1),
-        ("height", ours.root[3] - theirs.root[3]),
-    ];
+    let mut differences = vec![("height", ours.root[3] - theirs.root[3])];
+    if map.placement {
+        differences.push(("x", our_place.0 - their_place.0));
+        differences.push(("y", our_place.1 - their_place.1));
+    }
     if map.attach == Anchor::Stretch {
         // Each spans its own screen; the widths are not comparable.
         let fill = |side: &Side| side.root[2] - side.screen.0;
@@ -821,17 +832,23 @@ fn our_side<'a>(map: &Map, dump: &'a Value) -> Result<Side<'a>> {
         )?,
         None => 0.0,
     };
+    // What is reserved above belongs to neither a surface that hangs from
+    // the top nor one that fills the output: both start under it.
     let position = (
         place("left", "right", size.0, screen.0),
-        place("top", "bottom", size.1, screen.1) + reserved,
+        place("top", "bottom", size.1, screen.1 - reserved) + reserved,
     );
-    let tree = match &map.root {
+    let root = match &map.root {
         Some(selector) => tree::select(&surface["tree"], selector)?,
         None => &surface["tree"],
     };
+    let tree = match &map.tree {
+        Some(selector) => tree::select(&surface["tree"], selector)?,
+        None => root,
+    };
     Ok(Side {
         tree,
-        root: tree::rect(tree, "box")?,
+        root: tree::rect(root, "box")?,
         on_screen: position,
         // The picture is a screenshot of the whole output.
         in_picture: position,

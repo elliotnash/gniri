@@ -22,7 +22,13 @@ $contrast: 'normal';
 @import 'widgets/entries';
 @import 'widgets/dialogs';
 @import 'widgets/login-lock';
+@import 'widgets/overview';
+@import 'widgets/dash';
+@import 'widgets/search-entry';
+@import 'widgets/app-grid';
+@import 'widgets/search-results';
 
 // Last, so it overrides the stock look above.
 @import 'bms';
 @import 'bms-popup';
+@import 'bms-overview';

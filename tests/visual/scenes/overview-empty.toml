@@ -1,0 +1,20 @@
+# The overview of a session with no windows: one workspace, so that
+# nothing of niri's is behind the search entry, which GNOME's `overview`
+# reference capture has nothing behind either.
+
+[fixture]
+time = "2026-11-14T08:28:00"
+power = { profile = "performance", battery = { percentage = 91 } }
+audio = { output = { volume = 0.3 } }
+network = { primary = { kind = "wifi", strength = 70 } }
+
+[variants.flat-808080]
+time = "2026-11-13T22:09:00"
+power = { profile = "performance", battery = { percentage = 36, charge = "charging" } }
+
+[variants.flat-3584e4]
+time = "2026-11-13T22:09:00"
+power = { profile = "performance", battery = { percentage = 36, charge = "charging" } }
+
+[[steps]]
+action = { OpenOverview = {} }

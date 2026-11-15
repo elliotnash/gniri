@@ -3,6 +3,7 @@
 pub mod banner;
 pub mod layer;
 pub mod osd;
+pub mod overview;
 pub mod panel;
 pub mod stage;
 pub mod wallpaper;

@@ -1,0 +1,472 @@
+{
+ "gnome_shell": "51.1",
+ "state": "search",
+ "stage": [
+  1792,
+  1120
+ ],
+ "pixels_per_unit": 1.25,
+ "root_box": [
+  386,
+  280,
+  1020,
+  70
+ ],
+ "shot_box": [
+  373.6,
+  268.0,
+  1044.8,
+  94.4
+ ],
+ "tree": {
+  "type": "StBoxLayout",
+  "box": [
+   386,
+   280,
+   1020,
+   70
+  ],
+  "opacity": 255,
+  "classes": "search-section-content",
+  "pseudo": "insensitive first-child last-child",
+  "style": {
+   "bg": [
+    255,
+    255,
+    255,
+    17
+   ],
+   "fg": [
+    250,
+    250,
+    251,
+    255
+   ],
+   "radius": [
+    24,
+    24,
+    24,
+    24
+   ],
+   "padding": [
+    12,
+    12,
+    12,
+    12
+   ],
+   "margin": [
+    0,
+    12,
+    0,
+    12
+   ],
+   "border_width": [
+    1,
+    1,
+    1,
+    1
+   ],
+   "font": "Adwaita Sans 14.666px",
+   "border_color": [
+    [
+     255,
+     255,
+     255,
+     12
+    ],
+    [
+     255,
+     255,
+     255,
+     12
+    ],
+    [
+     255,
+     255,
+     255,
+     12
+    ],
+    [
+     255,
+     255,
+     255,
+     12
+    ]
+   ]
+  },
+  "children": [
+   {
+    "type": "Gjs_ui_search_ProviderInfo",
+    "box": [
+     399,
+     293,
+     176,
+     44
+    ],
+    "opacity": 255,
+    "classes": "search-provider-icon",
+    "pseudo": "first-child",
+    "style": {
+     "fg": [
+      250,
+      250,
+      251,
+      255
+     ],
+     "radius": [
+      13,
+      13,
+      13,
+      13
+     ],
+     "padding": [
+      6,
+      6,
+      6,
+      6
+     ],
+     "margin": [
+      0,
+      4,
+      0,
+      0
+     ],
+     "font": "Adwaita Sans 14.666px",
+     "transition_ms": 100,
+     "spacing": 6
+    },
+    "children": [
+     {
+      "type": "StBoxLayout",
+      "box": [
+       405,
+       299,
+       164,
+       32
+      ],
+      "opacity": 255,
+      "classes": "list-search-provider-content",
+      "pseudo": "insensitive first-child last-child",
+      "style": {
+       "fg": [
+        250,
+        250,
+        251,
+        255
+       ],
+       "font": "Adwaita Sans 14.666px",
+       "spacing": 12
+      },
+      "children": [
+       {
+        "type": "StIcon",
+        "box": [
+         405,
+         299,
+         32,
+         32
+        ],
+        "opacity": 255,
+        "pseudo": "insensitive first-child",
+        "style": {
+         "fg": [
+          250,
+          250,
+          251,
+          255
+         ],
+         "font": "Adwaita Sans 14.666px"
+        },
+        "icon": "application",
+        "icon_size": 32,
+        "children": [
+         {
+          "type": "ClutterActor",
+          "box": [
+           405,
+           299,
+           32,
+           32
+          ],
+          "opacity": 255
+         }
+        ],
+        "redacted": true
+       },
+       {
+        "type": "StBoxLayout",
+        "box": [
+         449,
+         299,
+         120,
+         32
+        ],
+        "opacity": 255,
+        "classes": "list-search-provider-details",
+        "pseudo": "insensitive last-child",
+        "style": {
+         "fg": [
+          250,
+          250,
+          251,
+          255
+         ],
+         "font": "Adwaita Sans 14.666px",
+         "width": 120,
+         "min_width": 120,
+         "max_width": 120
+        },
+        "children": [
+         {
+          "type": "StLabel",
+          "box": [
+           449,
+           305,
+           73,
+           19
+          ],
+          "opacity": 255,
+          "pseudo": "insensitive first-child last-child",
+          "style": {
+           "fg": [
+            250,
+            250,
+            251,
+            255
+           ],
+           "font": "Adwaita Sans 14.666px"
+          },
+          "text": "Characters",
+          "children": [
+           {
+            "type": "ClutterText",
+            "box": [
+             449,
+             305,
+             73,
+             19
+            ],
+            "opacity": 255
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "type": "StBoxLayout",
+    "box": [
+     579,
+     293,
+     814,
+     44
+    ],
+    "opacity": 255,
+    "classes": "list-search-results",
+    "pseudo": "insensitive last-child",
+    "style": {
+     "fg": [
+      250,
+      250,
+      251,
+      255
+     ],
+     "font": "Adwaita Sans 14.666px",
+     "spacing": 6
+    },
+    "children": [
+     {
+      "type": "Gjs_ui_search_ListSearchResult",
+      "box": [
+       579,
+       293,
+       814,
+       36
+      ],
+      "opacity": 255,
+      "classes": "list-search-result",
+      "pseudo": "first-child last-child",
+      "style": {
+       "fg": [
+        250,
+        250,
+        251,
+        255
+       ],
+       "radius": [
+        13,
+        13,
+        13,
+        13
+       ],
+       "padding": [
+        6,
+        6,
+        6,
+        6
+       ],
+       "font": "Adwaita Sans 14.666px",
+       "transition_ms": 100,
+       "spacing": 6
+      },
+      "children": [
+       {
+        "type": "StBoxLayout",
+        "box": [
+         585,
+         299,
+         222,
+         24
+        ],
+        "opacity": 255,
+        "classes": "list-search-result-content",
+        "pseudo": "insensitive first-child last-child",
+        "style": {
+         "fg": [
+          250,
+          250,
+          251,
+          255
+         ],
+         "font": "Adwaita Sans 14.666px",
+         "spacing": 6
+        },
+        "children": [
+         {
+          "type": "StBoxLayout",
+          "box": [
+           585,
+           299,
+           154,
+           24
+          ],
+          "opacity": 255,
+          "classes": "list-search-result-title",
+          "pseudo": "insensitive first-child",
+          "style": {
+           "fg": [
+            250,
+            250,
+            251,
+            255
+           ],
+           "font": "Adwaita Sans 14.666px",
+           "spacing": 12
+          },
+          "children": [
+           {
+            "type": "StIcon",
+            "box": [
+             585,
+             299,
+             24,
+             24
+            ],
+            "opacity": 255,
+            "pseudo": "insensitive first-child",
+            "style": {
+             "fg": [
+              250,
+              250,
+              251,
+              255
+             ],
+             "font": "Adwaita Sans 14.666px"
+            },
+            "icon": "application",
+            "icon_size": 24,
+            "children": [
+             {
+              "type": "ClutterActor",
+              "box": [
+               585,
+               299,
+               24,
+               24
+              ],
+              "opacity": 255
+             }
+            ],
+            "redacted": true
+           },
+           {
+            "type": "StLabel",
+            "box": [
+             621,
+             301,
+             118,
+             19
+            ],
+            "opacity": 255,
+            "pseudo": "insensitive last-child",
+            "style": {
+             "fg": [
+              250,
+              250,
+              251,
+              255
+             ],
+             "font": "Adwaita Sans 14.666px"
+            },
+            "text": "Pocket Calculator",
+            "children": [
+             {
+              "type": "ClutterText",
+              "box": [
+               621,
+               301,
+               118,
+               19
+              ],
+              "opacity": 255
+             }
+            ]
+           }
+          ]
+         },
+         {
+          "type": "StLabel",
+          "box": [
+           745,
+           301,
+           62,
+           19
+          ],
+          "opacity": 255,
+          "classes": "list-search-result-description",
+          "pseudo": "insensitive last-child",
+          "style": {
+           "fg": [
+            255,
+            255,
+            255,
+            128
+           ],
+           "font": "Adwaita Sans 14.666px"
+          },
+          "text": "U+1F5A9",
+          "children": [
+           {
+            "type": "ClutterText",
+            "box": [
+             745,
+             301,
+             62,
+             19
+            ],
+            "opacity": 255
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ }
+}

@@ -85,6 +85,19 @@ pub enum Request {
     /// Deliver a notification as if an application had sent it. Answers
     /// with its id.
     Notify(Notify),
+    /// Show the app grid, opening the overview for it; with the grid
+    /// showing, close the overview.
+    Apps,
+    /// Show the app grid (or with false the windows) in the open overview.
+    ShowApps(bool),
+    /// Put a text in the overview's search entry. `quiet` shows it as
+    /// GNOME Shell shows a search that a script started.
+    Search {
+        text: String,
+        quiet: bool,
+    },
+    /// Turn to a page of the app grid.
+    Page(usize),
 }
 
 /// A notification for [`Request::Notify`].

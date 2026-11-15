@@ -1,0 +1,140 @@
+// Search results. Upstream: widgets/_search-results.scss.
+//
+// Widget tree (crates/shell/src/overview/search_results.rs):
+//
+//   box#searchResults                   #searchResults
+//     scrolledwindow.search-display
+//       clamp
+//         box#searchResultsContent        #searchResultsContent
+//           box.search-section              .search-section
+//             box.grid-search-results         .grid-search-results
+//               button.overview-tile.grid-search-result
+//             box.search-section-separator    .search-section-separator
+//           box.search-section
+//             box.search-section-content      .search-section-content
+//               button.search-provider-icon     .search-provider-icon
+//                 box.list-search-provider-content
+//                   image
+//                   box.list-search-provider-details
+//                     label
+//               box.list-search-results         .list-search-results
+//                 button.list-search-result       .list-search-result
+//                   box.list-search-result-content
+//                     box.list-search-result-title
+//                       image
+//                       label
+//                     label.list-search-result-description
+//     box.search-statusbox
+//       label.search-statustext
+//
+// `#searchResultsContent`'s max-width and `.grid-search-results`' spacing
+// are in the code, which has to count with them.
+//
+// Only the geometry is here; the colours are blur-my-shell's
+// (_bms-overview.scss).
+
+$search_section_radius: $modal_radius * 1.5;
+// Upstream: $base_border_radius * 1.65, which St shows as 13px.
+$search_item_radius: 13px;
+
+@mixin title_1 { font-weight: 800; @include fontsize(20pt); }
+
+// search overview container
+#searchResults {
+    margin: 0 $base_margin;
+}
+
+.search-display {
+    // libadwaita gives a scrolled window nothing to unset but its
+    // undershoot shadows.
+    background: none;
+}
+
+// search results sections "the boxes"
+.search-section {
+    border-spacing: $base_padding * 3;
+
+    // separator (unstyled): used as a spacer
+    .search-section-separator {
+        min-height: $base_margin * 2;
+    }
+}
+
+// content
+.search-section-content {
+    border-radius: $search_section_radius;
+    padding: $base_padding * 2;
+    margin: 0 ($base_margin * 3);
+}
+
+// %search_section_content_item
+.search-provider-icon,
+.list-search-result {
+    all: unset;
+    // %tile
+    border-radius: $search_item_radius;
+    padding: $tile_padding;
+    transition: background-color $tile_transition $st_transition_easing;
+
+    label { @include st_line_height; }
+}
+
+// search result provider
+.search-provider-icon {
+    margin-right: $base_margin;
+
+    // content
+    .list-search-provider-content {
+        border-spacing: $base_padding * 2;
+
+        // provider labels
+        .list-search-provider-details {
+            min-width: 120px;
+        }
+    }
+}
+
+// search results list
+.list-search-results {
+    border-spacing: $base_padding;
+}
+
+// search result listitem
+.list-search-result {
+    // content
+    .list-search-result-content {
+        border-spacing: $base_padding;
+    }
+
+    // list item title (with leading icon)
+    .list-search-result-title {
+        border-spacing: $base_padding * 2;
+    }
+}
+
+.search-statusbox {
+    border-spacing: $base_padding * 4;
+}
+
+// "no results" text
+.search-statustext {
+    @include title_1;
+    color: transparentize($system_fg_color, .2);
+}
+
+:root {
+    --gniri-search-results-margin: 0 #{$base_margin};
+    --gniri-search-section-spacing: #{$base_padding * 3};
+    --gniri-search-section-separator: #{$base_margin * 2};
+    --gniri-search-section-radius: #{$search_section_radius};
+    --gniri-search-section-padding: #{$base_padding * 2};
+    --gniri-search-section-margin: 0 #{$base_margin * 3};
+    --gniri-search-item-radius: #{$search_item_radius};
+    --gniri-search-provider-margin: 0 #{$base_margin} 0 0;
+    --gniri-search-provider-spacing: #{$base_padding * 2};
+    --gniri-search-provider-details-width: 120px;
+    --gniri-search-results-spacing: #{$base_padding};
+    --gniri-search-result-title-spacing: #{$base_padding * 2};
+    --gniri-grid-search-spacing: #{$base_padding * 5};
+    --gniri-search-results-max-width: 1044px;
+}

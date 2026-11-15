@@ -10,13 +10,14 @@ use gniri_services::desktop_entry::DesktopEntry;
 use gniri_services::keyboard::LayoutNames;
 use gniri_services::user::User;
 use gniri_services::{
-    Bus, Fixture, Link, Model, audio, bluetooth, brightness, idle, logind, mpris, network,
-    night_light, niri, notifications, power, rfkill, session, toggles,
+    Bus, Fixture, Link, Model, apps, audio, bluetooth, brightness, idle, logind, mpris, network,
+    night_light, niri, notifications, power, rfkill, search, session, toggles,
 };
 use gtk::glib;
 
 use crate::dialogs::end_session;
 use crate::menus::Menus;
+use crate::overview::Overview;
 use crate::settings;
 
 /// Runs store notifications from the GLib main loop.
@@ -199,8 +200,15 @@ pub struct Services {
     pub notifications: Service<notifications::State>,
     pub mpris: Service<mpris::State>,
     pub idle: Service<idle::State>,
+    /// The installed applications.
+    pub apps: Service<apps::State>,
+    /// The applications that answer the overview's search, and what they
+    /// found.
+    pub search: Service<search::State>,
     /// Which menu is open, and where.
     pub menus: Store<Menus>,
+    /// What shows on top of niri's overview while it is open.
+    pub overview: Store<Overview>,
     /// The dialog that asks before logging out, restarting or powering
     /// off, while it is open.
     pub end_session: Store<Option<end_session::Kind>>,
@@ -259,6 +267,7 @@ impl Services {
         let settings_program = Some(config.commands.settings.clone())
             .filter(|program| !program.is_empty() && (sandboxed || on_path(program)));
         let menus = Store::new(Menus::default(), Rc::clone(&scheduler));
+        let overview = Store::new(Overview::default(), Rc::clone(&scheduler));
         let end_session = Store::new(None, Rc::clone(&scheduler));
         let (scheduler, log_ref) = (&scheduler, &log);
         let services = match fixture {
@@ -268,7 +277,17 @@ impl Services {
                 let notifications =
                     Service::fake("notifications", fixture.notifications, scheduler, log_ref);
                 let link = link_do_not_disturb(&do_not_disturb, &notifications);
+                let apps = Service::fake("apps", apps::State::default(), scheduler, log_ref);
+                // Through the event, which puts a scene's list in order.
+                apps.inject(apps::Event::Installed(fixture.apps.installed));
                 Self {
+                    apps,
+                    search: Service::live(
+                        "search",
+                        canned_search(fixture.search),
+                        scheduler,
+                        log_ref,
+                    ),
                     power: Service::fake("power", fixture.power, scheduler, log_ref),
                     audio: Service::fake("audio", fixture.audio, scheduler, log_ref),
                     network: Service::fake("network", fixture.network, scheduler, log_ref),
@@ -294,6 +313,7 @@ impl Services {
                     niri,
                     niri_client: socket.map(niri::Client::new),
                     menus,
+                    overview,
                     end_session,
                     commands: log.clone(),
                     sandboxed,
@@ -333,6 +353,18 @@ impl Services {
                         })
                     });
                 let mpris = session_bus.add("mpris", mpris::backend::run);
+                let search = if config.search.providers {
+                    let options = search::backend::Options {
+                        disabled: config.search.disabled.clone(),
+                    };
+                    let link = session_bus.add("search", move |connection, events, commands| {
+                        search::backend::run(connection, events, commands, options)
+                    });
+                    Service::live("search", link, scheduler, log_ref)
+                } else {
+                    // Nobody to ask: only applications are found.
+                    Service::fake("search", search::State::default(), scheduler, log_ref)
+                };
                 session_bus.start();
                 let notifications =
                     Service::live("notifications", notifications, scheduler, log_ref);
@@ -349,6 +381,8 @@ impl Services {
                 );
                 let link = link_do_not_disturb(&do_not_disturb, &notifications);
                 Self {
+                    apps: Service::live("apps", apps::backend::spawn(), scheduler, log_ref),
+                    search,
                     power: Service::live("power", power, scheduler, log_ref),
                     audio: Service::live("audio", audio::backend::spawn(), scheduler, log_ref),
                     network: Service::live("network", network, scheduler, log_ref),
@@ -384,6 +418,7 @@ impl Services {
                     niri,
                     niri_client: socket.map(niri::Client::new),
                     menus,
+                    overview,
                     end_session,
                     commands: log.clone(),
                     sandboxed,
@@ -421,6 +456,11 @@ impl Services {
     }
 
     /// Starts a program, detached. Under a fixture it is only logged.
+    ///
+    /// niri starts it where there is one, as it starts the programs its
+    /// key bindings name: the program is then no child of gniri's, and
+    /// under systemd it gets a scope of its own instead of living in
+    /// gniri's unit.
     pub fn launch(&self, command: &[&str]) {
         self.commands.push("launch", &command);
         let Some((program, arguments)) = command.split_first() else {
@@ -428,6 +468,13 @@ impl Services {
         };
         if self.sandboxed {
             return;
+        }
+        if let Some(client) = &self.niri_client {
+            let command = command.iter().map(|&word| word.to_owned()).collect();
+            match client.spawn(command) {
+                Ok(()) => return,
+                Err(error) => eprintln!("gniri: niri cannot start {program}: {error}"),
+            }
         }
         match std::process::Command::new(program).args(arguments).spawn() {
             // Wait for it on a thread of its own, so it does not stay
@@ -449,9 +496,30 @@ impl Services {
             self.commands.push("launch-app", &id);
             return true;
         }
-        let Some(command) = DesktopEntry::find(id).and_then(|entry| entry.command()) else {
+        // The list has what the overview shows; an entry that is not for
+        // menus (`NoDisplay`) is read from its file.
+        let listed = self
+            .apps
+            .state
+            .with(|apps| apps.app(id).map(|app| (app.command(), app.terminal)));
+        let (command, terminal) = match listed {
+            Some(found) => found,
+            None => match DesktopEntry::find(id) {
+                Some(entry) => (entry.command(), entry.terminal),
+                None => return false,
+            },
+        };
+        let Some(mut command) = command else {
             return false;
         };
+        if terminal {
+            let Some(mut terminal) = apps::terminal_prefix(on_path) else {
+                eprintln!("gniri: {id} wants a terminal and none is installed");
+                return false;
+            };
+            terminal.append(&mut command);
+            command = terminal;
+        }
         let command: Vec<&str> = command.iter().map(String::as_str).collect();
         self.launch(&command);
         true
@@ -461,6 +529,22 @@ impl Services {
     /// true under a fixture, where it would not be started anyway.
     pub fn has_app(&self, id: &str) -> bool {
         self.sandboxed || DesktopEntry::find(id).is_some()
+    }
+
+    /// Gives a window the keyboard focus, on whatever workspace it is.
+    pub fn focus_window(&self, id: u64) {
+        self.commands
+            .push("niri", &format_args!("FocusWindow({id})"));
+        if let Some(client) = &self.niri_client
+            && let Err(error) = client.focus_window(id)
+        {
+            eprintln!("gniri: cannot focus a window: {error}");
+        }
+    }
+
+    /// Closes niri's overview, and with it everything gniri shows on it.
+    pub fn close_overview(&self) {
+        self.niri_action(niri_ipc::Action::CloseOverview {});
     }
 
     /// Sends an action to niri, reporting a failure on stderr.
@@ -516,6 +600,44 @@ fn link_do_not_disturb(
         |state| state.on,
         move |on| notifications.update(|state| state.do_not_disturb = *on),
     )
+}
+
+/// A stand-in for the search providers under a fixture: whatever is
+/// searched for, each provider of the scene answers with the results the
+/// scene gives it.
+fn canned_search(canned: search::State) -> Link<search::State> {
+    let (link, events, commands) = Link::new();
+    glib::spawn_future_local(async move {
+        let infos = canned
+            .providers
+            .iter()
+            .map(|provider| search::ProviderInfo {
+                id: provider.id.clone(),
+                name: provider.name.clone(),
+                icon: provider.icon.clone(),
+            })
+            .collect();
+        let _ = events.send(search::Event::Providers(infos)).await;
+        while let Ok(command) = commands.recv().await {
+            let search::Command::Search(terms) = command else {
+                continue;
+            };
+            if terms.is_empty() {
+                continue;
+            }
+            for provider in &canned.providers {
+                let _ = events
+                    .send(search::Event::Results {
+                        terms: terms.clone(),
+                        provider: provider.id.clone(),
+                        results: provider.results.clone(),
+                        total: provider.total,
+                    })
+                    .await;
+            }
+        }
+    });
+    link
 }
 
 /// True if `program` is an executable on `PATH` (or a path to one).

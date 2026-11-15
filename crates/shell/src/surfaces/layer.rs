@@ -52,6 +52,9 @@ pub enum Zone {
     Reserve,
     /// Ignore reserved space and extend under it (wallpaper, stage).
     Ignore,
+    /// Reserve nothing, and stay out of what others reserve: the surface
+    /// starts under the panel (the overview).
+    Respect,
 }
 
 /// Creates an unmapped, transparent layer-shell window on `monitor`.
@@ -87,6 +90,7 @@ pub fn window(
     match zone {
         Zone::Reserve => window.auto_exclusive_zone_enable(),
         Zone::Ignore => window.set_exclusive_zone(-1),
+        Zone::Respect => window.set_exclusive_zone(0),
     }
     if pointer_ignored() {
         take_no_input(&window);

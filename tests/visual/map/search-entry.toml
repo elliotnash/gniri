@@ -1,0 +1,40 @@
+# The overview's search entry: gniri's widgets against GNOME Shell's
+# actors. Read by `cargo xtask diff search-entry` (crates/xtask/src/diff.rs).
+
+surface = "gniri-overview"
+root = ".search-entry"
+# It sits under the middle of the panel. The overview's surface starts
+# under the panel, which keeps the top of the screen to itself.
+attach = "center"
+below = "gniri-panel"
+margin = 8
+wallpaper = "/usr/share/backgrounds/f45/default/f45-01-night.jxl"
+
+[[states]]
+scene = "overview-empty"
+reference = "search-entry"
+
+[[regions]]
+name = "entry"
+anchor = "stretch"
+
+[[pairs]]
+name = "icon"
+ours = ".search-entry-icon:0"
+theirs = ".search-entry-icon"
+anchor = "left"
+
+[[pairs]]
+name = "text"
+ours = "GtkText"
+theirs = "ClutterText:0"
+anchor = "left"
+
+[[pairs]]
+name = "hint"
+ours = "GtkText GtkLabel"
+ours_box = "text"
+theirs = ".hint-text ClutterText"
+anchor = "left"
+# Pango's line is a pixel shorter than St's.
+tolerance_px = 1.1

@@ -1,0 +1,102 @@
+// The dash. Upstream: widgets/_dash.scss.
+//
+// Widget tree (crates/shell/src/overview/dash.rs):
+//
+//   box#dash                            #dash
+//     overlay
+//       box.dash-background               .dash-background
+//         box                               its sizer, as tall as an icon
+//       box.dash-container                the St.BoxLayout of both parts
+//         box.dash-apps
+//           box.dash-item-container         .dash-item-container
+//             button.overview-tile            .overview-tile
+//               overlay
+//                 box.overview-icon             .overview-icon
+//                   image                         StIcon
+//                 box.app-grid-running-dot      .app-grid-running-dot
+//           box.dash-separator              .dash-separator
+//         box.dash-item-container         ShowAppsIcon
+//           button.show-apps                .show-apps
+//
+// Only the geometry is here. blur-my-shell replaces every colour of the
+// dash; those are in _bms-overview.scss.
+
+$dash_padding: $base_padding * 2;
+$dash_edge_offset: $base_margin * 3;
+$dash_border_radius: $modal_radius + $dash_padding;
+$dash_spacing: $base_margin * 0.5;
+// %tile
+$tile_radius: $base_border_radius * 2;
+$tile_padding: $base_padding;
+$tile_transition: 100ms;
+
+// container for the dash
+#dash {
+    // a bit of spacing so that dash doesn't touch the screen edges
+    padding-left: $base_padding;
+    padding-right: $base_padding;
+
+    // background behind item container
+    .dash-background {
+        border-radius: $dash_border_radius;
+        padding-top: $dash_padding;
+        padding-bottom: $dash_padding;
+        // make sure all dash components have same margin from screen edge
+        margin-bottom: $dash_edge_offset;
+    }
+
+    // The background's horizontal padding, less the margins of the items:
+    // in St the background is as wide as the container plus this.
+    .dash-container {
+        margin-left: $dash_padding - $dash_spacing;
+        margin-right: $dash_padding - $dash_spacing;
+    }
+
+    // IMPORTANT: items on the dash need to extend to the edge to be
+    // adequate click targets, so the button is unstyled and the look is
+    // its child's, .overview-icon
+    .show-apps,
+    .overview-tile {
+        all: unset;
+        margin: 0 $dash_spacing;
+        padding-bottom: $dash_edge_offset; // align with other items
+
+        .overview-icon {
+            // %tile
+            border-radius: $tile_radius;
+            padding: $tile_padding;
+            transition: background-color $tile_transition $st_transition_easing;
+        }
+    }
+
+    .show-apps-icon { -gtk-icon-style: symbolic; }
+
+    // running app dot: manually positioned within the dash item
+    // (`offset-y: -$dash_padding`)
+    .app-grid-running-dot {
+        margin-bottom: $dash_padding;
+        // An icon's box is an even number of pixels wide and the dot is
+        // five: St puts the odd pixel on the right, GTK on the left.
+        margin-right: 1px;
+    }
+
+    // separator between pinned and running apps
+    .dash-separator {
+        min-width: 1px;
+        margin-left: $base_margin;
+        margin-right: $base_margin;
+        margin-bottom: $dash_edge_offset;
+    }
+}
+
+:root {
+    --gniri-dash-padding: 0 #{$base_padding};
+    --gniri-dash-background-radius: #{$dash_border_radius};
+    --gniri-dash-background-padding: #{$dash_padding} #{$dash_padding - $dash_spacing};
+    --gniri-dash-edge-offset: #{$dash_edge_offset};
+    --gniri-dash-item-margin: #{$dash_spacing};
+    --gniri-dash-separator-margin: #{$base_margin};
+    --gniri-tile-radius: #{$tile_radius};
+    --gniri-tile-padding: #{$tile_padding};
+    --gniri-tile-transition: #{$tile_transition};
+}

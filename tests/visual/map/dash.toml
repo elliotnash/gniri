@@ -1,0 +1,117 @@
+# The dash: gniri's widgets against GNOME Shell's actors.
+# Read by `cargo xtask diff dash` (crates/xtask/src/diff.rs).
+#
+# The applications are the scene's own. Their icons are blacked out of the
+# reference and never compared; where the icons are is compared.
+
+surface = "gniri-overview"
+root = ".dash-background"
+# The items are beside the background, not in it, as in GNOME.
+tree = "#dash"
+# It sits at the bottom centre of the screen, on a surface that starts
+# under the panel.
+attach = "center"
+vertical = "bottom"
+below = "gniri-panel"
+# Less than the dash's distance from niri's workspace on the nested
+# output, which is nearer to it than GNOME's is.
+margin = 4
+wallpaper = "/usr/share/backgrounds/f45/default/f45-01-night.jxl"
+
+[[states]]
+scene = "overview"
+reference = "dash"
+
+[[regions]]
+name = "dash"
+anchor = "stretch"
+
+[[pairs]]
+name = "container"
+ours = ".dash-container"
+theirs = "StBoxLayout"
+anchor = "left"
+
+[[pairs]]
+name = "first item"
+ours = ".dash-item-container:0"
+theirs = ".dash-item-container:0"
+anchor = "left"
+
+[[pairs]]
+name = "first button"
+ours = ".overview-tile:0"
+theirs = ".overview-tile:0"
+anchor = "left"
+
+[[pairs]]
+name = "first icon box"
+ours = ".overview-icon:0"
+theirs = ".overview-icon:0"
+anchor = "left"
+
+[[pairs]]
+name = "first icon"
+ours = ".overview-icon:0 GtkImage"
+theirs = ".overview-icon:0 StIcon"
+anchor = "left"
+
+[[pairs]]
+name = "first running dot"
+ours = ".app-grid-running-dot:0"
+theirs = ".app-grid-running-dot:0"
+anchor = "left"
+
+[[pairs]]
+name = "sixth icon box"
+ours = ".overview-icon:5"
+theirs = ".overview-icon:5"
+anchor = "left"
+
+[[pairs]]
+name = "separator"
+ours = ".dash-separator"
+theirs = ".dash-separator"
+anchor = "left"
+
+[[pairs]]
+name = "first running item"
+ours = ".dash-item-container:6"
+theirs = ".dash-item-container:6"
+anchor = "right"
+
+[[pairs]]
+name = "second running dot"
+ours = ".app-grid-running-dot:1"
+theirs = ".app-grid-running-dot:1"
+anchor = "right"
+
+[[pairs]]
+name = "last running icon box"
+ours = ".overview-icon:7"
+theirs = ".overview-icon:7"
+anchor = "right"
+
+[[pairs]]
+name = "show-apps item"
+ours = ".dash-item-container:8"
+theirs = ".dash-item-container:8"
+anchor = "right"
+
+[[pairs]]
+name = "show-apps button"
+ours = ".show-apps"
+theirs = ".show-apps"
+anchor = "right"
+
+[[pairs]]
+name = "show-apps icon box"
+ours = ".show-apps .overview-icon"
+theirs = ".show-apps .overview-icon"
+anchor = "right"
+
+[[pairs]]
+name = "show-apps icon"
+ours = ".show-apps-icon"
+theirs = ".show-apps-icon"
+anchor = "right"

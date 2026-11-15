@@ -42,6 +42,15 @@ layer-rule {
     place-within-backdrop true
 }
 
+// gniri puts a search entry at the top of niri's overview and a dash at
+// the bottom, as GNOME has them, and takes the keyboard there so that
+// typing searches. This zoom leaves the workspace in the middle clear of
+// both on a screen 800 logical pixels high or more; GNOME's own is a
+// little larger and niri allows up to 0.75.
+overview {
+    zoom 0.7
+}
+
 // The volume and brightness keys change the level through gniri, which
 // shows GNOME's on-screen display. A later bind of a key replaces an
 // earlier one, so put the include line after your own `binds` for these to
@@ -51,7 +60,10 @@ layer-rule {
 // Super+Alt+L locks the screen (niri's own suggestion for a screen locker;
 // Super+L, GNOME's, moves the focus in niri). Ctrl+Alt+Delete asks whether
 // to power off, as in GNOME.
+//
+// Super+A opens the app grid, as in GNOME.
 binds {
+    Super+A { spawn "gniri" "msg" "apps"; }
     Super+Alt+L { spawn "gniri" "msg" "lock"; }
     Ctrl+Alt+Delete { spawn "gniri" "msg" "power-off"; }
     XF86AudioRaiseVolume allow-when-locked=true { spawn "gniri" "msg" "volume" "up"; }

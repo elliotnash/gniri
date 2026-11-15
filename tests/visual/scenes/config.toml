@@ -8,6 +8,20 @@ format = "12h"
 [panel]
 show_battery_percentage = true
 
+# The dash as it was on the reference screen. The nested output is too
+# low for 64px icons by GNOME's own rule (crates/shell/src/overview/
+# layout.rs, where that rule is tested); the captures have them.
+[dash]
+favorites = [
+    "app.zen_browser.zen",
+    "org.gnome.Calendar",
+    "org.gnome.Nautilus",
+    "org.gnome.Software",
+    "org.gnome.TextEditor",
+    "org.gnome.Calculator",
+]
+icon_size = 64
+
 # A nested session counts its own idle time: the nested window not being
 # touched, while its user works beside it. Nothing may dim the real screen
 # or lock the real session for that, in the runs that have no fixture.

@@ -50,6 +50,16 @@ WALLPAPERS = ["flat-808080", "flat-3584e4", "real"]
 #              raw/ with its own metrics/ and shots, where that is not the
 #              main one.
 #   wallpapers (optional) the wallpapers that capture has shots for.
+#   index      (optional) which of the actors matching `match` is the
+#              root, counting from 0, where it is not the first.
+#   apps       (optional) the component shows the user's applications.
+#              Which those are is nobody's business and nothing a test
+#              can reproduce: every icon that is not a symbolic one of the
+#              theme is redacted (blacked out, never compared) and loses
+#              its name, and the actors named after applications lose
+#              theirs, with the label that says it.
+#   shots      (optional) False for a component that is only measured:
+#              no pictures are cut.
 WIFI_NAME = {
     "within": {"type": "Gjs_status_network_NMWirelessToggle"},
     "match": {"classes": "quick-toggle-subtitle"},
@@ -132,6 +142,79 @@ EXTRACTS = {
         "keep_text": True,
         "redact": LOCK_USER_PRIVATE,
     },
+    # No text. The dash's items are siblings of its background.
+    "dash": {
+        "state": "overview",
+        "match": {"classes": "dash-background dark-dash"},
+        "tree": {"name": "dash"},
+        "margin": 12,
+        "keep_text": True,
+        "apps": True,
+    },
+    # "Type to search".
+    "search-entry": {
+        "state": "overview",
+        "match": {"classes": "search-entry"},
+        "margin": 12,
+        "keep_text": True,
+    },
+    # Every icon of the first page with its name under it, the arrow to the
+    # next page and the page dots. Only measured: where things are on a
+    # screen of this size is arithmetic (crates/shell/src/overview/
+    # layout.rs), which is tested against these boxes.
+    "app-grid": {
+        "state": "app-grid",
+        "match": {"type": "Gjs_ui_appDisplay_AppDisplay"},
+        "keep_text": False,
+        "apps": True,
+        "shots": False,
+    },
+    # No text.
+    "page-indicators": {
+        "state": "app-grid",
+        "match": {"classes": "page-indicators"},
+        "margin": 6,
+        "keep_text": True,
+    },
+    "page-arrow": {
+        "state": "app-grid",
+        "match": {"classes": "page-navigation-arrow"},
+        "margin": 6,
+        "keep_text": True,
+    },
+    # A search for "calculator": the two applications it found.
+    "search-apps": {
+        "state": "search",
+        "match": {"classes": "grid-search-results"},
+        "margin": 12,
+        "keep_text": True,
+        "apps": True,
+    },
+    # What Characters found: one result, its name and code point.
+    "search-list-one": {
+        "state": "search",
+        "match": {"classes": "search-section-content"},
+        "margin": 12,
+        "keep_text": True,
+        "apps": True,
+    },
+    # What Software found: five applications of its catalogue, by name and
+    # one-line description, and "15 more".
+    "search-list": {
+        "state": "search",
+        "match": {"classes": "search-section-content"},
+        "index": 1,
+        "margin": 12,
+        "keep_text": True,
+        "apps": True,
+    },
+}
+
+# Actors that are named after the application they show.
+APP_ACTORS = {
+    "Gjs_ui_dash_DashIcon",
+    "Gjs_ui_appDisplay_AppIcon",
+    "Gjs_ui_appDisplay_FolderIcon",
 }
 
 
@@ -139,16 +222,45 @@ def matches(node, match):
     return all(node.get(key) == value for key, value in match.items())
 
 
-def find_path(node, match, path=()):
-    """The actors from `node` down to the first one matching, or None."""
+def find_paths(node, match, path=()):
+    """The actors from `node` down to each one matching, depth first."""
     path = (*path, node)
     if matches(node, match):
-        return path
+        yield path
     for child in node.get("children", []):
-        found = find_path(child, match, path)
-        if found:
-            return found
+        yield from find_paths(child, match, path)
+
+
+def find_path(node, match, index=0):
+    """The actors from `node` down to the one matching at `index`, or None."""
+    for found, path in enumerate(find_paths(node, match)):
+        if found == index:
+            return path
     return None
+
+
+def walk(node):
+    yield node
+    for child in node.get("children", []):
+        yield from walk(child)
+
+
+def redact_apps(tree):
+    """Takes the user's applications out of `tree`; returns their icons."""
+    hidden = []
+    for actor in walk(tree):
+        if actor["type"] in APP_ACTORS and actor.get("name"):
+            actor["name"] = "application"
+            for label in walk(actor):
+                if label["type"] == "StLabel":
+                    redact(label)
+                    label["redacted"] = True
+                    hidden.append(label)
+        if actor["type"] == "StIcon" and not (actor.get("icon") or "").endswith("-symbolic"):
+            actor["icon"] = "application"
+            actor["redacted"] = True
+            hidden.append(actor)
+    return hidden
 
 
 def find(node, match):
@@ -192,7 +304,7 @@ def extract(name, spec):
         return directory / f"{spec['state']}.png"
 
     dump = json.loads((raw / "metrics" / f"{spec['state']}.json").read_text())
-    path = find_path(dump["tree"], spec["match"])
+    path = find_path(dump["tree"], spec["match"], spec.get("index", 0))
     if path is None:
         sys.exit(f"{name}: no actor matching {spec['match']} in state {spec['state']}")
     root = path[-1]
@@ -207,6 +319,8 @@ def extract(name, spec):
     redact_unseen(tree)
 
     blackout = []
+    if spec.get("apps"):
+        blackout += [actor["box"] for actor in redact_apps(tree)]
     for rule in spec.get("redact", []):
         scope = find(tree, rule["within"])
         actors = find_all(scope, rule["match"]) if scope else []
@@ -252,7 +366,8 @@ def extract(name, spec):
     def pixels(value):
         return round(value * ratio)
 
-    for wallpaper in wallpapers:
+    shots = wallpapers if spec.get("shots", True) else []
+    for wallpaper in shots:
         source = shot(wallpaper)
         command = ["magick", str(source), "-crop",
                    f"{right - left}x{bottom - top}+{left}+{top}", "+repage",
@@ -268,7 +383,7 @@ def extract(name, spec):
     target = REFERENCE / "metrics" / f"{name}.json"
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(json.dumps(document, indent=1) + "\n")
-    print(f"{name}: {target.relative_to(REFERENCE)} and {len(wallpapers)} shots")
+    print(f"{name}: {target.relative_to(REFERENCE)} and {len(shots)} shots")
 
 
 def main():

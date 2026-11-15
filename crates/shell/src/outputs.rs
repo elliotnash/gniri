@@ -11,6 +11,7 @@ use crate::ready::ReadyTracker;
 use crate::services::Services;
 use crate::surfaces::banner::{self, Banner, Tray};
 use crate::surfaces::osd::{self, Osd};
+use crate::surfaces::overview::{self, Overview};
 use crate::surfaces::panel::{self, Panel};
 use crate::surfaces::stage::{self, Stage};
 use crate::surfaces::wallpaper::{self, WallpaperSource};
@@ -26,6 +27,8 @@ struct Output {
     osd: Osd,
     /// Unmapped until a notification asks for a banner.
     banner: Banner,
+    /// Unmapped until the compositor opens its overview.
+    overview: Option<Overview>,
 }
 
 impl Output {
@@ -46,6 +49,9 @@ impl Drop for Output {
         self.stage.window.destroy();
         self.osd.window.destroy();
         self.banner.window.destroy();
+        if let Some(overview) = &self.overview {
+            overview.window.destroy();
+        }
     }
 }
 
@@ -118,9 +124,13 @@ impl Outputs {
     }
 
     fn build(&self, monitor: gdk::Monitor) -> Output {
-        let wallpaper = match &self.wallpaper {
-            Some(source) => wallpaper::build(&self.app, &monitor, source).to_vec(),
-            None => Vec::new(),
+        let (wallpaper, cover) = match &self.wallpaper {
+            Some(source) => {
+                let wallpaper = wallpaper::build(&self.app, &monitor, source);
+                let cover = wallpaper.cover();
+                (wallpaper.windows.to_vec(), cover)
+            }
+            None => (Vec::new(), wallpaper::cover_without_wallpaper()),
         };
         // An output without a connector name cannot be excluded by name.
         let wants_panel = monitor
@@ -136,6 +146,10 @@ impl Outputs {
         });
         let osd = osd::build(&self.app, &monitor);
         let banner = banner::build(&self.app, &monitor);
+        // The dash and the search belong with the panel: an output without
+        // one shows niri's overview as it is.
+        let overview =
+            wants_panel.then(|| overview::build(&self.app, &monitor, &self.services, cover));
         Output {
             monitor,
             panel,
@@ -143,6 +157,7 @@ impl Outputs {
             stage,
             osd,
             banner,
+            overview,
         }
     }
 

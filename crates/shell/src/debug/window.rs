@@ -6,13 +6,19 @@
 use adw::prelude::*;
 use gtk::{gdk, gio, glib};
 
-pub fn run(colour: &str) -> glib::ExitCode {
+/// What the windows of a debug window call themselves when nothing else
+/// is asked for.
+const APP_ID: &str = "dev.gniri.DebugWindow";
+
+/// `app_id` is the application the window says it belongs to: a test's
+/// stand-in for a running application.
+pub fn run(colour: &str, app_id: Option<&str>) -> glib::ExitCode {
     let Ok(colour) = gdk::RGBA::parse(colour) else {
         eprintln!("gniri: {colour:?} is not a colour");
         return glib::ExitCode::FAILURE;
     };
     let app = adw::Application::builder()
-        .application_id("dev.gniri.DebugWindow")
+        .application_id(app_id.unwrap_or(APP_ID))
         .flags(gio::ApplicationFlags::NON_UNIQUE)
         .build();
     app.connect_activate(move |app| {

@@ -1,0 +1,44 @@
+// The overview's surface. Upstream: widgets/_overview.scss, and the
+// animations of js/ui/overviewControls.js.
+//
+// Widget tree (crates/shell/src/overview/controls.rs):
+//
+//   GniriControls.controls-manager      ControlsManager
+//     picture | box .overview-cover       gniri's own: see below
+//     box.search-entry                    SearchEntry
+//     box.app-display                     AppDisplay
+//     box#searchResults                   SearchResultsView
+//     box#dash                            Dash
+//
+// Upstream paints `#overviewGroup` in $system_base_color; blur-my-shell
+// puts the blurred wallpaper there instead, and so does gniri: it is the
+// backdrop surface niri draws behind its workspaces
+// (crates/shell/src/surfaces/wallpaper.rs).
+
+// overviewControls.js SIDE_CONTROLS_ANIMATION_TIME
+$overview_controls_time: 250ms;
+
+.controls-manager {
+    color: $system_fg_color;
+
+    // `ControlsManager.animateToOverview`: the dash comes up from the
+    // screen edge. GNOME fades the entry in; a blurred widget is blurred
+    // at full strength however faint it is drawn (docs/DECISIONS.md, S3),
+    // so here it comes out from under the panel instead.
+    > .search-entry,
+    > #dash {
+        transition: transform $overview_controls_time $ease_out_quad;
+    }
+
+    > .search-entry { transform: translateY(-64px); }
+    > #dash { transform: translateY(126px); }
+
+    &.open > .search-entry,
+    &.open > #dash {
+        transform: none;
+    }
+}
+
+:root {
+    --gniri-overview-controls-time: #{$overview_controls_time};
+}

@@ -267,19 +267,26 @@ impl Session {
     /// Opens a flat-coloured application window (`gniri debug-window`) in the
     /// session and waits until niri has mapped it.
     pub fn spawn_window(&self, colour: &str) -> Result<()> {
+        self.spawn_app_window(colour, None)
+    }
+
+    /// The same, as a window of the application called `app_id`.
+    pub fn spawn_app_window(&self, colour: &str, app_id: Option<&str>) -> Result<()> {
         let before = self.window_count()?;
         let gniri = self
             .gniri
             .to_str()
             .ok_or_else(|| anyhow!("non-UTF-8 path to gniri"))?;
-        self.action(Action::Spawn {
-            command: vec![
-                gniri.to_owned(),
-                "debug-window".to_owned(),
-                "--color".to_owned(),
-                colour.to_owned(),
-            ],
-        })?;
+        let mut command = vec![
+            gniri.to_owned(),
+            "debug-window".to_owned(),
+            "--color".to_owned(),
+            colour.to_owned(),
+        ];
+        if let Some(app_id) = app_id {
+            command.extend(["--app-id".to_owned(), app_id.to_owned()]);
+        }
+        self.action(Action::Spawn { command })?;
         wait_until("the debug window to open", || {
             Ok(self.window_count()? > before)
         })

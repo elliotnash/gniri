@@ -17,6 +17,14 @@ animations {
     off
 }
 
+// The nested output is 800 logical pixels high, lower than a real screen.
+// At the production zoom niri's workspace ends a few pixels above the dash
+// and its shadow falls on it; GNOME's workspace, on the taller reference
+// screen, stays clear.
+overview {
+    zoom 0.6
+}
+
 hotkey-overlay {
     skip-at-startup
 }

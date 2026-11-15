@@ -1,0 +1,439 @@
+{
+ "gnome_shell": "51.1",
+ "state": "search",
+ "stage": [
+  1792,
+  1120
+ ],
+ "pixels_per_unit": 1.25,
+ "root_box": [
+  736,
+  109,
+  320,
+  145
+ ],
+ "shot_box": [
+  724.0,
+  96.8,
+  344.0,
+  169.6
+ ],
+ "tree": {
+  "type": "StWidget",
+  "box": [
+   736,
+   109,
+   320,
+   145
+  ],
+  "opacity": 255,
+  "classes": "grid-search-results",
+  "pseudo": "insensitive first-child last-child",
+  "style": {
+   "fg": [
+    255,
+    255,
+    255,
+    255
+   ],
+   "font": "Adwaita Sans 14.666px",
+   "spacing": 30
+  },
+  "children": [
+   {
+    "type": "Gjs_ui_appDisplay_AppIcon",
+    "name": "application",
+    "box": [
+     736,
+     109,
+     145,
+     145
+    ],
+    "opacity": 255,
+    "classes": "overview-tile",
+    "pseudo": "first-child",
+    "style": {
+     "fg": [
+      250,
+      250,
+      251,
+      255
+     ],
+     "radius": [
+      24,
+      24,
+      24,
+      24
+     ],
+     "padding": [
+      12,
+      12,
+      12,
+      12
+     ],
+     "font": "Adwaita Sans 14.666px",
+     "transition_ms": 100,
+     "spacing": 6
+    },
+    "children": [
+     {
+      "type": "StWidget",
+      "box": [
+       748,
+       121,
+       121,
+       121
+      ],
+      "opacity": 255,
+      "pseudo": "insensitive first-child last-child",
+      "style": {
+       "fg": [
+        250,
+        250,
+        251,
+        255
+       ],
+       "font": "Adwaita Sans 14.666px"
+      },
+      "children": [
+       {
+        "type": "Gjs_ui_iconGrid_BaseIcon",
+        "box": [
+         748,
+         121,
+         121,
+         121
+        ],
+        "opacity": 255,
+        "classes": "overview-icon overview-icon-with-label",
+        "pseudo": "insensitive first-child last-child",
+        "style": {
+         "fg": [
+          250,
+          250,
+          251,
+          255
+         ],
+         "font": "Adwaita Sans 14.666px"
+        },
+        "children": [
+         {
+          "type": "StBoxLayout",
+          "box": [
+           748,
+           121,
+           121,
+           121
+          ],
+          "opacity": 255,
+          "pseudo": "insensitive first-child last-child",
+          "style": {
+           "fg": [
+            250,
+            250,
+            251,
+            255
+           ],
+           "font": "Adwaita Sans 14.666px",
+           "spacing": 6
+          },
+          "children": [
+           {
+            "type": "StBin",
+            "box": [
+             760,
+             121,
+             96,
+             96
+            ],
+            "opacity": 255,
+            "pseudo": "insensitive first-child",
+            "style": {
+             "fg": [
+              250,
+              250,
+              251,
+              255
+             ],
+             "font": "Adwaita Sans 14.666px"
+            },
+            "children": [
+             {
+              "type": "StIcon",
+              "box": [
+               760,
+               121,
+               96,
+               96
+              ],
+              "opacity": 255,
+              "pseudo": "insensitive first-child last-child",
+              "style": {
+               "fg": [
+                250,
+                250,
+                251,
+                255
+               ],
+               "font": "Adwaita Sans 14.666px"
+              },
+              "icon": "application",
+              "icon_size": 96,
+              "children": [
+               {
+                "type": "ClutterActor",
+                "box": [
+                 760,
+                 121,
+                 96,
+                 96
+                ],
+                "opacity": 255
+               }
+              ],
+              "redacted": true
+             }
+            ]
+           },
+           {
+            "type": "StLabel",
+            "box": [
+             748,
+             223,
+             121,
+             19
+            ],
+            "opacity": 255,
+            "pseudo": "insensitive last-child",
+            "style": {
+             "fg": [
+              250,
+              250,
+              251,
+              255
+             ],
+             "font": "Adwaita Sans 14.666px"
+            },
+            "text": "xxxxxxxxxx",
+            "children": [
+             {
+              "type": "ClutterText",
+              "box": [
+               774,
+               223,
+               68,
+               19
+              ],
+              "opacity": 255
+             }
+            ],
+            "redacted": true
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "type": "Gjs_ui_appDisplay_AppIcon",
+    "name": "application",
+    "box": [
+     911,
+     109,
+     145,
+     145
+    ],
+    "opacity": 255,
+    "classes": "overview-tile",
+    "pseudo": "last-child",
+    "style": {
+     "fg": [
+      250,
+      250,
+      251,
+      255
+     ],
+     "radius": [
+      24,
+      24,
+      24,
+      24
+     ],
+     "padding": [
+      12,
+      12,
+      12,
+      12
+     ],
+     "font": "Adwaita Sans 14.666px",
+     "transition_ms": 100,
+     "spacing": 6
+    },
+    "children": [
+     {
+      "type": "StWidget",
+      "box": [
+       923,
+       121,
+       121,
+       121
+      ],
+      "opacity": 255,
+      "pseudo": "insensitive first-child last-child",
+      "style": {
+       "fg": [
+        250,
+        250,
+        251,
+        255
+       ],
+       "font": "Adwaita Sans 14.666px"
+      },
+      "children": [
+       {
+        "type": "Gjs_ui_iconGrid_BaseIcon",
+        "box": [
+         923,
+         121,
+         121,
+         121
+        ],
+        "opacity": 255,
+        "classes": "overview-icon overview-icon-with-label",
+        "pseudo": "insensitive first-child last-child",
+        "style": {
+         "fg": [
+          250,
+          250,
+          251,
+          255
+         ],
+         "font": "Adwaita Sans 14.666px"
+        },
+        "children": [
+         {
+          "type": "StBoxLayout",
+          "box": [
+           923,
+           121,
+           121,
+           121
+          ],
+          "opacity": 255,
+          "pseudo": "insensitive first-child last-child",
+          "style": {
+           "fg": [
+            250,
+            250,
+            251,
+            255
+           ],
+           "font": "Adwaita Sans 14.666px",
+           "spacing": 6
+          },
+          "children": [
+           {
+            "type": "StBin",
+            "box": [
+             935,
+             121,
+             96,
+             96
+            ],
+            "opacity": 255,
+            "pseudo": "insensitive first-child",
+            "style": {
+             "fg": [
+              250,
+              250,
+              251,
+              255
+             ],
+             "font": "Adwaita Sans 14.666px"
+            },
+            "children": [
+             {
+              "type": "StIcon",
+              "box": [
+               935,
+               121,
+               96,
+               96
+              ],
+              "opacity": 255,
+              "pseudo": "insensitive first-child last-child",
+              "style": {
+               "fg": [
+                250,
+                250,
+                251,
+                255
+               ],
+               "font": "Adwaita Sans 14.666px"
+              },
+              "icon": "application",
+              "icon_size": 96,
+              "children": [
+               {
+                "type": "ClutterActor",
+                "box": [
+                 935,
+                 121,
+                 96,
+                 96
+                ],
+                "opacity": 255
+               }
+              ],
+              "redacted": true
+             }
+            ]
+           },
+           {
+            "type": "StLabel",
+            "box": [
+             923,
+             223,
+             121,
+             19
+            ],
+            "opacity": 255,
+            "pseudo": "insensitive last-child",
+            "style": {
+             "fg": [
+              250,
+              250,
+              251,
+              255
+             ],
+             "font": "Adwaita Sans 14.666px"
+            },
+            "text": "xxxxxxxxxxxxxxxxxxxx",
+            "children": [
+             {
+              "type": "ClutterText",
+              "box": [
+               923,
+               223,
+               121,
+               19
+              ],
+              "opacity": 255
+             }
+            ],
+            "redacted": true
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ }
+}

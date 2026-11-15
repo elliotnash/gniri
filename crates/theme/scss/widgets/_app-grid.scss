@@ -1,0 +1,121 @@
+// The app grid, and the icons the dash and the search share with it.
+// Upstream: widgets/_app-grid.scss.
+//
+// Widget tree (crates/shell/src/overview/app_grid.rs and icon.rs):
+//
+//   box.app-display                     AppDisplay
+//     GniriIconGrid.icon-grid             .icon-grid
+//       button.overview-tile                .overview-tile
+//         overlay
+//           GniriSquareBin.overview-icon.overview-icon-with-label
+//             box                             its St.BoxLayout
+//               image                           StIcon
+//               label                           StLabel
+//           box.app-grid-running-dot        .app-grid-running-dot
+//       button.page-navigation-arrow        .page-navigation-arrow
+//     box.page-indicators                 .page-indicators
+//       button.page-indicator               .page-indicator
+//         box.page-indicator-icon             .page-indicator-icon
+//
+// `.icon-grid`'s row and column spacing and page padding are St
+// properties, read by `IconGridLayout`. GTK has none like them: they are
+// in crates/shell/src/overview/app_grid.rs, and below as tokens so the
+// tests can hold them against GNOME's.
+//
+// Only the geometry is here; the colours are blur-my-shell's
+// (_bms-overview.scss).
+
+$app_icon_size: 96px;
+$overview_tile_radius: $base_border_radius * 3;
+$overview_tile_padding: $base_padding * 2;
+$running_dot_size: 5px;
+$page_indicator_size: 10px;
+// pageIndicators.js INDICATOR_INACTIVE_SCALE, _SCALE_PRESSED and _OPACITY
+$page_indicator_inactive_scale: 0.667;
+$page_indicator_pressed_scale: 0.5;
+$page_indicator_inactive_opacity: 0.5;
+
+// items in the app grid and dash
+.overview-tile {
+    all: unset;
+    // override the %tile style
+    border-radius: $overview_tile_radius;
+    padding: $overview_tile_padding;
+    transition: background-color $tile_transition $st_transition_easing;
+
+    // item with a label
+    .overview-icon-with-label {
+        > box { border-spacing: $base_padding; }
+
+        label { @include st_line_height; }
+    }
+}
+
+// Running app indicator (also shown in dash)
+.app-grid-running-dot {
+    min-height: $running_dot_size;
+    min-width: $running_dot_size;
+    border-radius: $running_dot_size;
+    // `offset-y: 6px`: it hangs below the icon's box.
+    margin-bottom: -$base_padding;
+}
+
+// App Grid pagination indicators
+.page-indicator {
+    all: unset;
+    padding: $base_padding ($base_padding * 2) 0;
+
+    .page-indicator-icon {
+        min-width: $page_indicator_size;
+        min-height: $page_indicator_size;
+        border-radius: $forced_circular_radius;
+        // `PageIndicators._updateIndicator`
+        transform: scale($page_indicator_inactive_scale);
+        opacity: $page_indicator_inactive_opacity;
+        transition: transform 400ms $st_transition_easing,
+                    opacity 400ms $st_transition_easing;
+    }
+
+    &:hover .page-indicator-icon { opacity: 1; }
+    &:active .page-indicator-icon { transform: scale($page_indicator_pressed_scale); }
+
+    &.current .page-indicator-icon {
+        transform: none;
+        opacity: 1;
+    }
+}
+
+// page navigation
+.page-navigation-arrow {
+    all: unset;
+    margin: $base_padding;
+    padding: $base_padding * 3;
+    min-width: $medium_icon_size;
+    min-height: $medium_icon_size;
+    border-radius: $forced_circular_radius;
+    transition: background-color 100ms $st_transition_easing;
+
+    image {
+        -gtk-icon-size: $medium_icon_size;
+        -gtk-icon-style: symbolic;
+    }
+}
+
+:root {
+    // .icon-grid
+    --gniri-icon-grid-row-spacing: #{$base_padding * 2};
+    --gniri-icon-grid-column-spacing: #{$base_padding * 2};
+    --gniri-icon-grid-max-row-spacing: #{$base_padding * 6};
+    --gniri-icon-grid-max-column-spacing: #{$base_padding * 6};
+    --gniri-icon-grid-page-padding: #{$base_padding * 4} #{$base_padding * 3};
+    --gniri-overview-tile-radius: #{$overview_tile_radius};
+    --gniri-overview-tile-padding: #{$overview_tile_padding};
+    --gniri-overview-tile-spacing: #{$base_padding};
+    --gniri-running-dot-size: #{$running_dot_size};
+    --gniri-running-dot-offset: #{$base_padding};
+    --gniri-page-indicator-padding: #{$base_padding} #{$base_padding * 2} 0 #{$base_padding * 2};
+    --gniri-page-indicator-size: #{$page_indicator_size};
+    --gniri-page-arrow-margin: #{$base_padding};
+    --gniri-page-arrow-padding: #{$base_padding * 3};
+    --gniri-page-arrow-size: #{$medium_icon_size};
+}

@@ -1,0 +1,45 @@
+# The overview with its dash and search entry, as in GNOME's `overview`
+# reference capture: six favourites, the first of them running, and two
+# more applications that run. The applications are the scene's own, with
+# the names GNOME's capture had.
+
+[fixture]
+time = "2026-11-14T08:28:00"
+power = { profile = "performance", battery = { percentage = 91 } }
+audio = { output = { volume = 0.3 } }
+network = { primary = { kind = "wifi", strength = 70 } }
+
+[variants.flat-808080]
+time = "2026-11-13T22:09:00"
+power = { profile = "performance", battery = { percentage = 36, charge = "charging" } }
+
+[variants.flat-3584e4]
+time = "2026-11-13T22:09:00"
+power = { profile = "performance", battery = { percentage = 36, charge = "charging" } }
+
+[fixture.apps]
+installed = [
+    { id = "app.zen_browser.zen", name = "Zen Browser", icon = "web-browser" },
+    { id = "org.gnome.Calendar", name = "Calendar", icon = "org.gnome.Calendar" },
+    { id = "org.gnome.Nautilus", name = "Files", icon = "org.gnome.Nautilus" },
+    { id = "org.gnome.Software", name = "Software", icon = "org.gnome.Software" },
+    { id = "org.gnome.TextEditor", name = "Text Editor", icon = "org.gnome.TextEditor" },
+    { id = "org.gnome.Calculator", name = "Calculator", icon = "org.gnome.Calculator" },
+    { id = "com.mitchellh.ghostty", name = "Ghostty", icon = "utilities-terminal" },
+    { id = "org.gnome.Settings", name = "Settings", icon = "org.gnome.Settings" },
+]
+
+[[steps]]
+window = { color = "#f6f5f4", app-id = "app.zen_browser.zen" }
+
+[[steps]]
+window = { color = "#f6f5f4", app-id = "com.mitchellh.ghostty" }
+
+[[steps]]
+window = { color = "#f6f5f4", app-id = "org.gnome.Settings" }
+
+[[steps]]
+action = { FocusWorkspaceDown = {} }
+
+[[steps]]
+action = { OpenOverview = {} }

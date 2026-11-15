@@ -1,0 +1,137 @@
+// blur-my-shell's overview and dash components: what the extension
+// changes about the overview's parts. Ported from its
+// `src/styles/overview.css` (`.overview-components-dark`) and `dash.css`
+// (`.dark-dash`), v78, for the default settings.
+//
+// The extension draws the overview's background itself: the wallpaper,
+// blurred and dimmed to its brightness. Here that is the backdrop surface
+// behind niri's workspaces, so what sits on it needs no dimming folded
+// into its colours: they are the extension's own, as written.
+
+// overview.css: the fills of a tile, an entry or an arrow, and how they
+// brighten.
+$bms_overview_fill: rgba(255, 255, 255, 0.07);
+$bms_overview_border: rgba(255, 255, 255, 0.05);
+$bms_overview_hover: rgba(255, 255, 255, 0.13);
+$bms_overview_active: rgba(255, 255, 255, 0.19);
+$bms_overview_selected_active: rgba(255, 255, 255, 0.24);
+$bms_overview_entry_focus: rgba(255, 255, 255, 0.12);
+$bms_overview_dim_fg: rgba(255, 255, 255, 0.65);
+$bms_overview_description_fg: rgba(255, 255, 255, 0.5);
+
+// dash.css `.dark-dash`
+$bms_dash_tint: rgba(30, 30, 33, 0.5);
+$bms_dash_border: rgba(255, 255, 255, 0.06);
+$bms_dash_separator: rgba(255, 255, 255, 0.12);
+$bms_dash_fg: rgba(255, 255, 255, 0.9);
+$bms_dash_checked_hover: rgba(255, 255, 255, 0.25);
+
+// What stands in front of niri's workspaces while the app grid or a
+// search shows (crates/shell/src/overview/controls.rs). With a wallpaper
+// of gniri's it is that wallpaper, blurred and dimmed: the very pixels of
+// the backdrop. Without one it is whatever niri has behind its
+// workspaces, blurred by niri and dimmed as the extension dims the
+// overview.
+.overview-cover-blurred {
+    @include bms-blur;
+    background-color: rgba(0, 0, 0, 1 - $bms_brightness);
+}
+
+// The extension blurs the wallpaper behind the dash, whatever window is
+// there. niri's default blur for a layer surface does the same ("xray":
+// it samples the backdrop, not the workspaces), and the backdrop is
+// dimmed already.
+#dash .dash-background {
+    @include bms-blur;
+    background-color: $bms_dash_tint;
+    border: 1px solid $bms_dash_border;
+}
+
+// The border is inside the background's box in St and widens it.
+#dash .dash-container {
+    margin-left: $dash_padding - $dash_spacing + 1px;
+    margin-right: $dash_padding - $dash_spacing + 1px;
+}
+
+#dash {
+    .dash-separator { background-color: $bms_dash_separator; }
+
+    .app-grid-running-dot { background-color: $bms_dash_fg; }
+
+    .show-apps .overview-icon { color: $bms_dash_fg; }
+
+    // Hover on the icon box, not on the button around it.
+    .overview-tile, .show-apps {
+        &:hover .overview-icon { background-color: $bms_overview_hover; }
+        &:active .overview-icon { background-color: $bms_overview_active; }
+    }
+
+    .show-apps:checked {
+        .overview-icon { background-color: $bms_overview_active; }
+        &:hover .overview-icon { background-color: $bms_dash_checked_hover; }
+    }
+}
+
+// The entry is not blurred by the extension: nothing of GNOME's overview
+// passes behind it. One of niri's workspaces can, so here it is.
+.search-entry {
+    @include bms-blur;
+    color: white;
+    background-color: $bms_overview_fill;
+
+    &.focused { background-color: $bms_overview_entry_focus; }
+
+    .search-entry-icon,
+    > text > placeholder {
+        color: $bms_overview_dim_fg;
+    }
+
+    > text { caret-color: transparent; }
+    &.focused > text { caret-color: currentColor; }
+}
+
+// Tiles of the app grid and of the search, the results of a list and the
+// provider's own icon.
+.controls-manager {
+    .icon-grid .overview-tile,
+    .grid-search-result,
+    .list-search-result,
+    .search-provider-icon {
+        background-color: transparent;
+
+        &:hover, &.selected { background-color: $bms_overview_hover; }
+        &:active, &.selected:hover { background-color: $bms_overview_active; }
+        &.selected:active { background-color: $bms_overview_selected_active; }
+    }
+
+    .app-grid-running-dot { background-color: $system_fg_color; }
+
+    .search-section-content,
+    .page-navigation-arrow {
+        background-color: $bms_overview_fill;
+        border: 1px solid $bms_overview_border;
+    }
+
+    .page-navigation-arrow {
+        &:hover { background-color: $bms_overview_hover; }
+        &:active { background-color: $bms_overview_active; }
+    }
+
+    .page-indicator-icon { background-color: $system_fg_color; }
+
+    .list-search-result-description { color: $bms_overview_description_fg; }
+}
+
+:root {
+    --gniri-bms-dash-tint: #{$bms_dash_tint};
+    --gniri-bms-dash-border: #{$bms_dash_border};
+    --gniri-bms-dash-separator: #{$bms_dash_separator};
+    --gniri-bms-dash-fg: #{$bms_dash_fg};
+    --gniri-bms-overview-fill: #{$bms_overview_fill};
+    --gniri-bms-overview-border: #{$bms_overview_border};
+    --gniri-bms-overview-hover: #{$bms_overview_hover};
+    --gniri-bms-overview-active: #{$bms_overview_active};
+    --gniri-bms-overview-entry-focus: #{$bms_overview_entry_focus};
+    --gniri-bms-overview-dim-fg: #{$bms_overview_dim_fg};
+    --gniri-bms-overview-description-fg: #{$bms_overview_description_fg};
+}

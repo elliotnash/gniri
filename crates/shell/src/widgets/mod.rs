@@ -5,3 +5,4 @@ pub mod level;
 pub mod password_entry;
 pub mod picture;
 pub mod slider;
+pub mod square;
