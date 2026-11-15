@@ -33,6 +33,8 @@ roxmltree = "0.21"
 # The default runtime (async-io), never tokio.
 zbus = "6"
 futures-lite = "2"
+# The PulseAudio client library, for the audio backend.
+libpulse-binding = "2.30"
 # Follows niri releases and is not semver-stable: pin to the installed niri.
 niri-ipc = "=26.4.0"
 

@@ -10,6 +10,7 @@ license.workspace = true
 gniri-core.workspace = true
 async-channel.workspace = true
 futures-lite.workspace = true
+libpulse-binding.workspace = true
 niri-ipc.workspace = true
 roxmltree.workspace = true
 serde.workspace = true
@@ -21,6 +22,7 @@ zbus.workspace = true
 # use them directly.
 async-channel.workspace = true
 futures-lite.workspace = true
+libpulse-binding.workspace = true
 serde.workspace = true
 zbus.workspace = true
 
