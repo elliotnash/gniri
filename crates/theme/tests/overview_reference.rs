@@ -90,10 +90,7 @@ fn dash() {
         top_right(&style["padding"]),
         lengths("dash-background-padding", em)
     );
-    assert_eq!(
-        numbers(&style["margin"])[2],
-        pixels("dash-edge-offset", em)
-    );
+    assert_eq!(numbers(&style["margin"])[2], pixels("dash-edge-offset", em));
 
     // An item: a button that reaches the screen edge, around the icon's
     // box.
@@ -149,10 +146,7 @@ fn search_entry() {
     let em = em(entry);
     let style = &entry["style"];
     assert_colour(&style["bg"], "bms-overview-fill");
-    assert_eq!(
-        top_right(&style["padding"]),
-        lengths("entry-padding", em)
-    );
+    assert_eq!(top_right(&style["padding"]), lengths("entry-padding", em));
     assert_eq!(
         numbers(&style["margin"]),
         lengths("search-entry-margin", em)

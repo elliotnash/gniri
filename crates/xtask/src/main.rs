@@ -47,7 +47,7 @@ enum Command {
     Report,
     /// Check how the shell behaves in a live nested session.
     Check {
-        /// Only this part: panel, quick-settings, notifications,
+        /// Only this part: panel, overview, quick-settings, notifications,
         /// notifications-bus, session, lock or polkit.
         part: Option<String>,
     },

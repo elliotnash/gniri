@@ -167,6 +167,15 @@ fn click(session: &Session, selector: &str) -> Result<()> {
 /// Where a surface's top left corner is on the output. The stage covers
 /// the output; a banner is centred under the panel.
 fn surface_origin(session: &Session, surface: &Value) -> Result<(f64, f64)> {
+    let panel_height = || -> Result<f64> {
+        Ok(self::surface(session, "gniri-panel")?
+            .and_then(|panel| panel["height"].as_f64())
+            .unwrap_or(0.0))
+    };
+    // The overview's surface fills the output under the panel.
+    if surface["namespace"] == "gniri-overview" {
+        return Ok((0.0, panel_height()?));
+    }
     if surface["namespace"] != "gniri-banner" {
         return Ok((0.0, 0.0));
     }
@@ -174,10 +183,7 @@ fn surface_origin(session: &Session, surface: &Value) -> Result<(f64, f64)> {
     let width = surface["width"]
         .as_f64()
         .ok_or_else(|| anyhow!("the surface has no width"))?;
-    let panel = self::surface(session, "gniri-panel")?
-        .and_then(|panel| panel["height"].as_f64())
-        .unwrap_or(0.0);
-    Ok(((f64::from(output_width) - width) / 2.0, panel))
+    Ok(((f64::from(output_width) - width) / 2.0, panel_height()?))
 }
 
 /// Clicks the middle of the widget `selector` picks on the surface called
@@ -277,11 +283,25 @@ fn on_surface(session: &Session, namespace: &str, selector: &str) -> Result<Opti
 
 /// How many nodes of the stage carry `class`.
 fn count_on_stage(session: &Session, class: &str) -> Result<usize> {
-    let Some(stage) = surface(session, "gniri-stage")? else {
+    count_on(session, "gniri-stage", "", class)
+}
+
+/// How many nodes carry `class` below the node `within` picks on the
+/// surface called `namespace` (anywhere on it for an empty `within`).
+fn count_on(session: &Session, namespace: &str, within: &str, class: &str) -> Result<usize> {
+    let Some(surface) = surface(session, namespace)? else {
         return Ok(0);
     };
+    let root = if within.is_empty() {
+        &surface["tree"]
+    } else {
+        match tree::select(&surface["tree"], within) {
+            Ok(root) => root,
+            Err(_) => return Ok(0),
+        }
+    };
     let mut count = 0;
-    tree::walk(&stage["tree"], &mut |node| {
+    tree::walk(root, &mut |node| {
         if tree::classes(node).contains(&class) {
             count += 1;
         }
@@ -508,8 +528,9 @@ fn panel_and_overview() -> Result<(usize, usize)> {
 type Part = fn() -> Result<(usize, usize)>;
 
 /// The parts, by the names `cargo xtask check <part>` takes.
-const PARTS: [(&str, Part); 7] = [
+const PARTS: [(&str, Part); 8] = [
     ("panel", panel_and_overview),
+    ("overview", overview),
     ("quick-settings", quick_settings),
     ("notifications", notifications),
     ("notifications-bus", notifications_over_the_bus),
@@ -1517,5 +1538,430 @@ fn authentication_dialog() -> Result<(usize, usize)> {
         failed,
     } = checker;
     session.quit()?;
+    Ok((passed, failed))
+}
+
+/// The overview's surface, with the `search` scene's fixture for
+/// services: its applications, and two search providers that answer any
+/// search with what the scene gives them. What a click or a key asked for
+/// is read back from the command log; nothing is started.
+fn overview() -> Result<(usize, usize)> {
+    const SURFACE: &str = "gniri-overview";
+    const ENTRY: &str = ".search-entry GtkText";
+
+    let on = |session: &Session, selector: &str| on_surface(session, SURFACE, selector);
+    let is_open = |session: &Session| Ok(surface(session, SURFACE)?.is_some());
+    let is_closed = |session: &Session| {
+        Ok(surface(session, SURFACE)?.is_none() && !session.overview_is_open()?)
+    };
+    let entry_text = |session: &Session| -> Result<Option<String>> {
+        Ok(on(session, ENTRY)?.and_then(|entry| entry["text"].as_str().map(str::to_owned)))
+    };
+    // The text of the label in the first node that carries `class` and is
+    // selected.
+    let selected = |session: &Session| -> Result<Option<String>> {
+        Ok(on(session, ".selected")?.and_then(|node| texts(&node).into_iter().next()))
+    };
+    // Types into the overview. The surface gets the keyboard a moment
+    // after it is mapped, and what is typed before then goes nowhere: the
+    // entry is emptied and the text typed again until it has all of it.
+    let type_search = |session: &Session, text: &str| -> Result<()> {
+        for _ in 0..4 {
+            session.gniri_msg(&["debug", "sync"])?;
+            type_text(session, text)?;
+            let arrived = wait_until_within(
+                "the text to arrive",
+                std::time::Duration::from_millis(700),
+                || Ok(entry_text(session)?.as_deref() == Some(text)),
+            );
+            if arrived.is_ok() {
+                return Ok(());
+            }
+            session.gniri_msg(&["debug", "search", ""])?;
+        }
+        bail!("the overview never took {text:?} from the keyboard")
+    };
+
+    let fixture = Scene::load("search")?.write_fixture("check-overview", None)?;
+    let session = Session::start(&SessionOptions {
+        name: "check-overview".to_owned(),
+        niri_config: None,
+        renderer: "vulkan".to_owned(),
+        gniri_args: scene::gniri_args(Some(&fixture), Some(WALLPAPER)),
+    })?;
+    let mut checker = Checker {
+        session,
+        passed: 0,
+        failed: 0,
+    };
+
+    println!("overview: dash");
+    checker.expect("nothing of the overview shows on the desktop", |session| {
+        Ok(surface(session, SURFACE)?.is_none())
+    });
+    checker.session.action(Action::OpenOverview {})?;
+    checker.expect("niri's overview brings the entry and the dash", |session| {
+        Ok(on(session, ".search-entry")?.is_some() && on(session, "#dash")?.is_some())
+    });
+    checker.expect(
+        "the dash has the six favourites and the apps button",
+        |session| {
+            Ok(count_on(session, SURFACE, "#dash", "overview-tile")? == 6
+                && count_on(session, SURFACE, "#dash", "show-apps")? == 1)
+        },
+    );
+    checker.expect("with nothing running: no dot, no separator", |session| {
+        Ok(
+            count_on(session, SURFACE, "#dash", "app-grid-running-dot")? == 0
+                && count_on(session, SURFACE, "#dash", "dash-separator")? == 0,
+        )
+    });
+    checker
+        .session
+        .spawn_app_window(WINDOW, Some("org.gnome.Settings"))?;
+    checker.expect(
+        "an application that starts joins it after a separator, with a dot",
+        |session| {
+            Ok(count_on(session, SURFACE, "#dash", "overview-tile")? == 7
+                && count_on(session, SURFACE, "#dash", "dash-separator")? == 1
+                && count_on(session, SURFACE, "#dash", "app-grid-running-dot")? == 1)
+        },
+    );
+    checker
+        .session
+        .spawn_app_window(WINDOW, Some("org.gnome.Nautilus"))?;
+    checker.expect("a favourite that starts only gets its dot", |session| {
+        Ok(count_on(session, SURFACE, "#dash", "overview-tile")? == 7
+            && count_on(session, SURFACE, "#dash", "app-grid-running-dot")? == 2)
+    });
+
+    println!("overview: search");
+    if on_path("wtype") {
+        // A window that was just opened has the focus; the overview is
+        // opened afresh for the keyboard to be the entry's.
+        checker.session.action(Action::CloseOverview {})?;
+        checker.expect("(the overview is closed)", is_closed);
+        checker.session.action(Action::OpenOverview {})?;
+        checker.expect("(and open again)", is_open);
+        type_search(&checker.session, "calc")?;
+        checker.expect("typing fills the search entry", |session| {
+            Ok(entry_text(session)?.as_deref() == Some("calc"))
+        });
+        checker.expect("and finds the applications by name", |session| {
+            let Some(results) = on(session, ".grid-search-results")? else {
+                return Ok(false);
+            };
+            Ok(texts(&results) == ["Calculator", "KiCad PCB Calculator"])
+        });
+        checker.expect("the providers are asked for the same", |session| {
+            sent(session, "search: Search([\"calc\"])")
+        });
+        checker.expect("and what they found is listed under them", |session| {
+            let Some(results) = on(session, "#searchResults")? else {
+                return Ok(false);
+            };
+            let texts = texts(&results);
+            Ok([
+                "Characters",
+                "Pocket Calculator",
+                "Software",
+                "15 more",
+                "Uno Calculator",
+            ]
+            .iter()
+            .all(|wanted| texts.iter().any(|text| text == wanted)))
+        });
+        checker.expect("the first result is the one Enter would take", |session| {
+            Ok(selected(session)?.as_deref() == Some("Calculator"))
+        });
+        key(&checker.session, "Right")?;
+        checker.expect(
+            "Right belongs to the text until an arrow has gone down",
+            |session| Ok(selected(session)?.as_deref() == Some("Calculator")),
+        );
+        key(&checker.session, "Down")?;
+        checker.expect("Down goes to the first provider's result", |session| {
+            Ok(selected(session)?.as_deref() == Some("Pocket Calculator"))
+        });
+        key(&checker.session, "Return")?;
+        checker.expect("Enter there opens it in its application", |session| {
+            sent(
+                session,
+                "search: Activate { provider: \"org.gnome.Characters\", \
+                 result: \"pocket-calculator\", terms: [\"calc\"] }",
+            )
+        });
+        checker.expect("and closes the overview", is_closed);
+
+        checker.session.action(Action::OpenOverview {})?;
+        checker.expect("(the overview is open)", is_open);
+        checker.expect("a new overview has forgotten the search", |session| {
+            Ok(entry_text(session)?.as_deref() == Some("")
+                && on(session, "#searchResults")?.is_none())
+        });
+        type_search(&checker.session, "calc")?;
+        checker.expect("(the search is back)", |session| {
+            Ok(selected(session)?.as_deref() == Some("Calculator"))
+        });
+        key(&checker.session, "Return")?;
+        checker.expect("Enter on an application starts it", |session| {
+            sent(session, "launch-app: \"org.gnome.Calculator\"")
+        });
+        checker.expect("and closes the overview", is_closed);
+
+        checker.session.action(Action::OpenOverview {})?;
+        checker.expect("(the overview is open)", is_open);
+        type_search(&checker.session, "pocket")?;
+        checker.expect("(a search with only a provider's results)", |session| {
+            Ok(selected(session)?.as_deref() == Some("Pocket Calculator"))
+        });
+        key(&checker.session, "Escape")?;
+        checker.expect(
+            "Escape ends the search and stays in the overview",
+            |session| {
+                Ok(entry_text(session)?.as_deref() == Some("")
+                    && on(session, "#searchResults")?.is_none()
+                    && session.overview_is_open()?)
+            },
+        );
+        checker.session.gniri_msg(&["debug", "show-apps"])?;
+        checker.expect("(the app grid shows)", |session| {
+            Ok(on(session, ".icon-grid")?.is_some())
+        });
+        key(&checker.session, "Escape")?;
+        checker.expect("Escape leaves the app grid for the windows", |session| {
+            Ok(on(session, ".icon-grid")?.is_none() && session.overview_is_open()?)
+        });
+        key(&checker.session, "Escape")?;
+        checker.expect("and then closes the overview", is_closed);
+    } else {
+        println!("  skip wtype is not installed");
+    }
+
+    println!("overview: pointer");
+    if on_path("wlrctl") {
+        // Away from niri's hot corner, which the pointer may be resting in.
+        pointer_to(&checker.session, 400, 300)?;
+        checker.session.action(Action::CloseOverview {})?;
+        checker.expect("(the overview is closed)", is_closed);
+        checker.session.action(Action::OpenOverview {})?;
+        checker.expect("(the overview is open)", is_open);
+
+        click_on(&checker.session, SURFACE, ".show-apps")?;
+        checker.expect("the dash's last button shows the app grid", |session| {
+            Ok(on(session, ".icon-grid")?.is_some()
+                && on(session, ".show-apps")?.is_some_and(|button| has_state(&button, "checked")))
+        });
+        checker.expect(
+            "Settings runs and is no favourite: in the grid with a dot",
+            |session| {
+                Ok(count_on(
+                    session,
+                    SURFACE,
+                    ".icon-grid #Settings",
+                    "app-grid-running-dot",
+                )? == 1)
+            },
+        );
+        click_on(&checker.session, SURFACE, ".icon-grid #Settings")?;
+        checker.expect("a click on it goes to its window", |session| {
+            Ok(
+                session.focused_app()?.as_deref() == Some("org.gnome.Settings")
+                    && sent(session, "niri: FocusWindow")?,
+            )
+        });
+        checker.expect("and closes the overview", is_closed);
+
+        checker.session.action(Action::OpenOverview {})?;
+        checker.expect("(the overview is open)", is_open);
+        click_on(&checker.session, SURFACE, "#dash #Files")?;
+        checker.expect(
+            "a click on a running favourite goes to its window",
+            |session| Ok(session.focused_app()?.as_deref() == Some("org.gnome.Nautilus")),
+        );
+        checker.expect("and closes the overview", is_closed);
+
+        checker.session.action(Action::OpenOverview {})?;
+        checker.expect("(the overview is open)", is_open);
+        click_on(&checker.session, SURFACE, "#dash #Calendar")?;
+        checker.expect("a click on one that does not run starts it", |session| {
+            sent(session, "launch-app: \"org.gnome.Calendar\"")
+        });
+        checker.expect("and closes the overview", is_closed);
+
+        // Between the entry and the dash the surface lets the pointer
+        // through to niri, whose overview is underneath.
+        checker.session.action(Action::OpenOverview {})?;
+        checker.expect("(the overview is open)", is_open);
+        let (width, height) = output_size(&checker.session)?;
+        pointer_to(&checker.session, width / 2, height / 2)?;
+        pointer(&checker.session, &["click", "left"])?;
+        checker.expect(
+            "a click on a window in niri's overview reaches niri, which closes it",
+            is_closed,
+        );
+    } else {
+        println!("  skip wlrctl is not installed");
+    }
+
+    println!("overview: gniri msg apps");
+    checker.session.action(Action::CloseOverview {})?;
+    checker.expect("(the overview is closed)", is_closed);
+    checker.session.gniri_msg(&["apps"])?;
+    checker.expect("opens the overview on the app grid", |session| {
+        Ok(session.overview_is_open()? && on(session, ".icon-grid")?.is_some())
+    });
+    checker.session.gniri_msg(&["apps"])?;
+    checker.expect("and closes it again", is_closed);
+
+    let Checker {
+        session,
+        mut passed,
+        mut failed,
+    } = checker;
+    session.quit()?;
+
+    // The pages of the app grid, with the `app-grid` scene's applications:
+    // more than one page of them.
+    let fixture = Scene::load("app-grid")?.write_fixture("check-grid", None)?;
+    let session = Session::start(&SessionOptions {
+        name: "check-grid".to_owned(),
+        niri_config: None,
+        renderer: "vulkan".to_owned(),
+        gniri_args: scene::gniri_args(Some(&fixture), Some(WALLPAPER)),
+    })?;
+    let mut checker = Checker {
+        session,
+        passed: 0,
+        failed: 0,
+    };
+    let current_page = |session: &Session| -> Result<Option<usize>> {
+        let Some(indicators) = on(session, ".page-indicators")? else {
+            return Ok(None);
+        };
+        Ok(tree::children(&indicators)
+            .iter()
+            .position(|indicator| tree::classes(indicator).contains(&"current")))
+    };
+    let first_icon = |session: &Session| -> Result<Option<String>> {
+        Ok(on(session, ".icon-grid .overview-tile")?
+            .and_then(|tile| texts(&tile).into_iter().next()))
+    };
+
+    println!("overview: app grid");
+    checker.session.gniri_msg(&["apps"])?;
+    checker.expect("the grid shows a page of 24 icons", |session| {
+        Ok(count_on(session, SURFACE, ".icon-grid", "overview-tile")? == 24)
+    });
+    checker.expect("of two, the first", |session| {
+        Ok(count_on(session, SURFACE, "", "page-indicator")? == 2
+            && current_page(session)? == Some(0))
+    });
+    checker.expect("in name order", |session| {
+        Ok(first_icon(session)?.as_deref() == Some("Boxes"))
+    });
+    checker.expect("with an arrow to the next page only", |session| {
+        Ok(count_on(session, SURFACE, "", "page-navigation-arrow")? == 1)
+    });
+    if on_path("wlrctl") {
+        pointer_to(&checker.session, 400, 300)?;
+        click_on(&checker.session, SURFACE, ".page-navigation-arrow")?;
+        checker.expect("the arrow turns the page", |session| {
+            Ok(
+                current_page(session)? == Some(1)
+                    && first_icon(session)?.as_deref() == Some("Tour"),
+            )
+        });
+        checker.expect("to the last, which has an arrow back only", |session| {
+            Ok(
+                count_on(session, SURFACE, "", "page-navigation-arrow")? == 1
+                    && count_on(session, SURFACE, ".icon-grid", "overview-tile")? == 6,
+            )
+        });
+        // Over the icons, where the grid has the pointer.
+        let (width, height) = output_size(&checker.session)?;
+        pointer_to(&checker.session, width / 2, height / 2)?;
+        pointer(&checker.session, &["scroll", "-15", "0"])?;
+        checker.expect("scrolling up turns it back", |session| {
+            Ok(current_page(session)? == Some(0))
+        });
+        click_on(&checker.session, SURFACE, ".page-indicator:1")?;
+        checker.expect("a click on a page's dot goes to that page", |session| {
+            Ok(current_page(session)? == Some(1))
+        });
+    } else {
+        println!("  skip wlrctl is not installed");
+        checker.session.gniri_msg(&["debug", "page", "1"])?;
+    }
+    if on_path("wtype") {
+        key_until(&checker.session, "Page_Up", |session| {
+            Ok(current_page(session)? == Some(0))
+        })?;
+        checker.expect("Page Up goes back a page", |session| {
+            Ok(current_page(session)? == Some(0))
+        });
+        key(&checker.session, "Down")?;
+        checker.expect("an arrow key picks the first icon", |session| {
+            Ok(selected(session)?.as_deref() == Some("Boxes"))
+        });
+        key(&checker.session, "Left")?;
+        key(&checker.session, "Down")?;
+        key(&checker.session, "Right")?;
+        checker.expect("and arrows move through the grid", |session| {
+            // Second row, second column.
+            Ok(selected(session)?.as_deref() == Some("Help"))
+        });
+        key(&checker.session, "Return")?;
+        checker.expect("Enter starts what is picked", |session| {
+            sent(session, "launch-app: \"org.example.Help\"")
+        });
+        checker.expect("and closes the overview", is_closed);
+
+        // This scene has no search providers: only applications are found.
+        checker.session.action(Action::OpenOverview {})?;
+        checker.expect("(the overview is open)", is_open);
+        type_search(&checker.session, "zzz")?;
+        checker.expect("a search that finds nothing says so", |session| {
+            Ok(on(session, ".search-statustext")?
+                .is_some_and(|label| label["text"] == "No results"))
+        });
+    } else {
+        println!("  skip wtype is not installed");
+    }
+
+    passed += checker.passed;
+    failed += checker.failed;
+    checker.session.quit()?;
+
+    // The real thing: no fixture, so the applications are the ones
+    // installed here and the surface comes and goes with its animations.
+    println!("overview: installed applications");
+    let session = Session::start(&SessionOptions {
+        name: "check-apps".to_owned(),
+        niri_config: None,
+        renderer: "vulkan".to_owned(),
+        gniri_args: scene::gniri_args(None, Some(WALLPAPER)),
+    })?;
+    let mut checker = Checker {
+        session,
+        passed: 0,
+        failed: 0,
+    };
+    checker.session.gniri_msg(&["apps"])?;
+    checker.expect("the app grid lists what is installed", |session| {
+        Ok(count_on(session, SURFACE, ".icon-grid", "overview-tile")? > 0)
+    });
+    checker.expect("the dash and the entry have slid into place", |session| {
+        Ok(on(session, ".controls-manager")?
+            .is_some_and(|controls| tree::classes(&controls).contains(&"open")))
+    });
+    checker.session.action(Action::CloseOverview {})?;
+    checker.expect("and the surface goes once they have slid away", |session| {
+        Ok(surface(session, SURFACE)?.is_none())
+    });
+
+    passed += checker.passed;
+    failed += checker.failed;
+    checker.session.quit()?;
     Ok((passed, failed))
 }

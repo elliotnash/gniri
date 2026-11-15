@@ -131,7 +131,14 @@ fn node(widget: &gtk::Widget, root: &gtk::Widget) -> Node {
 
     let (text, text_box) = match widget.downcast_ref::<gtk::Label>() {
         Some(label) => (Some(label.text().to_string()), text_box(label, root)),
-        None => (None, None),
+        // What is typed in a field, unless the field hides it: a password
+        // is never written anywhere.
+        None => match widget.downcast_ref::<gtk::Text>() {
+            Some(field) if field.property::<bool>("visibility") => {
+                (Some(field.text().to_string()), None)
+            }
+            _ => (None, None),
+        },
     };
     let icon = widget
         .downcast_ref::<gtk::Image>()

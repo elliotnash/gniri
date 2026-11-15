@@ -636,7 +636,10 @@ mod tests {
         };
         assert_eq!(lengths("icon-grid-row-spacing"), [STYLE.row_spacing]);
         assert_eq!(lengths("icon-grid-column-spacing"), [STYLE.column_spacing]);
-        assert_eq!(lengths("icon-grid-max-row-spacing"), [STYLE.max_row_spacing]);
+        assert_eq!(
+            lengths("icon-grid-max-row-spacing"),
+            [STYLE.max_row_spacing]
+        );
         assert_eq!(
             lengths("icon-grid-max-column-spacing"),
             [STYLE.max_column_spacing]

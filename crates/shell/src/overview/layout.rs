@@ -452,7 +452,10 @@ mod tests {
         let size = (view[2], view[3]);
         // An item is 49px larger than its icon: 96px icons give 145.
         assert_eq!(
-            f64::from(grid_icon_size(size, &STYLE, arrow_room, |icon| f64::from(icon) + 49.0)) + 49.0,
+            f64::from(grid_icon_size(size, &STYLE, arrow_room, |icon| f64::from(
+                icon
+            ) + 49.0))
+                + 49.0,
             child
         );
         let grid = grid(size, &STYLE, arrow_room, child);
@@ -475,7 +478,10 @@ mod tests {
         let band = grid.indicators_width;
         let left = (view[0] + view[2] - band + (band - arrow_room) / 2.0).floor() + 6.0;
         assert_eq!(arrow[0], left);
-        assert_eq!(arrow[1], view[1] + ((view[3] - arrow_room) / 2.0).floor() + 6.0);
+        assert_eq!(
+            arrow[1],
+            view[1] + ((view[3] - arrow_room) / 2.0).floor() + 6.0
+        );
     }
 
     #[test]

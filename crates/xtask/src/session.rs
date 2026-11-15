@@ -257,6 +257,15 @@ impl Session {
         }
     }
 
+    /// The application id of the window with the keyboard focus, if a
+    /// window has it.
+    pub fn focused_app(&self) -> Result<Option<String>> {
+        match self.request(Request::FocusedWindow)? {
+            Response::FocusedWindow(window) => Ok(window.and_then(|window| window.app_id)),
+            other => bail!("unexpected reply to FocusedWindow: {other:?}"),
+        }
+    }
+
     fn window_count(&self) -> Result<usize> {
         match self.request(Request::Windows)? {
             Response::Windows(windows) => Ok(windows.len()),
