@@ -75,4 +75,7 @@ $popup_arrow_rise: $base_padding;
 :root {
     --gniri-popup-arrow-rise: #{$popup_arrow_rise};
     --gniri-popup-animation-time: #{$popup_animation_time};
+    --gniri-popup-menu-item-padding: #{$base_padding * 1.5} #{$base_padding * 2};
+    --gniri-popup-menu-item-radius: #{$menuitem_border_radius};
+    --gniri-popup-menu-item-spacing: #{$base_padding};
 }

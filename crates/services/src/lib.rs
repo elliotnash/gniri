@@ -12,6 +12,7 @@ pub mod fixture;
 pub mod keyboard;
 pub mod model;
 pub mod network;
+pub mod night_light;
 pub mod niri;
 pub mod power;
 pub mod rfkill;

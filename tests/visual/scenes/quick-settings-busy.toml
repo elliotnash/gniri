@@ -1,0 +1,39 @@
+# The quick settings menu with everything in it at once: a wired
+# connection, a Bluetooth device, a microphone in use, night light. GNOME
+# was not captured in this state; the scene is for looking at, and for the
+# submenus the reference machine could not show.
+
+extends = "quick-settings"
+
+[fixture]
+night_light = { available = true, on = true }
+rfkill = { available = true, has_bluetooth = true }
+
+[fixture.audio]
+output = { volume = 0.7, headphones = true }
+outputs = [
+    { name = "headphones", description = "Headphones – Built-in Audio", active = true },
+    { name = "speakers", description = "Speakers – Built-in Audio" },
+]
+input = { volume = 0.4 }
+inputs = [
+    { name = "internal", description = "Internal Microphone – Built-in Audio", active = true },
+    { name = "headset", description = "Headset Microphone – Built-in Audio" },
+]
+recording = true
+
+[fixture.network]
+primary = { kind = "wired" }
+wired = { status = "connected" }
+wifi = { enabled = true, networks = [
+    { ssid = "Home", strength = 82, secure = true, known = true, status = "connected" },
+    { ssid = "Cafe Guest", strength = 55, secure = false },
+    { ssid = "Neighbour", strength = 31, secure = true },
+] }
+
+[fixture.bluetooth]
+adapter = { powered = true }
+devices = [
+    { address = "00:00:00:00:00:01", name = "Headphones", icon = "audio-headphones", status = "connected", battery = 80 },
+    { address = "00:00:00:00:00:02", name = "Mouse", icon = "input-mouse" },
+]

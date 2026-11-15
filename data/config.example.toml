@@ -33,6 +33,11 @@
 # Default: every output.
 # outputs = ["eDP-1"]
 
+[night_light]
+# Colour temperature of the screen while Night Light is on, in kelvin; lower
+# is warmer. 1700 to 4700. Default: 2700.
+# temperature = 3500
+
 [commands]
 # The settings application, started as `<settings> <panel>` by entries such
 # as "Power Settings" (panels: power, wifi, bluetooth, sound). Default:

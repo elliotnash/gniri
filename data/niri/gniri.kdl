@@ -41,3 +41,16 @@ layer-rule {
 
     place-within-backdrop true
 }
+
+// The volume and brightness keys change the level through gniri, which
+// shows GNOME's on-screen display. A later bind of a key replaces an
+// earlier one, so put the include line after your own `binds` for these to
+// win. `gniri` must be on PATH; with the binary elsewhere, bind the same
+// keys in your own config, after the include line, with its full path.
+binds {
+    XF86AudioRaiseVolume allow-when-locked=true { spawn "gniri" "msg" "volume" "up"; }
+    XF86AudioLowerVolume allow-when-locked=true { spawn "gniri" "msg" "volume" "down"; }
+    XF86AudioMute allow-when-locked=true { spawn "gniri" "msg" "volume" "mute"; }
+    XF86MonBrightnessUp allow-when-locked=true { spawn "gniri" "msg" "brightness" "up"; }
+    XF86MonBrightnessDown allow-when-locked=true { spawn "gniri" "msg" "brightness" "down"; }
+}

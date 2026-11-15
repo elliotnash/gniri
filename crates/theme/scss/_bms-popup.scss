@@ -33,7 +33,7 @@ $bms_menu_backdrop: $bms_brightness * (1 - alpha($shadow_color));
     color: $bms_popup_fg_color;
     background-color: bms-fold($bms_popup_tint);
     border-color: $bms_popup_border_color;
-    // The extension's "volume and brightness OSD corner radius", 48px.
+    // The extension's "volume and brightness OSD corner radius".
     border-radius: 48px;
 }
 
@@ -175,4 +175,7 @@ $bms_submenu_white: 0.08;
     --gniri-bms-popup-tint: #{$bms_popup_tint};
     --gniri-bms-popup-border-color: #{$bms_popup_border_color};
     --gniri-bms-popup-fg-color: #{$bms_popup_fg_color};
+    --gniri-bms-popup-button-color: #{rgba(255, 255, 255, 0.1)};
+    --gniri-bms-submenu-white: #{rgba(255, 255, 255, $bms_submenu_white)};
+    --gniri-bms-osd-radius: 48px;
 }

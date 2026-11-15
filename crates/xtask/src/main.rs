@@ -132,3 +132,25 @@ fn main() -> ExitCode {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::process::Command;
+
+    /// gniri's own code runs on the GLib main loop and a few plain
+    /// threads; zbus is used with its default runtime. A crate that pulls
+    /// tokio in would start a second runtime beside them.
+    #[test]
+    fn nothing_depends_on_tokio() {
+        let output = Command::new(env!("CARGO"))
+            .args(["tree", "--workspace", "--invert", "tokio"])
+            .current_dir(crate::session::workspace_root())
+            .output()
+            .expect("cargo runs");
+        let listing = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            listing.trim().is_empty(),
+            "tokio is in the dependency tree:\n{listing}"
+        );
+    }
+}

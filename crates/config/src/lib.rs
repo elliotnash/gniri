@@ -18,6 +18,7 @@ pub struct Config {
     pub wallpaper: Wallpaper,
     pub clock: Clock,
     pub panel: Panel,
+    pub night_light: NightLight,
     pub commands: Commands,
 }
 
@@ -89,6 +90,21 @@ impl Panel {
             Some(outputs) => outputs.iter().any(|name| name == output),
             None => true,
         }
+    }
+}
+
+/// The Night Light toggle.
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct NightLight {
+    /// Colour temperature of the screen while night light is on, in kelvin.
+    /// Lower is warmer. 1700 to 4700, the range GNOME Settings offers.
+    pub temperature: u32,
+}
+
+impl Default for NightLight {
+    fn default() -> Self {
+        Self { temperature: 2700 }
     }
 }
 
@@ -165,6 +181,12 @@ impl Config {
                 Error::Invalid("wallpaper.image starts with ~ but HOME is not set".to_owned())
             })?;
             config.wallpaper.image = Some(home.join(rest));
+        }
+        if !(1700..=4700).contains(&config.night_light.temperature) {
+            return Err(Error::Invalid(format!(
+                "night_light.temperature: {} is not between 1700 and 4700",
+                config.night_light.temperature
+            )));
         }
         if let Some(outputs) = &config.panel.outputs
             && outputs.iter().any(String::is_empty)
@@ -244,6 +266,9 @@ mod tests {
             show_battery_percentage = true
             outputs = ["eDP-1"]
 
+            [night_light]
+            temperature = 3500
+
             [commands]
             settings = "my-settings"
             "##,
@@ -267,6 +292,7 @@ mod tests {
         assert!(config.panel.shows_on("eDP-1"));
         assert!(!config.panel.shows_on("HDMI-A-1"));
         assert_eq!(config.commands.settings, "my-settings");
+        assert_eq!(config.night_light.temperature, 3500);
     }
 
     #[test]
@@ -303,6 +329,10 @@ mod tests {
         ));
         assert!(matches!(
             parse("[panel]\noutputs = [\"\"]"),
+            Err(Error::Invalid(_))
+        ));
+        assert!(matches!(
+            parse("[night_light]\ntemperature = 9000"),
             Err(Error::Invalid(_))
         ));
         assert!(matches!(

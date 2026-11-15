@@ -76,6 +76,11 @@ impl Inner {
 
         let widget = match menu {
             Menu::QuickSettings => {
+                // Something else may have changed the backlight since the
+                // slider last heard of it.
+                self.services
+                    .brightness
+                    .send(gniri_services::brightness::Command::Refresh);
                 let mut quick_settings = self.quick_settings.borrow_mut();
                 let quick_settings =
                     quick_settings.get_or_insert_with(|| quick_settings::build(&self.services));

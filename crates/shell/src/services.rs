@@ -8,8 +8,8 @@ use gniri_config::Config;
 use gniri_core::{Clock, LocalTime, Scheduler, Store};
 use gniri_services::keyboard::LayoutNames;
 use gniri_services::{
-    Fixture, Link, Model, SystemBus, audio, bluetooth, brightness, network, niri, power, rfkill,
-    session, toggles,
+    Fixture, Link, Model, SystemBus, audio, bluetooth, brightness, network, night_light, niri,
+    power, rfkill, session, toggles,
 };
 use gtk::glib;
 
@@ -256,14 +256,14 @@ impl Services {
                         scheduler,
                         log_ref,
                     ),
-                    // Until the notification server exists (M3) the toggle
-                    // only remembers its own state.
-                    night_light: Service::fake(
+                    night_light: Service::live(
                         "night-light",
-                        toggles::State::default(),
+                        night_light::backend::spawn(config.night_light.temperature),
                         scheduler,
                         log_ref,
                     ),
+                    // Until the notification server exists (M3) the toggle
+                    // only remembers its own state.
                     do_not_disturb: Service::fake(
                         "do-not-disturb",
                         toggles::State {

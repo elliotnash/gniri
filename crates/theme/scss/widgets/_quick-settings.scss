@@ -181,5 +181,10 @@ $quick_toggle_height: 48px; // $scalable_icon_size * 3
     --gniri-quick-toggle-width: #{$quick_toggle_width};
     --gniri-quick-toggle-height: #{$quick_toggle_height};
     --gniri-quick-toggle-menu-radius: #{$base_border_radius * 3};
+    --gniri-quick-toggle-menu-padding: #{$scaled_padding * 2};
+    --gniri-quick-toggle-menu-margin-top: #{$base_padding * 2};
+    --gniri-quick-toggle-menu-icon-padding: #{1.5 * $base_padding};
+    --gniri-quick-settings-button-padding: #{ceil($base_padding * 1.75)};
+    --gniri-quick-slider-button-padding: #{$base_padding};
     --gniri-quick-settings-dim-brightness: #{$quick_settings_dim_brightness};
 }

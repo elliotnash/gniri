@@ -33,6 +33,10 @@ roxmltree = "0.21"
 # The default runtime (async-io), never tokio.
 zbus = "6"
 futures-lite = "2"
+# A second Wayland connection of our own, for protocols GTK does not speak
+# (gamma control). Never GTK's connection: see docs/DECISIONS.md.
+wayland-client = "0.31"
+wayland-protocols-wlr = { version = "0.3", features = ["client"] }
 # The PulseAudio client library, for the audio backend.
 libpulse-binding = "2.30"
 # Follows niri releases and is not semver-stable: pin to the installed niri.
