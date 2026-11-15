@@ -612,3 +612,40 @@ pub fn build(services: &Rc<Services>) -> AppDisplay {
         _subscriptions: subscriptions,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The grid's lengths are in the code because GTK has no style
+    /// properties for them; the theme lists the same ones, from the same
+    /// variables as the rest of GNOME's stylesheet.
+    #[test]
+    fn the_grid_lengths_are_the_themes() {
+        let lengths = |name: &str| -> Vec<f64> {
+            gniri_theme::token(name)
+                .unwrap_or_else(|| panic!("no token {name}"))
+                .split_whitespace()
+                .map(|length| {
+                    length
+                        .strip_suffix("px")
+                        .and_then(|pixels| pixels.parse().ok())
+                        .unwrap_or_else(|| panic!("token {name} is not pixels"))
+                })
+                .collect()
+        };
+        assert_eq!(lengths("icon-grid-row-spacing"), [STYLE.row_spacing]);
+        assert_eq!(lengths("icon-grid-column-spacing"), [STYLE.column_spacing]);
+        assert_eq!(lengths("icon-grid-max-row-spacing"), [STYLE.max_row_spacing]);
+        assert_eq!(
+            lengths("icon-grid-max-column-spacing"),
+            [STYLE.max_column_spacing]
+        );
+        assert_eq!(
+            lengths("icon-grid-page-padding"),
+            [STYLE.page_padding_top, STYLE.page_padding_right]
+        );
+        assert_eq!(STYLE.page_padding_top, STYLE.page_padding_bottom);
+        assert_eq!(STYLE.page_padding_left, STYLE.page_padding_right);
+    }
+}

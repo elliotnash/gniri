@@ -19,8 +19,8 @@
 //
 // `.icon-grid`'s row and column spacing and page padding are St
 // properties, read by `IconGridLayout`. GTK has none like them: they are
-// in crates/shell/src/overview/app_grid.rs, and below as tokens so the
-// tests can hold them against GNOME's.
+// in crates/shell/src/overview/app_grid.rs, and below as tokens, which a
+// test holds the code against.
 //
 // Only the geometry is here; the colours are blur-my-shell's
 // (_bms-overview.scss).

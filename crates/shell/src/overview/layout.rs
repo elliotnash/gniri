@@ -399,6 +399,85 @@ mod tests {
         assert!((grid.indicators_width - 179.2).abs() < 1e-9);
     }
 
+    /// Every icon of the first page, and the arrow, where the capture of
+    /// GNOME's own app grid has them
+    /// (tests/visual/reference/gnome-51.1/metrics/app-grid.json).
+    #[test]
+    fn every_icon_is_where_gnome_has_it() {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../tests/visual/reference/gnome-51.1/metrics/app-grid.json"
+        );
+        let reference: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+        fn find<'a>(
+            node: &'a serde_json::Value,
+            class: &str,
+            found: &mut Vec<&'a serde_json::Value>,
+        ) {
+            let classes = node["classes"].as_str().unwrap_or_default();
+            if classes.split(' ').any(|other| other == class) {
+                found.push(node);
+                return;
+            }
+            for child in node["children"].as_array().into_iter().flatten() {
+                find(child, class, found);
+            }
+        }
+        let rect = |node: &serde_json::Value| -> [f64; 4] {
+            let numbers: Vec<f64> = node["box"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|number| number.as_f64().unwrap())
+                .collect();
+            [numbers[0], numbers[1], numbers[2], numbers[3]]
+        };
+        let one = |class: &str| {
+            let mut found = Vec::new();
+            find(&reference["tree"], class, &mut found);
+            rect(found[0])
+        };
+
+        let view = one("apps-scroll-view");
+        let arrow = one("page-navigation-arrow");
+        // The arrow's box and the 6px of margin on each side of it.
+        let arrow_room = arrow[2] + 12.0;
+        let mut tiles = Vec::new();
+        find(&reference["tree"], "overview-tile", &mut tiles);
+        let tiles: Vec<[f64; 4]> = tiles.into_iter().map(rect).collect();
+        assert!(tiles.len() > 24, "the capture has a second page");
+        let child = tiles[0][2];
+
+        let size = (view[2], view[3]);
+        // An item is 49px larger than its icon: 96px icons give 145.
+        assert_eq!(
+            f64::from(grid_icon_size(size, &STYLE, arrow_room, |icon| f64::from(icon) + 49.0)) + 49.0,
+            child
+        );
+        let grid = grid(size, &STYLE, arrow_room, child);
+        assert_eq!(grid.per_page(), 24);
+        assert_eq!(grid.pages(tiles.len()), 2);
+        for (index, tile) in tiles.iter().enumerate() {
+            let (page, position) = (index / grid.per_page(), index % grid.per_page());
+            let (x, y) = grid.origin(position);
+            // The pages are side by side, each as wide as the view.
+            let expected = [
+                f64::from(x) + view[0] + page as f64 * view[2],
+                f64::from(y) + view[1],
+            ];
+            assert_eq!([tile[0], tile[1]], expected, "icon {index}");
+            assert_eq!([tile[2], tile[3]], [child, child], "icon {index}");
+        }
+
+        // The arrow to the next page, in the middle of its band at the
+        // right; app_grid.rs places it so.
+        let band = grid.indicators_width;
+        let left = (view[0] + view[2] - band + (band - arrow_room) / 2.0).floor() + 6.0;
+        assert_eq!(arrow[0], left);
+        assert_eq!(arrow[1], view[1] + ((view[3] - arrow_room) / 2.0).floor() + 6.0);
+    }
+
     #[test]
     fn a_small_page_takes_smaller_icons() {
         // The nested test output: the scroll view is 1280x423.
