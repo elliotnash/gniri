@@ -267,6 +267,7 @@ pub fn incoming(
             resident: hint_bool(&call.hints, "resident"),
             transient: hint_bool(&call.hints, "transient"),
             acknowledged: false,
+            system: hint_string(&call.hints, "x-gnome-privacy-scope").as_deref() == Some("system"),
             // A sound of the theme wins over a file, as in
             // `MessageTray.Sound.play`.
             sound: hint_string(&call.hints, "sound-name")

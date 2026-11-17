@@ -406,6 +406,9 @@ fn activate(
         move |request| -> ipc::Pending {
             match request {
                 ipc::Request::Sync => Box::pin(sync(app.clone())),
+                ipc::Request::LockNotifications(known) => Box::pin(
+                    crate::lock::notifications::answer(Rc::clone(&services), known),
+                ),
                 ipc::Request::Outputs(plugged) => {
                     outputs.set_unplugged(!plugged);
                     dialogs.set_unplugged(!plugged);
@@ -528,7 +531,9 @@ fn handle(
             serde_json::to_value(debug::dump::dump(app)).map_err(|error| error.to_string())
         }
         // Answered by `sync`, which has to wait, and by the caller.
-        ipc::Request::Sync | ipc::Request::Outputs(_) => Ok(Value::Null),
+        ipc::Request::Sync | ipc::Request::Outputs(_) | ipc::Request::LockNotifications(_) => {
+            Ok(Value::Null)
+        }
         ipc::Request::Commands => Ok(Value::from(services.commands.entries())),
         ipc::Request::OpenMenu { menu, output } => {
             let output = output.or_else(|| outputs.default_output());
@@ -604,6 +609,12 @@ fn handle(
             services
                 .bluetooth_agent
                 .inject(gniri_services::bluetooth::agent::Event::End);
+            Ok(Value::Null)
+        }
+        ipc::Request::Locked(locked) => {
+            services
+                .session
+                .inject(gniri_services::session::Event::Locked(locked));
             Ok(Value::Null)
         }
         ipc::Request::Idle { timer, resumed } => {

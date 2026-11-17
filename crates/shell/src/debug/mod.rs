@@ -52,6 +52,7 @@ pub fn notify(services: &Rc<Services>, notify: ipc::Notify) -> u32 {
             transient: notify.transient,
             acknowledged: false,
             sound: notify.sound.map(Sound::Name),
+            system: notify.system,
             time: services.time.get(),
         },
         source_key: format!("debug:{}", notify.app),

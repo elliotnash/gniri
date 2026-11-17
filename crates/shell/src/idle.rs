@@ -10,8 +10,9 @@ use std::cell::Cell;
 use std::rc::Rc;
 
 use gniri_core::Subscription;
-use gniri_services::idle::{DIM_BRIGHTNESS, Timer};
-use gniri_services::{brightness, session};
+use gniri_services::idle::{BLANK_LOCKED_AFTER, DIM_BRIGHTNESS, Timer};
+use gniri_services::{brightness, notifications, session};
+use gtk::glib;
 
 use crate::services::Services;
 
@@ -90,5 +91,48 @@ pub fn start(services: &Rc<Services>) -> Vec<Subscription> {
             }
         });
 
-    vec![dim, blank_when_idle, blank_when_locked, lock]
+    // `UnlockDialog._wakeUpScreenForSource`: a notification arriving while
+    // the lock screen is on screens that are off turns them on to show it,
+    // unless Do Not Disturb is on. With nobody there they go off again
+    // when they would have.
+    let unseen = |state: &notifications::State| -> usize {
+        crate::lock::notifications::listed(state)
+            .iter()
+            .map(|listed| listed.count)
+            .sum()
+    };
+    let known: Cell<Option<usize>> = Cell::new(None);
+    let wake = services.notifications.state.select(unseen, {
+        let services = Rc::downgrade(services);
+        move |count| {
+            let before = known.replace(Some(*count));
+            let Some(services) = services.upgrade() else {
+                return;
+            };
+            let asleep =
+                || services.session.state.with(|session| session.locked) && blank(&services);
+            if before.is_none_or(|before| *count <= before)
+                || services
+                    .notifications
+                    .state
+                    .with(|state| state.do_not_disturb)
+                || !asleep()
+            {
+                return;
+            }
+            services.power_on_monitors();
+            let services = Rc::downgrade(&services);
+            glib::timeout_add_local_once(BLANK_LOCKED_AFTER, move || {
+                // Still nobody: no input came since.
+                if let Some(services) = services.upgrade()
+                    && services.session.state.with(|session| session.locked)
+                    && blank(&services)
+                {
+                    services.power_off_monitors();
+                }
+            });
+        }
+    });
+
+    vec![dim, blank_when_idle, blank_when_locked, lock, wake]
 }

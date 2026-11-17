@@ -15,6 +15,7 @@
 //! shell, which is holding the machine's sleep back until then, and its exit
 //! status says how it ended (crates/services/src/session/locker.rs).
 
+pub mod notifications;
 mod prompt;
 mod screen;
 
@@ -28,15 +29,15 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use adw::prelude::*;
 use gniri_core::{FixedClock, LocalTime, Store};
 use gniri_services::auth::{self, Authenticator, Message, Outcome};
-use gniri_services::logind;
 use gniri_services::session::locker::{LOCKED_LINE, REFUSED_STATUS};
 use gniri_services::user::User;
+use gniri_services::{Bus, logind, mpris};
 use gtk::{gdk, glib};
 
 use crate::Cli;
 use crate::app;
 use crate::ipc::Role;
-use crate::services::{self, SystemClock};
+use crate::services::{self, CommandLog, Service, SystemClock};
 use crate::surfaces::wallpaper::WallpaperSource;
 
 /// What the prompt says and whether it takes an answer.
@@ -99,6 +100,10 @@ pub struct Lock {
     fingerprint_wake: Option<async_channel::Sender<()>>,
     /// The surfaces, one per output.
     screens: RefCell<Vec<screen::Screen>>,
+    /// What the lock screen lists of the notifications nobody has seen.
+    pub notifications: Store<Vec<notifications::Listed>>,
+    /// The media players, whose cards come first in that list.
+    pub mpris: Service<mpris::State>,
     unlocking: Cell<bool>,
 }
 
@@ -314,6 +319,23 @@ pub fn run(cli: Cli) -> glib::ExitCode {
             }
         }
 
+        // The lock screen asks the players itself: the shell's own
+        // backend is in another process.
+        let mpris = match fixture {
+            Some(fixture) => Service::fake(
+                "mpris",
+                fixture.mpris.clone(),
+                &scheduler,
+                &CommandLog::default(),
+            ),
+            None => {
+                let mut bus = Bus::session();
+                let link = bus.add("mpris", mpris::backend::run);
+                bus.start();
+                Service::live("mpris", link, &scheduler, &CommandLog::default())
+            }
+        };
+
         let instance = (!preview).then(gtk4_session_lock::Instance::new);
         let lock = Rc::new(Lock {
             app: app.clone(),
@@ -327,7 +349,9 @@ pub fn run(cli: Cli) -> glib::ExitCode {
             hour12: config.clock.format().hour12,
             wallpaper: app::wallpaper_source(&options, config),
             time,
-            status: Store::new(Status::default(), scheduler),
+            status: Store::new(Status::default(), Rc::clone(&scheduler)),
+            notifications: Store::new(Vec::new(), scheduler),
+            mpris,
             still: fixture.is_some(),
             start_on_prompt: fixture.is_some_and(|fixture| fixture.lock.prompt),
             fingerprint_wanted,
@@ -342,6 +366,15 @@ pub fn run(cli: Cli) -> glib::ExitCode {
                 while let Ok(report) = incoming.recv().await {
                     let Some(lock) = lock.upgrade() else { break };
                     lock.handle(report);
+                }
+            }
+        });
+        // The shell's notifications, as they change.
+        glib::spawn_future_local({
+            let (listed, store) = (notifications::follow(), lock.notifications.clone());
+            async move {
+                while let Ok(listed) = listed.recv().await {
+                    store.update(|current| *current = listed);
                 }
             }
         });

@@ -164,6 +164,9 @@ pub struct Notification {
     pub acknowledged: bool,
     /// What to play when its banner shows (`MessageTray.Sound`).
     pub sound: Option<Sound>,
+    /// It is about the system rather than the user's own business
+    /// (`x-gnome-privacy-scope` "system"): the lock screen may show it.
+    pub system: bool,
     /// When it arrived or last changed, `YYYY-MM-DDTHH:MM:SS` in a scene.
     #[serde(deserialize_with = "deserialize_time")]
     pub time: LocalTime,
@@ -183,6 +186,7 @@ impl Default for Notification {
             transient: false,
             acknowledged: false,
             sound: None,
+            system: false,
             time: epoch(),
         }
     }

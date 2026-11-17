@@ -72,6 +72,8 @@ pub enum Request {
     EndSession(end_session::Kind),
     /// Close that dialog, as its Cancel button does.
     CloseDialog,
+    /// Report the session as locked or not, as logind would.
+    Locked(bool),
     /// Report an idle timer as passed, or as over, as the compositor would.
     Idle {
         timer: IdleTimer,
@@ -100,6 +102,9 @@ pub enum Request {
     },
     /// Turn to a page of the app grid.
     Page(usize),
+    /// What the lock screen lists of the notifications: answered once it
+    /// is not what the lock screen says it has.
+    LockNotifications(Option<Vec<crate::lock::notifications::Listed>>),
     /// Open an app folder's dialog, by the folder's id; `None` closes it.
     Folder(Option<String>),
     /// Ask a Bluetooth pairing question, as if BlueZ had asked the agent.
@@ -185,6 +190,9 @@ pub struct Notify {
     /// A sound of the sound theme to play when its banner shows.
     #[arg(long)]
     pub sound: Option<String>,
+    /// It is about the system: the lock screen shows what it says.
+    #[arg(long)]
+    pub system: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, clap::ValueEnum)]

@@ -172,7 +172,9 @@ answers `dump-tree` and `sync` on a socket of its own, and the harness
 reads its widgets along with the shell's. A scene's lock screen takes the
 scene's password and never asks PAM; a scene's agent shows the scene's
 request and never talks to polkit. Only a debug build accepts a fixture
-for the lock screen.
+for the lock screen. The lock screen asks the shell for the notifications
+to list, so a scene's lists the scene's (`lock-notifications`, with a media
+player's card, for looking at).
 
 niri takes no screenshot of a locked session. So the scenes that are
 compared with GNOME (`lock`, `lock-prompt`) show a preview: the same

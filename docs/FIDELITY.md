@@ -254,9 +254,16 @@ BlueZ's agent all the time.
   (network, sound, battery, with a reduced quick settings menu). gniri's
   shows the clock and the prompt alone: the volume and brightness keys
   still work, but nothing shows the battery.
-- **No notifications.** GNOME lists who sent notifications while locked,
-  at the bottom of the screen. gniri's lock screen does not, and no banner
-  shows over it. They are in the date menu after unlocking.
+- **Notifications.** As in GNOME: at the foot of the screen, the media
+  players' cards, then each application with notifications nobody has seen,
+  as its icon, its name and a count; notifications about the system
+  (`x-gnome-privacy-scope` "system") in full. No banner shows while the
+  session is locked, and a new notification turns screens that went off
+  back on, unless Do Not Disturb is on. Every application is listed: GNOME
+  Settings' per-application "Lock Screen Notifications" switches are not
+  read. The list does not grow in or shrink away; it changes at once. A
+  player's controls work there, and a click on its card does nothing, as in
+  GNOME.
 - **Changing between clock and prompt.** They cross-fade. GNOME also
   shrinks one away upwards as the other grows in from below, follows a
   swipe on a touch screen, and reacts to scrolling.
@@ -272,7 +279,7 @@ BlueZ's agent all the time.
   PAM's own text. The hint under the clock always says "Click or press a
   key".
 - **Not there:** "Switch User…", the on-screen keyboard, the
-  screen-time-limit shield, media controls.
+  screen-time-limit shield.
 - **Compared over the real wallpaper only.** GNOME's lock screen was
   captured once, by accident, so there are no flat-wallpaper pixels to
   compare with. The blurred background is the overview's (see "Blur").

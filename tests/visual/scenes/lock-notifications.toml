@@ -1,0 +1,33 @@
+# The lock screen with what arrived while nobody looked: a media player's
+# card, an application's notifications as a count, and a notification about
+# the system in full. GNOME was not captured so; the scene is for looking at.
+
+extends = "lock"
+
+[[fixture.mpris.players]]
+bus_name = "org.mpris.MediaPlayer2.example"
+name = "Music"
+icon = { name = "org.gnome.Music" }
+status = "playing"
+title = "A Song With a Rather Long Title That Does Not Fit"
+artists = ["An Artist", "Another Artist"]
+can_play = true
+can_go_next = true
+can_go_previous = false
+
+[[fixture.notifications.sources]]
+key = "app:org.gnome.Software"
+title = "Software"
+icon = { name = "org.gnome.Software" }
+notifications = [
+    { id = 3, title = "Updates Ready to Install", body = "Restart to install them", time = "2026-11-13T22:01:00", system = true },
+]
+
+[[fixture.notifications.sources]]
+key = "Chat"
+title = "Chat"
+icon = { name = "chat-symbolic" }
+notifications = [
+    { id = 2, title = "Ada", body = "Hello?", time = "2026-11-13T22:00:00" },
+    { id = 1, title = "Ada", body = "Are you there?", time = "2026-11-13T21:59:00" },
+]

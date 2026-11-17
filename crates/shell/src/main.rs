@@ -190,6 +190,12 @@ enum DebugRequest {
         #[arg(long)]
         back: bool,
     },
+    /// Report the session locked, or with `--off` unlocked, as logind
+    /// would. The lock screen itself is `gniri lock`.
+    Locked {
+        #[arg(long)]
+        off: bool,
+    },
     /// Report an idle timer as passed, as the compositor would after that
     /// long without input.
     Idle {
@@ -224,6 +230,7 @@ impl Message {
                 DebugRequest::Notify(notify) => ipc::Request::Notify(notify),
                 DebugRequest::CloseDialog => ipc::Request::CloseDialog,
                 DebugRequest::Idle { timer, resumed } => ipc::Request::Idle { timer, resumed },
+                DebugRequest::Locked { off } => ipc::Request::Locked(!off),
                 DebugRequest::ShowApps { off } => ipc::Request::ShowApps(!off),
                 DebugRequest::Search { text, quiet } => ipc::Request::Search { text, quiet },
                 DebugRequest::Page { page } => ipc::Request::Page(page),

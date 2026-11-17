@@ -192,6 +192,63 @@ window.gniri-lock-window {
     }
 }
 
+// Notifications nobody has seen yet, at the foot of the lock screen
+// (crates/shell/src/lock/notifications.rs).
+.unlock-dialog-notifications-container {
+    margin: $base_margin * 3;
+    border-spacing: $base_padding;
+    // $_message_list_width
+    min-width: $message_list_width;
+    background-color: transparent;
+
+    // The media players' cards, as the applications' boxes.
+    .message,
+    .unlock-dialog-notification-source {
+        padding: ($base_margin * 3) ($base_margin * 4);
+        border: none;
+        background-color: transparentize($_gdm_fg, 0.9);
+        color: $_gdm_fg;
+        border-radius: $modal_radius;
+
+        &.critical { background-color: transparentize($_gdm_fg, 0.8); }
+        &:active { background-color: transparentize($_gdm_fg, 0.9); }
+
+        // %lockscreen_button, without its background at rest
+        .message-media-control {
+            color: $_gdm_fg;
+            background-color: transparent;
+
+            &:hover { background-color: transparentize($_gdm_fg, 0.87); }
+            &:active { background-color: transparentize($_gdm_fg, 0.84); }
+            &:disabled {
+                color: $_gdm_fg;
+                background-color: transparent;
+                opacity: 0.5;
+            }
+        }
+
+        .message-header,
+        .message-header .event-time { color: $_gdm_fg; }
+    }
+}
+
+.unlock-dialog-notification-icon {
+    -gtk-icon-size: $large_icon_size;
+}
+
+.unlock-dialog-notification-label {
+    padding-left: $base_padding * 2;
+    padding-right: 0;
+}
+
+.unlock-dialog-notification-count-text {
+    font-weight: bold;
+    padding: 0 ($base_padding * 2);
+    color: $_gdm_fg;
+    background-color: transparentize($_gdm_fg, 0.9);
+    border-radius: $forced_circular_radius;
+}
+
 :root {
     --gniri-lock-bg-color: #{$_gdm_bg};
     --gniri-lock-fg-color: #{$_gdm_fg};

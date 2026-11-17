@@ -5,6 +5,7 @@
 
 mod group;
 mod list;
+pub mod media;
 mod message;
 
 use std::rc::Rc;

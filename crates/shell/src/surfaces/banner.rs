@@ -367,13 +367,14 @@ impl Inner {
             .state
             .with(|state| (state.banner, !state.queue.is_empty()));
         // `Main.messageTray.bannerBlocked`: no banners over the list they
-        // would end up in.
+        // would end up in, nor under the lock screen, which lists what
+        // was not seen.
         let blocked = self.services.menus.with(|menus| {
             menus
                 .open
                 .as_ref()
                 .is_some_and(|open| open.menu == Menu::DateMenu)
-        });
+        }) || self.services.session.state.with(|session| session.locked);
 
         match self.phase.get() {
             Phase::Hidden => match wanted {
@@ -495,6 +496,10 @@ impl Tray {
                     let update = update(&inner);
                     move |_| update()
                 }),
+            services.session.state.select(|session| session.locked, {
+                let update = update(&inner);
+                move |_| update()
+            }),
         ];
         Self {
             _inner: inner,

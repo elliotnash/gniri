@@ -800,6 +800,11 @@ impl Services {
     pub fn power_off_monitors(&self) {
         self.drastic_niri_action(niri_ipc::Action::PowerOffMonitors {});
     }
+
+    /// Turns the screens back on.
+    pub fn power_on_monitors(&self) {
+        self.drastic_niri_action(niri_ipc::Action::PowerOnMonitors {});
+    }
 }
 
 /// The settings application to start: the configured one, if it is

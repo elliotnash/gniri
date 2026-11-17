@@ -15,6 +15,7 @@ use gniri_services::notifications::{self, Command};
 use gtk::prelude::*;
 
 use super::group::MessageGroup;
+use super::media::MediaCard;
 use super::message::Message;
 use super::{notification_message, show_notification};
 use crate::services::Services;
@@ -24,13 +25,6 @@ struct Group {
     title: gtk::Label,
     /// By notification id.
     messages: HashMap<u32, Message>,
-}
-
-struct MediaCard {
-    message: Message,
-    play_pause: gtk::Button,
-    previous: gtk::Button,
-    next: gtk::Button,
 }
 
 struct Inner {
@@ -55,27 +49,16 @@ pub struct MessageList {
     _subscriptions: Vec<Subscription>,
 }
 
-/// `MediaMessage`
+/// `MediaMessage` in the list: its controls go to the player, and a
+/// click brings the player up and closes the menu.
 fn media_card(inner: &Rc<Inner>, bus_name: &str) -> MediaCard {
-    let message = Message::new();
-    message.root().add_css_class("media-message");
-    message.set_close_visible(false);
-    message.set_time(None);
-
-    let control = |icon: &str, command: fn(String) -> mpris::Command| {
-        let (services, bus_name) = (Rc::clone(&inner.services), bus_name.to_owned());
-        message.add_media_control(icon, move || {
-            services.mpris.send(command(bus_name.clone()));
-        })
+    let send = {
+        let services = Rc::clone(&inner.services);
+        move |command: mpris::Command| services.mpris.send(command)
     };
-    let previous = control("media-skip-backward-symbolic", mpris::Command::Previous);
-    let play_pause = control("media-playback-start-symbolic", mpris::Command::PlayPause);
-    let next = control("media-skip-forward-symbolic", mpris::Command::Next);
-
-    // `MediaMessage.vfunc_clicked`: bring the player up.
-    message.connect_clicked({
-        let (services, bus_name) = (Rc::clone(&inner.services), bus_name.to_owned());
-        move || {
+    let raise = {
+        let services = Rc::clone(&inner.services);
+        move |bus_name: &str| {
             let player = services.mpris.state.with(|state| {
                 state
                     .players
@@ -94,35 +77,13 @@ fn media_card(inner: &Rc<Inner>, bus_name: &str) -> MediaCard {
                 .as_deref()
                 .is_some_and(|app| services.launch_app(app));
             if !started && player.can_raise {
-                services.mpris.send(mpris::Command::Raise(bus_name.clone()));
+                services
+                    .mpris
+                    .send(mpris::Command::Raise(bus_name.to_owned()));
             }
         }
-    });
-    MediaCard {
-        message,
-        play_pause,
-        previous,
-        next,
-    }
-}
-
-impl MediaCard {
-    /// `MediaMessage._update`
-    fn update(&self, player: &Player) {
-        self.message.set_source(&player.name, player.icon.as_ref());
-        self.message.set_title(&player.title);
-        self.message.set_body(&player.artists_text());
-        self.message.set_icon(Some(&player.picture()));
-        if let Some(image) = self
-            .play_pause
-            .child()
-            .and_then(|child| child.downcast::<gtk::Image>().ok())
-        {
-            image.set_icon_name(Some(player.play_pause_icon()));
-        }
-        self.previous.set_sensitive(player.can_go_previous);
-        self.next.set_sensitive(player.can_go_next);
-    }
+    };
+    MediaCard::new(bus_name, send, raise)
 }
 
 impl Inner {

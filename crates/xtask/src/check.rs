@@ -1905,6 +1905,14 @@ fn end_session_and_idle() -> Result<(usize, usize)> {
     checker.expect("`gniri msg lock` asks the same", |session| {
         Ok(locks(session)? == 2)
     });
+    checker.session.gniri_msg(&["debug", "locked"])?;
+    checker
+        .session
+        .gniri_msg(&["debug", "notify", "--app", "Chat", "Ada", "Wake up"])?;
+    checker.expect(
+        "a notification while locked turns the screens on to show it",
+        |session| sent(session, "niri: PowerOnMonitors"),
+    );
 
     let Checker {
         session,
@@ -1948,6 +1956,27 @@ fn lock_screen() -> Result<(usize, usize)> {
     checker.expect("(the desktop shows before)", |session| {
         Ok(near(pixel(session, BAR.0, BAR.1)?, [53, 53, 55]))
     });
+    // What arrives while the session is locked waits for the lock screen
+    // to list it: no banner shows it, under the lock.
+    checker.session.gniri_msg(&["debug", "locked"])?;
+    for arguments in [
+        vec!["--app", "Chat", "Ada", "Are you there?"],
+        vec!["--app", "Chat", "Ada", "Hello?"],
+        vec![
+            "--app",
+            "Updates",
+            "--system",
+            "Updates are ready",
+            "Restart to install",
+        ],
+    ] {
+        let mut all = vec!["debug", "notify"];
+        all.extend(arguments);
+        checker.session.gniri_msg(&all)?;
+    }
+    checker.expect("no banner shows while the session is locked", |session| {
+        Ok(surface(session, "gniri-banner")?.is_none())
+    });
     checker.session.spawn_helper("lock")?;
     checker.expect("the locker says when the compositor has locked", |_| {
         Ok(fs::read_to_string(&log).is_ok_and(|log| log.lines().any(|line| line == "locked")))
@@ -1963,6 +1992,20 @@ fn lock_screen() -> Result<(usize, usize)> {
                 "Click or press a key",
             ]
             && on_lock(session, PROMPT)?.is_none())
+    });
+    checker.expect("under it, who sent what nobody has seen", |session| {
+        let Some(list) = on_lock(session, "#unlockDialogNotifications")? else {
+            return Ok(false);
+        };
+        // Newest first, as in the notification list; what is about the
+        // system in full, the rest as a count.
+        Ok(texts(&list)
+            == [
+                "Updates",
+                "Updates are ready Restart to install",
+                "Chat",
+                "2",
+            ])
     });
     key_until(&checker.session, "Return", |session| {
         Ok(on_lock(session, PROMPT)?.is_some())
