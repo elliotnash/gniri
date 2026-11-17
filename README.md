@@ -16,7 +16,8 @@ What it is:
   not disturb), and the date menu with the calendar and its events, world
   clocks, the notification list and media player controls;
 - what a session needs to be lived in: the lock screen (password and
-  fingerprint), dimming, blanking and locking when idle, locking before
+  fingerprint, with the notifications that came meanwhile and the media
+  players' controls), dimming, fading out and locking when idle, locking before
   sleep, the dialog that asks before restarting, powering off or logging
   out, and the polkit authentication agent;
 - GNOME's dress for niri's overview: the search entry, the dash with the
@@ -151,8 +152,10 @@ offer GNOME Shell results over D-Bus, starting them as GNOME does;
 
 gniri locks the screen itself (`gniri msg lock`, the lock button, `loginctl
 lock-session`), before the machine sleeps, and after five minutes without
-input, having dimmed the screen first and turning it off as it locks. The
-delays are in the config file.
+input, having dimmed the screen first and then faded it to black over ten
+seconds (any input before then brings everything back). The delays are in
+the config file. While it is locked, the lock screen lists who sent
+notifications, and a new one turns the screens on to show it.
 
 **Read "The real session" in `docs/TESTING.md` before you first lock**: it
 says how to get back in from another terminal if the lock screen ever
@@ -178,7 +181,8 @@ asks for a password when a program needs privileges).
 
 A click on a network in the Wi-Fi menu joins it. If it wants a password,
 NetworkManager asks gniri and gniri asks you; NetworkManager keeps the
-password. A network that wants more than a password (a user name, a
+password, or, for a network set to keep it for your user only, gniri keeps
+it in the keyring (as GNOME does, where GNOME and nm-applet find it too). A network that wants more than a password (a user name, a
 certificate) has to be set up in a settings application first.
 
 The Bluetooth menu lists the devices that are set up, as GNOME's does, and

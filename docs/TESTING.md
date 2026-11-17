@@ -215,8 +215,8 @@ part's name after `check` runs that one alone.
 | `notifications` | Banners, the list, do not disturb, sounds |
 | `calendar` | The date menu's events and world clocks |
 | `notifications-bus` | The same over D-Bus, with `notify-send` |
-| `session` | The end-session dialog and what idleness does |
-| `lock` | The lock screen, locking the nested session for real |
+| `session` | The end-session dialog, what idleness does, a notification waking the screens |
+| `lock` | The lock screen, locking the nested session for real, and the notifications it lists |
 | `polkit` | The authentication dialog |
 | `agents` | The Wi-Fi password and Bluetooth pairing dialogs |
 | `config` | The config file changing under a running shell |
@@ -237,6 +237,15 @@ translated, and nobody reading English would see why.
 virtual pointer), since `wlrctl` can click but not hold a button down. It
 leaves two pictures of drags under way, `target/visual/drag-room.png` and
 `drag-folder-preview.png`, to look at.
+
+The network agent's bus test (`crates/services/tests/network_agent_bus.rs`)
+runs a gnome-keyring of its own on its private bus, with a login keyring
+made for it and unlocked from its standard input, to check what is kept
+there; the agent's other tests run without a keyring, and none of them
+touches the user's. It is skipped where gnome-keyring is not installed.
+
+None of the checks sees an animation: a scene's shell shows the end of
+each at once. "Watching things move" above says how to look at them.
 
 Two of the others need saying more about.
 

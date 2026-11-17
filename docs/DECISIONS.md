@@ -784,7 +784,7 @@ was unlocked by `loginctl unlock-session`.
 - **The niri fragment is validated by a test**, as written and as
   installed, where the plan had it as a rule to remember.
 
-## M7: what the folders, the drags, the languages and the light style taught
+## M7: what the folders, the drags, the languages, the light style and the motion taught
 
 ### Looks
 
@@ -846,6 +846,36 @@ was unlocked by `loginctl unlock-session`.
   are on. The tests run a gnome-keyring of their own on the private bus,
   with a login keyring made for them and unlocked from its standard
   input, so that nothing of the user's is touched and nothing asks.
+
+### Motion
+
+- **One easing helper, after Clutter's `ease_property`** (`Eased`): a
+  value eased by libadwaita's animation, tied to a widget. libadwaita
+  skips an animation to its end while the widget is not mapped and when
+  GTK's animations are off, as `Main.overview` and St do, so a scene's
+  shell sees only ends and nothing hidden animates.
+- **GNOME's scales are a bin's** (`ScaleBin`): what it takes up scaled
+  (`ScaleLayout`, the dash's items) or only how it looks (an actor's
+  scale, the lock screen's clock and prompt), the child allocated at its
+  own size with a transform. Still never for what the compositor blurs:
+  the banner keeps its plain slide, and the menus do not grow.
+- **What goes is kept until it has gone.** Lists rebuilt from the state
+  (the dash, the message list, the workspace dots) keep a leaving item in
+  its place while it shrinks away, and only then take it out.
+- **Some layouts take a progress**, as GNOME's do: a message group's
+  between the stack and the open list, the overview's grid between below
+  the screen and its place, the lock screen's stack between the clock's
+  height and the prompt's. The last fixed a layout: the stack had always
+  measured as tall as the prompt, which on a small screen left the
+  notifications no room under the clock.
+- **The folder dialog draws its own blur, so it carries it while it
+  zooms**: what it draws behind itself is placed by its bounds on screen,
+  not in its own coordinates, and stays put while the dialog is scaled.
+- **A headless mutter is a host that always draws.** A nested niri draws
+  only when its host shows its window; behind the host's lock screen
+  every animation stands still. mutter's `--headless --virtual-monitor`
+  hosts it instead, for watching motion (not for the pixel comparisons:
+  its output scale is not the reference's).
 
 ### Harness
 
