@@ -1,0 +1,7 @@
+# An app folder's dialog open over the app grid. For looking at: GNOME was
+# not captured with one open.
+
+extends = "app-grid-folders"
+
+[[steps]]
+gniri = ["debug", "open-folder", "Utilities"]

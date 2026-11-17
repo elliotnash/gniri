@@ -124,3 +124,9 @@ $tile_transition: 100ms;
     --gniri-tile-padding: #{$tile_padding};
     --gniri-tile-transition: #{$tile_transition};
 }
+
+// The room made in the dash for something dragged to it
+// (`DragPlaceholderItem`): nothing is drawn there. Its size is the code's.
+#dash .dash-item-container .placeholder {
+    background: none;
+}

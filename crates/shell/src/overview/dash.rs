@@ -2,8 +2,9 @@
 
 //! The dash: the favourite and the running applications in a row at the
 //! bottom of the overview, and the button that opens the app grid. Port of
-//! `Dash` and `ShowAppsIcon` in `js/ui/dash.js`, without dragging and
-//! without the items' menus.
+//! `Dash` and `ShowAppsIcon` in `js/ui/dash.js`, without the items' menus.
+//! Dragging an item, or an application to the dash, is `overview/drag.rs`;
+//! this module only shows where it would go.
 //!
 //! Widget tree, with the actors it stands for:
 //!
@@ -15,6 +16,8 @@
 //!       box.dash-apps                   the box of application items
 //!         box.dash-item-container         DashItemContainer
 //!           button.overview-tile            DashIcon (overview/icon.rs)
+//!         box.dash-item-container         DragPlaceholderItem, during a drag
+//!           box.placeholder
 //!         box.dash-separator
 //!       box.dash-item-container         ShowAppsIcon
 //!         button.show-apps
@@ -30,15 +33,14 @@
 //! constraint; here the two share a `GtkOverlay` that is measured by the
 //! container.
 
-use gniri_core::tr;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::time::Duration;
 
-use gniri_core::Subscription;
+use gniri_core::{Subscription, tr};
 use gniri_services::apps::{self, DashItem};
-use gtk::glib;
 use gtk::prelude::*;
+use gtk::{glib, graphene};
 
 use super::icon::{self, DashButton};
 use super::layout::{self, DashMetrics};
@@ -105,6 +107,12 @@ struct Inner {
     label_showing: Cell<bool>,
     /// Counts shows and hides, so one that was overtaken does nothing.
     label_generation: Cell<u64>,
+    /// Where something dragged would go among the favourites, with the room
+    /// made for it there.
+    placeholder: RefCell<Option<(usize, gtk::Box)>>,
+    /// An application that is a favourite is over the show-apps button:
+    /// letting go of it unpins it.
+    unpin: Cell<bool>,
 }
 
 pub struct Dash {
@@ -225,10 +233,7 @@ impl Inner {
 
     /// The dash as it should be now.
     fn dash(&self) -> apps::Dash {
-        let favorites = self
-            .services
-            .config
-            .with(|config| config.dash.favorites.clone());
+        let favorites = self.services.favorites();
         self.services.niri.with(|niri| {
             self.services
                 .apps
@@ -246,10 +251,43 @@ impl Inner {
             .find(|item| item.id == id)
     }
 
+    /// Makes room for something dragged at `position` among the items of
+    /// the dash, or takes the room away (`DragPlaceholderItem`).
+    fn set_placeholder(&self, position: Option<usize>) {
+        if self.placeholder.borrow().as_ref().map(|(at, _)| *at) == position {
+            return;
+        }
+        if let Some((_, old)) = self.placeholder.take() {
+            self.apps.remove(&old);
+        }
+        let Some(position) = position else {
+            return;
+        };
+        let size = self.icon_size.get();
+        let gap = gtk::Box::builder()
+            .css_classes(["placeholder"])
+            .width_request(size)
+            .height_request(size / 2)
+            .valign(gtk::Align::Center)
+            .build();
+        let holder = container(&gap);
+        // After the item that comes before it, the separator not counted.
+        let items = self.items.borrow();
+        match position.checked_sub(1).and_then(|before| items.get(before)) {
+            Some(before) => self
+                .apps
+                .insert_child_after(&holder, Some(&before.container)),
+            None => self.apps.prepend(&holder),
+        }
+        drop(items);
+        self.placeholder.replace(Some((position, holder)));
+    }
+
     /// Makes the row show `dash` (`Dash._redisplay`). The items of
     /// applications that stay are kept, so a pointer over one stays over
     /// it.
     fn sync(self: &Rc<Self>, dash: &apps::Dash) {
+        self.set_placeholder(None);
         let wanted: Vec<&DashItem> = dash.favorites.iter().chain(&dash.running).collect();
         let shown = |item: &DashItem| (item.id.clone(), item.name.clone(), item.icon.clone());
         let mut items = self.items.borrow_mut();
@@ -391,6 +429,142 @@ impl Dash {
         ))
     }
 
+    /// The application of the item whose button `widget` is or is inside,
+    /// and whether it is a favourite.
+    pub fn item_of(&self, widget: &gtk::Widget) -> Option<(String, bool)> {
+        let items = self.inner.items.borrow();
+        let favorites = self.inner.favorites.get();
+        let mut current = Some(widget.clone());
+        while let Some(widget) = current {
+            if let Some(index) = items
+                .iter()
+                .position(|item| item.button.button.upcast_ref::<gtk::Widget>() == &widget)
+            {
+                return Some((items[index].shown.0.clone(), index < favorites));
+            }
+            current = widget.parent();
+        }
+        None
+    }
+
+    /// The button of the item of `app`, to hide while it is dragged.
+    pub fn button_of(&self, app: &str) -> Option<gtk::Button> {
+        self.inner
+            .items
+            .borrow()
+            .iter()
+            .find(|item| item.shown.0 == app)
+            .map(|item| item.button.button.clone())
+    }
+
+    /// The size of the dash's icons.
+    pub fn icon_size(&self) -> i32 {
+        self.inner.icon_size.get()
+    }
+
+    /// Where among the favourites something dragged to `(x, y)` of
+    /// `relative_to` would go, if it is over the dash's items
+    /// (`Dash.handleDragOver`): a place in the row as it shows, at most
+    /// after the last favourite. `own` is where the dragged application is
+    /// among the favourites, if it is one: just before or after it is
+    /// where it already is, and no place.
+    pub fn place_at(
+        &self,
+        relative_to: &impl IsA<gtk::Widget>,
+        (x, y): (f64, f64),
+        own: Option<usize>,
+    ) -> Option<Option<usize>> {
+        let inner = &self.inner;
+        let background = self.background();
+        let point = relative_to
+            .as_ref()
+            .compute_point(&background, &graphene::Point::new(x as f32, y as f32))?;
+        let inside = point.x() >= 0.0
+            && point.y() >= 0.0
+            && point.x() <= background.width() as f32
+            && point.y() <= background.height() as f32;
+        if !inside {
+            return None;
+        }
+        // Over the show-apps button: that is no place in the row.
+        let over_show_apps = relative_to
+            .as_ref()
+            .compute_point(
+                &inner.show_apps.button,
+                &graphene::Point::new(x as f32, y as f32),
+            )
+            .is_some_and(|point| {
+                point.x() >= 0.0 && point.x() <= inner.show_apps.button.width() as f32
+            });
+        if over_show_apps {
+            return None;
+        }
+        let box_x = relative_to
+            .as_ref()
+            .compute_point(&inner.apps, &graphene::Point::new(x as f32, y as f32))?
+            .x();
+        let items = inner.items.borrow();
+        let count = items.len();
+        // The room for the placeholder and the separator left out.
+        let width: i32 = items.iter().map(|item| item.container.width()).sum();
+        let favorites = inner.favorites.get();
+        let position = if count == 0 || width <= 0 {
+            0
+        } else {
+            let position = (f64::from(box_x) * count as f64 / f64::from(width)).floor();
+            (position.max(0.0) as usize).min(favorites)
+        };
+        if own.is_some_and(|own| position == own || position == own + 1) {
+            return Some(None);
+        }
+        Some(Some(position))
+    }
+
+    /// Shows the room for something dragged at `position`, or none.
+    pub fn show_placeholder(&self, position: Option<usize>) {
+        self.inner.set_placeholder(position);
+    }
+
+    /// Whether `(x, y)` of `relative_to` is on the show-apps button.
+    pub fn over_show_apps(&self, relative_to: &impl IsA<gtk::Widget>, (x, y): (f64, f64)) -> bool {
+        let button = &self.inner.show_apps.button;
+        relative_to
+            .as_ref()
+            .compute_point(button, &graphene::Point::new(x as f32, y as f32))
+            .is_some_and(|point| {
+                point.x() >= 0.0
+                    && point.y() >= 0.0
+                    && point.x() <= button.width() as f32
+                    && point.y() <= button.height() as f32
+            })
+    }
+
+    /// A favourite dragged over the show-apps button would be unpinned
+    /// there: the button is drawn hovered and named "Unpin"
+    /// (`ShowAppsIcon.setDragApp`).
+    pub fn set_unpin(&self, unpin: bool) {
+        let inner = &self.inner;
+        if inner.unpin.replace(unpin) == unpin {
+            return;
+        }
+        let button = &inner.show_apps.button;
+        if unpin {
+            button.set_state_flags(gtk::StateFlags::PRELIGHT, false);
+        } else {
+            button.unset_state_flags(gtk::StateFlags::PRELIGHT);
+        }
+        let container = button
+            .parent()
+            .and_then(|parent| parent.downcast::<gtk::Box>().ok());
+        if let Some(container) = container {
+            if unpin {
+                inner.show_label(&container, &tr("Unpin"));
+            } else {
+                inner.hide_label();
+            }
+        }
+    }
+
     /// The part that is drawn: what takes pointer input while the windows
     /// show around it.
     pub fn background(&self) -> gtk::Widget {
@@ -476,6 +650,8 @@ pub fn build(services: &Rc<Services>) -> Dash {
         label_timer: RefCell::new(None),
         label_showing: Cell::new(false),
         label_generation: Cell::new(0),
+        placeholder: RefCell::new(None),
+        unpin: Cell::new(false),
     });
     inner.hook_label(
         &show_apps_container,
@@ -493,10 +669,13 @@ pub fn build(services: &Rc<Services>) -> Dash {
         }
     };
     let subscriptions = vec![
-        services.apps.state.select(|apps| apps.installed.clone(), {
-            let refresh = refresh.clone();
-            move |_| refresh()
-        }),
+        services.apps.state.select(
+            |apps| (apps.installed.clone(), apps.layout.favorites.clone()),
+            {
+                let refresh = refresh.clone();
+                move |_| refresh()
+            },
+        ),
         services.niri.select(|niri| niri.windows.clone(), {
             let refresh = refresh.clone();
             move |_| refresh()

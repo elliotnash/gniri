@@ -9,9 +9,11 @@
 //! windows are open, and [`State::dash`] puts the two together.
 
 pub mod backend;
+pub mod layout;
 
 use serde::Deserialize;
 
+pub use self::layout::{Entry, Folder, GridItem, Layout, ShownFolder};
 use crate::desktop_entry::{self, DesktopEntry};
 use crate::model::Model;
 use crate::niri::Window;
@@ -201,6 +203,11 @@ pub struct Dash {
 pub struct State {
     /// Every application that is to be shown, by name.
     pub installed: Vec<App>,
+    /// How they are arranged: GNOME's own arrangement until the user has
+    /// dragged something. A scene that says nothing has them in name
+    /// order, as its captures were taken.
+    #[serde(default = "Layout::none")]
+    pub layout: Layout,
 }
 
 #[derive(Debug)]
@@ -213,6 +220,9 @@ pub enum Event {
 pub enum Command {
     /// Look again: something may have been installed or removed.
     Refresh,
+    /// Arrange the applications like this. No backend hears it: the
+    /// arrangement is the shell's own to keep.
+    Arrange(Layout),
 }
 
 impl Model for State {
@@ -228,7 +238,12 @@ impl Model for State {
         }
     }
 
-    fn predict(&mut self, _command: &Command) {}
+    fn predict(&mut self, command: &Command) {
+        match command {
+            Command::Refresh => {}
+            Command::Arrange(layout) => self.layout = layout.clone(),
+        }
+    }
 }
 
 /// Orders applications as GNOME's app grid does before anyone has moved an
@@ -239,7 +254,7 @@ fn sort_by_name(apps: &mut [App]) {
 
 /// A desktop entry id as written in a list of favourites: with or without
 /// ".desktop".
-fn bare_id(id: &str) -> &str {
+pub(crate) fn bare_id(id: &str) -> &str {
     id.strip_suffix(".desktop").unwrap_or(id)
 }
 

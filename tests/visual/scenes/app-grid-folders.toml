@@ -1,0 +1,35 @@
+# The app grid with two folders of the scene's applications, arranged as
+# a drag would leave them: GNOME's own two folder names, and one of the
+# user's. Nothing of GNOME was captured in this state: for looking at,
+# and for `cargo xtask check folders`.
+
+extends = "app-grid"
+
+[fixture.apps.layout]
+grid = [
+    "org.example.Maps",
+    { folder = "Utilities" },
+    "org.example.Boxes",
+    { folder = "folder-1" },
+]
+
+[[fixture.apps.layout.folders]]
+id = "Utilities"
+name = "X-GNOME-Shell-Utilities.directory"
+translate = true
+apps = [
+    "org.example.DocumentViewer",
+    "org.example.Fonts",
+    "org.example.ImageViewer",
+    "org.example.Passwords",
+    "org.example.ZipArchives",
+]
+
+[[fixture.apps.layout.folders]]
+id = "folder-1"
+name = "Office"
+apps = [
+    "org.example.Writer",
+    "org.example.Spreadsheets",
+    "org.example.Presentations",
+]

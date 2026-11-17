@@ -68,9 +68,9 @@ lists everything known to fall outside that, and why.
   not supported. The device list is built as GNOME's library builds it, from
   memory of that library rather than its source.
 - **Night Light** is on while its toggle is, at one colour temperature from
-  the config file. GNOME's follows a schedule and fades in. The toggle is
-  off again after a restart.
-- **Do Not Disturb** is off again after a restart; GNOME keeps it in a
+  the config file. GNOME's follows a schedule and fades in. Whether it is
+  on is kept in gniri's state file (see "Settings").
+- **Do Not Disturb** is kept in the state file too; GNOME keeps it in a
   setting.
 - **Brightness** follows what gniri sets and what the kernel reports when
   the menu opens; a change made by another program while the menu is open is
@@ -307,9 +307,14 @@ search results to it and takes none of niri's own away.
 
 ## Dash
 
-- **Favourites** are set in the config file. Nothing can be dragged to or
-  within the dash, and an item has no menu: no "Pin to Dash", "New
-  Window" or "Quit", no list of its windows.
+- **Favourites** are the config file's list until something is dragged to,
+  within or out of the dash; from then on they are the state file's,
+  until the config file is given another list. An item has no menu: no
+  "Pin to Dash", "New Window" or "Quit", no list of its windows.
+- **Dragging** works as in GNOME: to the dash to pin, within it, onto the
+  apps button to unpin ("Unpin"). Applications cannot be dragged from
+  the search results, nor onto a workspace to open there. An item makes
+  room and is moved at once where GNOME's grow and shrink.
 - **A click** on an application that runs goes to the window of its that
   was used last. GNOME shows all its windows when there are several, and
   starts a new one on a middle click or with Ctrl held.
@@ -329,10 +334,23 @@ search results to it and takes none of niri's own away.
 
 ## App grid
 
-- **Order.** By name. GNOME's can be rearranged by dragging and keeps the
-  arrangement.
-- **Folders.** There are none: what GNOME keeps in "Utilities" and
-  "System" is in the grid with everything else. No icon can be dragged.
+- **Order and folders** are GNOME's to start with: its default order and
+  its two folders, "Utilities" and "System". Dragging rearranges them as
+  in GNOME (a place in the grid, onto another application to make a
+  folder, into a folder, out of one, a page turned at the grid's edge),
+  and the arrangement is kept in gniri's state file, not in GNOME's
+  settings: an arrangement made in GNOME does not carry over.
+- **Pages are always full.** GNOME keeps an icon on the page it was put
+  on, and a page can end before it is full; here the icons flow from one
+  page to the next.
+- **A folder's dialog** fades in and out; GNOME's also grows out of the
+  folder's icon and back. The blur behind it is gniri's own: the
+  compositor cannot blur what is on gniri's surface under another part of
+  it, so the dialog draws the overview again behind itself, blurred and
+  dimmed as blur-my-shell's blur would have it.
+- **A new folder** is called by the category its applications share if
+  a desktop directory file names it, else "Unnamed Folder", as in GNOME;
+  its id is a number where GNOME's is random.
 - **A long name** is cut short. GNOME shows all of it, on two lines,
   while the pointer is on the icon.
 - **Turning the page** by its arrows, by scrolling, by a click on a page's
@@ -437,6 +455,10 @@ installed for the user's language, gniri is in that language.
 
 ## Settings
 
+- **What the shell itself changes** (how the applications are arranged,
+  Do Not Disturb and Night Light) is kept in a state file,
+  `~/.local/state/gniri/state.toml`, which is the shell's to write. One
+  that cannot be read is set aside and the shell starts afresh.
 - **One file.** What GNOME keeps in GSettings and shows in GNOME Settings
   is, as far as gniri has it, in `~/.config/gniri/config.toml`
   (docs/CONFIG.md). A change to the file takes effect at once. GNOME

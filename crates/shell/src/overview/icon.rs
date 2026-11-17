@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! The icons the overview is made of. Port of `BaseIcon` (iconGrid.js),
-//! and of `AppIcon` and `AppViewItem` (appDisplay.js) without their menus
-//! and without dragging.
+//! and of `AppIcon`, `FolderIcon` and `AppViewItem` (appDisplay.js)
+//! without their menus. Dragging them is `overview/drag.rs`.
 //!
 //! Widget trees, with the actors they stand for:
 //!
@@ -14,6 +14,14 @@
 //!         image                         its StIcon
 //!         label
 //!     box.app-grid-running-dot
+//!
+//! button.overview-tile.app-folder     FolderIcon
+//!   overlay
+//!     GniriSquareBin.overview-icon.overview-icon-with-label
+//!       box
+//!         grid.folder-icon              FolderView.createFolderIcon
+//!           image ...                     up to four of its applications
+//!         label
 //!
 //! button.overview-tile | button.show-apps     DashIcon, ShowAppsIcon's button
 //!   overlay
@@ -64,12 +72,74 @@ fn running_dot() -> gtk::Box {
         .build()
 }
 
+/// appDisplay.js `FOLDER_SUBICON_FRACTION`: how large the icons in a
+/// folder's icon are, of the folder's.
+const FOLDER_SUBICON_FRACTION: f64 = 0.4;
+
+/// A folder's icon: four of its applications' icons, two by two, in a
+/// square as large as an application's icon.
+#[derive(Clone)]
+pub struct FolderIcon {
+    pub grid: gtk::Grid,
+    images: [gtk::Image; 4],
+}
+
+impl FolderIcon {
+    fn new(size: i32) -> Self {
+        let grid = gtk::Grid::builder()
+            .css_classes(["folder-icon"])
+            .row_homogeneous(true)
+            .column_homogeneous(true)
+            .halign(gtk::Align::Center)
+            .valign(gtk::Align::Center)
+            .build();
+        let images: [gtk::Image; 4] = std::array::from_fn(|_| image(0));
+        for (index, image) in images.iter().enumerate() {
+            let rtl = grid.direction() == gtk::TextDirection::Rtl;
+            let column = if rtl { (index + 1) % 2 } else { index % 2 };
+            grid.attach(image, column as i32, (index / 2) as i32, 1, 1);
+        }
+        let icon = Self { grid, images };
+        icon.set_size(size);
+        icon
+    }
+
+    fn set_size(&self, size: i32) {
+        self.grid.set_size_request(size, size);
+        let sub_size = (FOLDER_SUBICON_FRACTION * f64::from(size)).floor() as i32;
+        for image in &self.images {
+            image.set_pixel_size(sub_size);
+        }
+    }
+
+    /// Shows the first four of these icons; the rest of the square stays
+    /// empty.
+    pub fn set_icons(&self, icons: &[Option<String>]) {
+        for (index, image) in self.images.iter().enumerate() {
+            match icons.get(index) {
+                Some(icon) => {
+                    set_app_icon(image, icon.as_deref());
+                    image.set_child_visible(true);
+                }
+                None => image.set_child_visible(false),
+            }
+        }
+    }
+}
+
+/// What a tile shows above its name.
+#[derive(Clone)]
+enum TileIcon {
+    App(gtk::Image),
+    Folder(FolderIcon),
+}
+
 /// An icon with its name under it: an application in the grid or among the
-/// search results.
+/// search results, or a folder.
 #[derive(Clone)]
 pub struct Tile {
     pub button: gtk::Button,
-    image: gtk::Image,
+    icon: TileIcon,
     label: gtk::Label,
     dot: gtk::Box,
 }
@@ -77,6 +147,21 @@ pub struct Tile {
 impl Tile {
     pub fn new(icon_size: i32) -> Self {
         let image = image(icon_size);
+        Self::with_icon(TileIcon::App(image))
+    }
+
+    /// A folder's tile.
+    pub fn new_folder(icon_size: i32) -> Self {
+        let tile = Self::with_icon(TileIcon::Folder(FolderIcon::new(icon_size)));
+        tile.button.add_css_class("app-folder");
+        tile
+    }
+
+    fn with_icon(icon: TileIcon) -> Self {
+        let widget: gtk::Widget = match &icon {
+            TileIcon::App(image) => image.clone().upcast(),
+            TileIcon::Folder(folder) => folder.grid.clone().upcast(),
+        };
         let label = gtk::Label::builder()
             .ellipsize(pango::EllipsizeMode::End)
             .justify(gtk::Justification::Center)
@@ -87,14 +172,14 @@ impl Tile {
         let column = gtk::Box::builder()
             .orientation(gtk::Orientation::Vertical)
             .build();
-        column.append(&image);
+        column.append(&widget);
         column.append(&label);
-        let icon = SquareBin::new(&column);
-        icon.add_css_class("overview-icon");
-        icon.add_css_class("overview-icon-with-label");
+        let square = SquareBin::new(&column);
+        square.add_css_class("overview-icon");
+        square.add_css_class("overview-icon-with-label");
 
         let dot = running_dot();
-        let overlay = gtk::Overlay::builder().child(&icon).build();
+        let overlay = gtk::Overlay::builder().child(&square).build();
         overlay.add_overlay(&dot);
         let button = gtk::Button::builder()
             .css_classes(["overview-tile"])
@@ -103,7 +188,7 @@ impl Tile {
             .build();
         Self {
             button,
-            image,
+            icon,
             label,
             dot,
         }
@@ -111,12 +196,69 @@ impl Tile {
 
     pub fn set(&self, name: &str, icon: Option<&str>) {
         self.label.set_label(name);
-        set_app_icon(&self.image, icon);
+        if let TileIcon::App(image) = &self.icon {
+            set_app_icon(image, icon);
+        }
+        self.button.set_widget_name(name);
+    }
+
+    /// A folder's name and the icons of its first applications.
+    pub fn set_folder(&self, name: &str, icons: &[Option<String>]) {
+        self.label.set_label(name);
+        if let TileIcon::Folder(folder) = &self.icon {
+            folder.set_icons(icons);
+        }
         self.button.set_widget_name(name);
     }
 
     pub fn set_icon_size(&self, size: i32) {
-        self.image.set_pixel_size(size);
+        match &self.icon {
+            TileIcon::App(image) => image.set_pixel_size(size),
+            TileIcon::Folder(folder) => folder.set_size(size),
+        }
+    }
+
+    /// What follows the pointer while the tile is dragged: its icon, at
+    /// `size`.
+    pub fn drag_image(&self, size: i32) -> gtk::Widget {
+        match &self.icon {
+            TileIcon::App(image) => {
+                let copy = super::icon::image(size);
+                match image.paintable() {
+                    Some(paintable) if image.icon_name().is_none() => {
+                        copy.set_paintable(Some(&paintable));
+                    }
+                    _ => copy.set_icon_name(image.icon_name().as_deref()),
+                }
+                copy.upcast()
+            }
+            TileIcon::Folder(folder) => {
+                let copy = FolderIcon::new(size);
+                let icons: Vec<Option<String>> = folder
+                    .images
+                    .iter()
+                    .filter(|image| image.is_child_visible())
+                    .map(|image| image.icon_name().map(String::from))
+                    .collect();
+                copy.set_icons(&icons);
+                copy.grid.upcast()
+            }
+        }
+    }
+
+    /// The icon is drawn small and the name hidden: what another
+    /// application looks like when something dragged onto it would make a
+    /// folder of the two (`AppIcon._showFolderPreview`).
+    pub fn set_folder_preview(&self, on: bool) {
+        self.label.set_opacity(if on { 0.0 } else { 1.0 });
+        if let TileIcon::App(image) = &self.icon {
+            set_class(image, "folder-preview", on);
+        }
+    }
+
+    /// Something dragged would be dropped onto this tile (`:drop`).
+    pub fn set_drop(&self, on: bool) {
+        set_class(&self.button, "drop", on);
     }
 
     pub fn set_running(&self, running: bool) {

@@ -29,6 +29,7 @@ pub mod power;
 pub mod rfkill;
 pub mod search;
 pub mod session;
+pub mod state;
 pub mod toggles;
 pub mod user;
 

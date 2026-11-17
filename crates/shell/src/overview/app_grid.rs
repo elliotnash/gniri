@@ -1,22 +1,28 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! The app grid: every installed application, a page at a time. Port of
-//! `AppDisplay`, `BaseAppView` and `AppGrid` (appDisplay.js), `IconGrid`
-//! (iconGrid.js) and `PageIndicators` (pageIndicators.js), without
-//! folders, dragging and the icons' menus.
+//! The app grid: every installed application and folder, a page at a time,
+//! and the same for the inside of a folder. Port of `AppDisplay`,
+//! `FolderView`, `BaseAppView` and `AppGrid` (appDisplay.js), `IconGrid`
+//! (iconGrid.js) and `PageIndicators` (pageIndicators.js), without the
+//! icons' menus.
 //!
 //! Widget tree, with the actors it stands for:
 //!
 //! ```text
-//! box.app-display                       AppDisplay
+//! box.app-display                       AppDisplay, or a FolderView
 //!   GniriIconGrid.icon-grid             the scroll view and its AppGrid
-//!     button.overview-tile ...            AppIcon (overview/icon.rs)
+//!     button.overview-tile ...            AppIcon, FolderIcon (overview/icon.rs)
 //!     button.page-navigation-arrow        the arrow to the page before
 //!     button.page-navigation-arrow        and to the page after
 //!   box.page-indicators                 PageIndicators
 //!     button.page-indicator
 //!       box.page-indicator-icon
 //! ```
+//!
+//! What is shown comes from the applications' arrangement
+//! (`gniri_services::apps::layout`); dragging an icon changes it
+//! (`overview/drag.rs`), and while a drag is under way the grid shows the
+//! icons where they would be after it ([`AppView::preview`]).
 
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
@@ -24,11 +30,12 @@ use std::time::{Duration, Instant};
 
 use adw::prelude::*;
 use gniri_core::Subscription;
+use gniri_services::apps::{self, GridItem};
 use gtk::glib;
 use gtk::subclass::prelude::*;
 
 use super::icon::{Tile, set_class};
-use super::layout::{self, Grid, GridStyle};
+use super::layout::{self, DropTarget, Grid, GridKind, GridStyle};
 use crate::services::Services;
 
 /// `.icon-grid` in the theme (crates/theme/scss/widgets/_app-grid.scss).
@@ -49,6 +56,24 @@ const PAGE_SWITCH_TIME_MS: u32 = 300;
 const SCROLL_INTERVAL: Duration = Duration::from_millis(150);
 /// The largest of iconGrid.js `IconSize`, which the grid starts from.
 const LARGEST_ICON: i32 = layout::GRID_ICON_SIZES[0];
+/// How long an icon takes to move to another place: Clutter's default
+/// easing time, which `animateIconPosition` keeps.
+const ICON_MOVE_TIME_MS: f64 = 250.0;
+/// iconGrid.js `ICON_POSITION_DELAY`: each icon that moves starts this
+/// much after the one before.
+const ICON_POSITION_DELAY_MS: f64 = 10.0;
+
+/// Where an icon that is moving set out from, and how many milliseconds
+/// after the others it sets out.
+type Departure = Option<((f64, f64), f64)>;
+
+/// One place of the grid while it is laid out: an icon, or room for one
+/// that is being dragged in from elsewhere.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Slot {
+    Tile(usize),
+    Gap,
+}
 
 mod imp {
     use super::*;
@@ -57,11 +82,23 @@ mod imp {
     pub struct IconGrid {
         pub(super) tiles: RefCell<Vec<Tile>>,
         pub(super) arrows: RefCell<Option<[gtk::Button; 2]>>,
+        pub(super) kind: Cell<GridKind>,
+        /// The order the icons are laid out in, where it is not theirs: a
+        /// drag shows where it would put one.
+        pub(super) order: RefCell<Option<Vec<Slot>>>,
         /// The page that shows, or is being turned to.
         pub(super) page: Cell<usize>,
         /// Where the turning is: `page` once it has arrived.
         pub(super) position: Cell<f64>,
         pub(super) animation: RefCell<Option<adw::TimedAnimation>>,
+        /// Where each icon was last put, through every page.
+        pub(super) placed: RefCell<Vec<Option<(f64, f64)>>>,
+        /// Where each icon that is moving set out from, and how long after
+        /// the start it sets out.
+        pub(super) moving: RefCell<Vec<Departure>>,
+        /// Milliseconds since the icons started moving.
+        pub(super) moved_for: Cell<f64>,
+        pub(super) move_animation: RefCell<Option<adw::TimedAnimation>>,
         pub(super) icon_size: Cell<i32>,
         /// How the last layout came out.
         pub(super) geometry: Cell<Option<Grid>>,
@@ -112,6 +149,20 @@ mod imp {
                 arrows[0].measure(gtk::Orientation::Horizontal, -1).1
             })
         }
+
+        /// The places in the order they are laid out.
+        pub(super) fn slots(&self) -> Vec<Slot> {
+            self.order
+                .borrow()
+                .clone()
+                .unwrap_or_else(|| (0..self.tiles.borrow().len()).map(Slot::Tile).collect())
+        }
+    }
+
+    /// Ease-out-quad.
+    fn ease(progress: f64) -> f64 {
+        let progress = progress.clamp(0.0, 1.0);
+        1.0 - (1.0 - progress) * (1.0 - progress)
     }
 
     impl WidgetImpl for IconGrid {
@@ -123,6 +174,7 @@ mod imp {
 
         fn size_allocate(&self, width: i32, height: i32, _baseline: i32) {
             let obj = self.obj();
+            let kind = self.kind.get();
             let size = (f64::from(width), f64::from(height));
             let arrow = self.arrow_size();
             let icon = self.icon_size.get();
@@ -131,7 +183,7 @@ mod imp {
             // `IconGridLayout._findBestIconSize`: the largest icons whose
             // items fit. An item is this much larger than its icon.
             let extra = child - icon;
-            let best = layout::grid_icon_size(size, &STYLE, f64::from(arrow), |icon| {
+            let best = layout::grid_icon_size(size, &STYLE, f64::from(arrow), kind, |icon| {
                 f64::from(icon + extra)
             });
             if best != icon {
@@ -152,21 +204,53 @@ mod imp {
                 });
             }
 
-            let grid = layout::grid(size, &STYLE, f64::from(arrow), f64::from(child));
+            let grid = layout::grid(size, &STYLE, f64::from(arrow), f64::from(child), kind);
             let tiles = self.tiles.borrow();
             let position = self.position.get();
-            for (index, tile) in tiles.iter().enumerate() {
-                let page = index / grid.per_page();
-                let (x, y) = grid.origin(index % grid.per_page());
-                let offset = (page as f64 - position) * size.0;
-                // Only the page that shows and one being turned from are
-                // drawn or take the pointer.
-                tile.button.set_child_visible(offset.abs() < size.0);
+            let moved_for = self.moved_for.get();
+            let moving = self.moving.borrow();
+            let mut placed = vec![None; tiles.len()];
+            let mut laid_out = vec![false; tiles.len()];
+            for (slot_index, slot) in self.slots().into_iter().enumerate() {
+                let Slot::Tile(index) = slot else {
+                    continue;
+                };
+                let Some(tile) = tiles.get(index) else {
+                    continue;
+                };
+                laid_out[index] = true;
+                let page = slot_index / grid.per_page();
+                let (x, y) = grid.origin(slot_index % grid.per_page());
+                // Through every page, as if they lay side by side.
+                let target = (f64::from(x) + page as f64 * size.0, f64::from(y));
+                placed[index] = Some(target);
+                let (x, y) = match moving.get(index).copied().flatten() {
+                    Some((from, delay)) => {
+                        let progress = ease((moved_for - delay) / ICON_MOVE_TIME_MS);
+                        (
+                            from.0 + (target.0 - from.0) * progress,
+                            from.1 + (target.1 - from.1) * progress,
+                        )
+                    }
+                    None => target,
+                };
+                let x = x - position * size.0;
+                // Only what is on the grid, of the page that shows or one
+                // being turned from, is drawn or takes the pointer.
+                tile.button
+                    .set_child_visible(x + f64::from(child) > 0.0 && x < size.0);
                 tile.button.size_allocate(
-                    &gtk::Allocation::new(x + offset.round() as i32, y, child, child),
+                    &gtk::Allocation::new(x.round() as i32, y.round() as i32, child, child),
                     -1,
                 );
             }
+            for (tile, laid_out) in tiles.iter().zip(laid_out) {
+                if !laid_out {
+                    tile.button.set_child_visible(false);
+                }
+            }
+            drop(moving);
+            self.placed.replace(placed);
 
             // The arrows are centred in the bands at the sides
             // (`BaseAppViewGridLayout.vfunc_allocate`).
@@ -206,9 +290,10 @@ glib::wrapper! {
 }
 
 impl IconGrid {
-    fn new(previous: &gtk::Button, next: &gtk::Button) -> Self {
+    fn new(kind: GridKind, previous: &gtk::Button, next: &gtk::Button) -> Self {
         let grid: Self = glib::Object::new();
         grid.add_css_class("icon-grid");
+        grid.imp().kind.set(kind);
         previous.set_parent(&grid);
         next.set_parent(&grid);
         grid.imp()
@@ -230,8 +315,108 @@ impl IconGrid {
             tile.button.insert_before(self, below);
         }
         drop(arrows);
+        imp.order.replace(None);
+        imp.placed.replace(Vec::new());
+        imp.moving.replace(Vec::new());
         imp.tiles.replace(tiles);
         self.queue_resize();
+    }
+
+    /// Lays the icons out in `order` (`None`: their own), moving each that
+    /// changes place to its new one (`animateIconPosition`).
+    fn set_order(&self, order: Option<Vec<Slot>>) {
+        let imp = self.imp();
+        if *imp.order.borrow() == order {
+            return;
+        }
+        let animated =
+            gtk::Settings::default().is_some_and(|settings| settings.is_gtk_enable_animations());
+        // Where each icon is drawn now, mid-move or not: where it sets out
+        // from.
+        let now: Vec<Option<(f64, f64)>> = {
+            let placed = imp.placed.borrow();
+            let moving = imp.moving.borrow();
+            let moved_for = imp.moved_for.get();
+            placed
+                .iter()
+                .enumerate()
+                .map(|(index, target)| {
+                    let target = (*target)?;
+                    Some(match moving.get(index).copied().flatten() {
+                        Some((from, delay)) => {
+                            let progress = (moved_for - delay) / ICON_MOVE_TIME_MS;
+                            let progress = 1.0 - (1.0 - progress.clamp(0.0, 1.0)).powi(2);
+                            (
+                                from.0 + (target.0 - from.0) * progress,
+                                from.1 + (target.1 - from.1) * progress,
+                            )
+                        }
+                        None => target,
+                    })
+                })
+                .collect()
+        };
+        let old_slots = imp.slots();
+        imp.order.replace(order);
+        let new_slots = imp.slots();
+        if let Some(animation) = imp.move_animation.take() {
+            animation.pause();
+        }
+        if !animated || !self.is_mapped() {
+            imp.moving.replace(Vec::new());
+            self.queue_allocate();
+            return;
+        }
+        // Those whose place changed set out, one a little after another.
+        let place =
+            |slots: &[Slot], index: usize| slots.iter().position(|slot| *slot == Slot::Tile(index));
+        let mut moving = vec![None; now.len()];
+        let mut changed = 0;
+        for (index, start) in now.iter().enumerate() {
+            let Some(start) = start else {
+                continue;
+            };
+            if place(&old_slots, index) != place(&new_slots, index) {
+                moving[index] = Some((*start, changed as f64 * ICON_POSITION_DELAY_MS));
+                changed += 1;
+            }
+        }
+        imp.moving.replace(moving);
+        imp.moved_for.set(0.0);
+        if changed == 0 {
+            self.queue_allocate();
+            return;
+        }
+        let total = ICON_MOVE_TIME_MS + (changed - 1) as f64 * ICON_POSITION_DELAY_MS;
+        let grid = self.downgrade();
+        let target = adw::CallbackAnimationTarget::new(move |value| {
+            if let Some(grid) = grid.upgrade() {
+                grid.imp().moved_for.set(value);
+                grid.queue_allocate();
+            }
+        });
+        let animation = adw::TimedAnimation::builder()
+            .widget(self)
+            .value_from(0.0)
+            .value_to(total)
+            .duration(total as u32)
+            .easing(adw::Easing::Linear)
+            .target(&target)
+            .build();
+        animation.connect_done({
+            let grid = self.downgrade();
+            move |_| {
+                if let Some(grid) = grid.upgrade() {
+                    grid.imp().moving.replace(Vec::new());
+                    grid.imp().move_animation.take();
+                    grid.queue_allocate();
+                }
+            }
+        });
+        animation.play();
+        if animation.state() == adw::AnimationState::Playing {
+            imp.move_animation.replace(Some(animation));
+        }
     }
 
     /// The columns and rows of a page, once the grid has been laid out.
@@ -243,7 +428,7 @@ impl IconGrid {
     }
 
     fn pages(&self) -> usize {
-        let count = self.imp().tiles.borrow().len();
+        let count = self.imp().slots().len();
         self.imp()
             .geometry
             .get()
@@ -292,53 +477,136 @@ impl IconGrid {
             imp.animation.replace(Some(animation));
         }
     }
+
+    /// Whether a page is being turned.
+    fn turning(&self) -> bool {
+        self.imp().animation.borrow().is_some()
+    }
 }
 
-/// One application in the grid.
+/// Which grid a view is.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum View {
+    /// Every application and folder.
+    Apps,
+    /// The open folder's applications.
+    Folder,
+}
+
+/// One item of a grid as it shows.
 #[derive(Clone, Debug, PartialEq, Eq)]
-struct Shown {
-    id: String,
-    name: String,
-    icon: Option<String>,
-    running: bool,
+pub enum Shown {
+    App {
+        id: String,
+        name: String,
+        icon: Option<String>,
+        running: bool,
+    },
+    Folder {
+        id: String,
+        name: String,
+        /// Of its first four applications.
+        icons: Vec<Option<String>>,
+    },
+}
+
+impl Shown {
+    /// Its place in the arrangement.
+    pub fn entry(&self) -> apps::Entry {
+        match self {
+            Self::App { id, .. } => apps::Entry::App(id.clone()),
+            Self::Folder { id, .. } => apps::Entry::Folder { folder: id.clone() },
+        }
+    }
+
+    /// The same tile, whether or not its application runs.
+    fn same_tile(&self, other: &Self) -> bool {
+        match (self, other) {
+            (
+                Self::App { id, name, icon, .. },
+                Self::App {
+                    id: other_id,
+                    name: other_name,
+                    icon: other_icon,
+                    ..
+                },
+            ) => (id, name, icon) == (other_id, other_name, other_icon),
+            (a, b) => a == b,
+        }
+    }
 }
 
 struct Inner {
     services: Rc<Services>,
+    view: View,
     grid: IconGrid,
     arrows: [gtk::Button; 2],
     indicators: gtk::Box,
     shown: RefCell<Vec<Shown>>,
+    /// The tile something dragged would be dropped onto.
+    drop_on: RefCell<Option<usize>>,
 }
 
-pub struct AppDisplay {
+pub struct AppView {
     pub widget: gtk::Box,
     inner: Rc<Inner>,
     _subscriptions: Vec<Subscription>,
 }
 
+/// The applications of folder `id` as the grid has them.
+fn folder_items<'a>(items: Vec<GridItem<'a>>, id: &str) -> Vec<&'a apps::App> {
+    items
+        .into_iter()
+        .find_map(|item| match item {
+            GridItem::Folder(folder) if folder.id == id => Some(folder.apps),
+            _ => None,
+        })
+        .unwrap_or_default()
+}
+
 impl Inner {
-    /// What the grid should show now: every application that is not in
-    /// the dash for good, with a dot under those that run.
+    /// What the grid should show now.
     fn wanted(&self) -> Vec<Shown> {
-        let favorites = &self
+        let favorites = self.services.favorites();
+        let folder = self
             .services
-            .config
-            .with(|config| config.dash.favorites.clone());
+            .overview
+            .with(|overview| overview.folder.clone());
         self.services.apps.state.with(|apps| {
             let dash = self
                 .services
                 .niri
-                .with(|niri| apps.dash(favorites, &niri.windows));
-            apps.grid(favorites)
-                .into_iter()
-                .map(|app| Shown {
-                    id: app.id.clone(),
-                    name: app.name.clone(),
-                    icon: app.icon.clone(),
-                    running: dash.running.iter().any(|item| item.id == app.id),
-                })
-                .collect()
+                .with(|niri| apps.dash(&favorites, &niri.windows));
+            let running = |id: &str| dash.running.iter().any(|item| item.id == id);
+            let app = |app: &apps::App| Shown::App {
+                id: app.id.clone(),
+                name: app.name.clone(),
+                icon: app.icon.clone(),
+                running: running(&app.id),
+            };
+            let items = apps.grid_items(&favorites);
+            match self.view {
+                View::Apps => items
+                    .iter()
+                    .map(|item| match item {
+                        GridItem::App(found) => app(found),
+                        GridItem::Folder(folder) => Shown::Folder {
+                            id: folder.id.to_owned(),
+                            name: folder.name.clone(),
+                            icons: folder
+                                .apps
+                                .iter()
+                                .take(4)
+                                .map(|app| app.icon.clone())
+                                .collect(),
+                        },
+                    })
+                    .collect(),
+                View::Folder => match &folder {
+                    Some(id) => folder_items(items, id).into_iter().map(app).collect(),
+                    None => Vec::new(),
+                },
+            }
         })
     }
 
@@ -347,53 +615,115 @@ impl Inner {
         if *self.shown.borrow() == wanted {
             return;
         }
-        let same_icons = {
+        let same_tiles = {
             let shown = self.shown.borrow();
             shown.len() == wanted.len()
-                && shown.iter().zip(&wanted).all(|(shown, wanted)| {
-                    (&shown.id, &shown.name, &shown.icon)
-                        == (&wanted.id, &wanted.name, &wanted.icon)
-                })
+                && shown
+                    .iter()
+                    .zip(&wanted)
+                    .all(|(shown, wanted)| shown.same_tile(wanted))
         };
-        if same_icons {
+        if same_tiles {
             // Only the dots changed.
             for (tile, wanted) in self.grid.imp().tiles.borrow().iter().zip(&wanted) {
-                tile.set_running(wanted.running);
+                if let Shown::App { running, .. } = wanted {
+                    tile.set_running(*running);
+                }
             }
         } else {
-            let tiles = wanted
-                .iter()
-                .map(|app| {
-                    let tile = Tile::new(LARGEST_ICON);
-                    tile.set(&app.name, app.icon.as_deref());
-                    tile.set_running(app.running);
-                    tile.button.connect_clicked({
-                        let (services, id) = (Rc::clone(&self.services), app.id.clone());
-                        move |_| {
-                            let app = services.apps.state.with(|apps| apps.app(&id).cloned());
-                            if let Some(app) = app {
-                                super::activate_app(&services, &app);
-                            }
-                        }
-                    });
-                    tile
-                })
-                .collect();
+            self.drop_on.take();
+            let tiles = wanted.iter().map(|item| self.build_tile(item)).collect();
             self.grid.set_tiles(tiles);
         }
         self.shown.replace(wanted);
         self.pages_changed();
+        self.hide_open_folder();
+    }
+
+    /// A folder's icon is not there while its dialog is open
+    /// (`FolderIcon._ensureFolderDialog`).
+    fn hide_open_folder(&self) {
+        if self.view != View::Apps {
+            return;
+        }
+        let open = self
+            .services
+            .overview
+            .with(|overview| overview.folder.clone());
+        let shown = self.shown.borrow();
+        for (tile, item) in self.grid.imp().tiles.borrow().iter().zip(shown.iter()) {
+            if let Shown::Folder { id, .. } = item {
+                let hidden = open.as_deref() == Some(id.as_str());
+                tile.button.set_opacity(if hidden { 0.0 } else { 1.0 });
+            }
+        }
+    }
+
+    fn build_tile(self: &Rc<Self>, item: &Shown) -> Tile {
+        match item {
+            Shown::App {
+                id,
+                name,
+                icon,
+                running,
+            } => {
+                let tile = Tile::new(LARGEST_ICON);
+                tile.set(name, icon.as_deref());
+                tile.set_running(*running);
+                tile.button.connect_clicked({
+                    let (services, id) = (Rc::clone(&self.services), id.clone());
+                    move |_| {
+                        let app = services.apps.state.with(|apps| apps.app(&id).cloned());
+                        if let Some(app) = app {
+                            super::activate_app(&services, &app);
+                        }
+                    }
+                });
+                tile
+            }
+            Shown::Folder { id, name, icons } => {
+                let tile = Tile::new_folder(LARGEST_ICON);
+                tile.set_folder(name, icons);
+                tile.button.connect_clicked({
+                    let (services, id) = (Rc::clone(&self.services), id.clone());
+                    move |_| {
+                        services
+                            .overview
+                            .update(|overview| overview.open_folder(&id))
+                    }
+                });
+                tile
+            }
+        }
+    }
+
+    fn page(&self) -> usize {
+        match self.view {
+            View::Apps => self.services.overview.with(|overview| overview.page),
+            View::Folder => self.services.overview.with(|overview| overview.folder_page),
+        }
+    }
+
+    fn set_page(&self, page: usize) {
+        match self.view {
+            View::Apps => self
+                .services
+                .overview
+                .update(|overview| overview.page = page),
+            View::Folder => self
+                .services
+                .overview
+                .update(|overview| overview.folder_page = page),
+        }
     }
 
     /// Brings the page dots, the arrows and the page itself in line with
     /// how many pages there are.
     fn pages_changed(self: &Rc<Self>) {
         let pages = self.grid.pages();
-        let page = self.services.overview.with(|overview| overview.page);
+        let page = self.page();
         if page >= pages {
-            self.services
-                .overview
-                .update(|overview| overview.page = pages - 1);
+            self.set_page(pages - 1);
         }
 
         let mut count = 0;
@@ -418,8 +748,12 @@ impl Inner {
                 .focusable(false)
                 .build();
             indicator.connect_clicked({
-                let (services, page) = (Rc::clone(&self.services), count);
-                move |_| services.overview.update(|overview| overview.page = page)
+                let (inner, page) = (Rc::downgrade(self), count);
+                move |_| {
+                    if let Some(inner) = inner.upgrade() {
+                        inner.set_page(page);
+                    }
+                }
             });
             self.indicators.append(&indicator);
             count += 1;
@@ -453,9 +787,35 @@ impl Inner {
             tile.set_selected(selected == Some(index));
         }
     }
+
+    /// Turns the page by `by`, within the pages there are.
+    fn turn(&self, by: isize) {
+        let pages = self.grid.pages();
+        let page = self
+            .page()
+            .saturating_add_signed(by)
+            .min(pages.saturating_sub(1));
+        self.set_page(page);
+    }
 }
 
-impl AppDisplay {
+/// What is under a point of a grid, for a drag.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Under {
+    /// Nowhere to drop.
+    Nothing,
+    /// The band at the side of the page, where hovering turns it: -1 for
+    /// the page before, 1 for the one after.
+    PageEdge(isize),
+    /// A place in the grid's order, through every page, and the icon
+    /// there with where on it.
+    Place {
+        index: usize,
+        target: Option<(usize, layout::DragLocation)>,
+    },
+}
+
+impl AppView {
     /// How many icons there are and how a page holds them, for the arrow
     /// keys.
     pub fn shape(&self) -> (usize, (usize, usize)) {
@@ -465,13 +825,124 @@ impl AppDisplay {
         )
     }
 
-    /// The application at `index`.
-    pub fn app_at(&self, index: usize) -> Option<String> {
-        self.inner
-            .shown
-            .borrow()
-            .get(index)
-            .map(|shown| shown.id.clone())
+    /// The item at `index`.
+    pub fn item_at(&self, index: usize) -> Option<Shown> {
+        self.inner.shown.borrow().get(index).cloned()
+    }
+
+    /// The grid widget, which drags' points are relative to.
+    pub fn grid(&self) -> gtk::Widget {
+        self.inner.grid.clone().upcast()
+    }
+
+    /// The tile at `index`.
+    pub fn tile(&self, index: usize) -> Option<Tile> {
+        self.inner.grid.imp().tiles.borrow().get(index).cloned()
+    }
+
+    /// The index of the tile whose button `widget` is or is inside.
+    pub fn tile_of(&self, widget: &gtk::Widget) -> Option<usize> {
+        let tiles = self.inner.grid.imp().tiles.borrow();
+        let mut current = Some(widget.clone());
+        while let Some(widget) = current {
+            if let Some(index) = tiles
+                .iter()
+                .position(|tile| tile.button.upcast_ref::<gtk::Widget>() == &widget)
+            {
+                return Some(index);
+            }
+            current = widget.parent();
+        }
+        None
+    }
+
+    /// What is at `(x, y)` of the grid widget.
+    pub fn under(&self, (x, y): (f64, f64)) -> Under {
+        let grid = &self.inner.grid;
+        let Some(geometry) = grid.imp().geometry.get() else {
+            return Under::Nothing;
+        };
+        let (width, height) = (f64::from(grid.width()), f64::from(grid.height()));
+        if x < 0.0 || y < 0.0 || x > width || y > height {
+            return Under::Nothing;
+        }
+        if x < geometry.indicators_width {
+            return Under::PageEdge(-1);
+        }
+        if x > width - geometry.indicators_width {
+            return Under::PageEdge(1);
+        }
+        let page = self.inner.page();
+        let per_page = geometry.per_page();
+        let count = grid.imp().slots().len();
+        let on_page = count.saturating_sub(page * per_page).min(per_page);
+        match geometry.drop_target((x, y), on_page) {
+            DropTarget::Invalid => Under::Nothing,
+            DropTarget::Empty => Under::Place {
+                index: page * per_page + on_page,
+                target: None,
+            },
+            DropTarget::Item(position, location) => Under::Place {
+                index: page * per_page + position,
+                target: Some((page * per_page + position, location)),
+            },
+        }
+    }
+
+    /// The tile at `position` of the grid as it is laid out now, if there
+    /// is one there and not the room for something dragged.
+    pub fn tile_at(&self, position: usize) -> Option<usize> {
+        match self.inner.grid.imp().slots().get(position) {
+            Some(Slot::Tile(index)) => Some(*index),
+            _ => None,
+        }
+    }
+
+    /// The columns of a page.
+    pub fn columns(&self) -> usize {
+        self.inner.grid.shape().map_or(1, |(columns, _)| columns)
+    }
+
+    /// Lays the icons out as if the one at `from` (or one from elsewhere,
+    /// for `None`) were at `to`; `None` puts them back.
+    pub fn preview(&self, moved: Option<(Option<usize>, usize)>) {
+        let order = moved.map(|(from, to)| {
+            let count = self.inner.shown.borrow().len();
+            let mut slots: Vec<Slot> = (0..count).map(Slot::Tile).collect();
+            let moved = match from {
+                Some(from) if from < count => slots.remove(from),
+                _ => Slot::Gap,
+            };
+            slots.insert(to.min(slots.len()), moved);
+            slots
+        });
+        self.inner.grid.set_order(order);
+    }
+
+    /// Marks the tile something would be dropped onto, or none.
+    pub fn set_drop_on(&self, index: Option<usize>, folder_preview: bool) {
+        let previous = self.inner.drop_on.replace(index);
+        let tiles = self.inner.grid.imp().tiles.borrow();
+        if let Some(previous) = previous
+            && Some(previous) != index
+            && let Some(tile) = tiles.get(previous)
+        {
+            tile.set_drop(false);
+            tile.set_folder_preview(false);
+        }
+        if let Some(tile) = index.and_then(|index| tiles.get(index)) {
+            tile.set_drop(true);
+            tile.set_folder_preview(folder_preview);
+        }
+    }
+
+    /// Turns the page by `by`, unless one is being turned.
+    pub fn turn(&self, by: isize) -> bool {
+        if self.inner.grid.turning() {
+            return false;
+        }
+        self.inner.turn(by);
+        true
     }
 }
 
@@ -483,12 +954,16 @@ fn arrow(icon: &str) -> gtk::Button {
         .build()
 }
 
-pub fn build(services: &Rc<Services>) -> AppDisplay {
+pub fn build(services: &Rc<Services>, view: View) -> AppView {
     let arrows = [
         arrow("carousel-arrow-previous-symbolic"),
         arrow("carousel-arrow-next-symbolic"),
     ];
-    let grid = IconGrid::new(&arrows[0], &arrows[1]);
+    let kind = match view {
+        View::Apps => GridKind::Apps,
+        View::Folder => GridKind::Folder,
+    };
+    let grid = IconGrid::new(kind, &arrows[0], &arrows[1]);
     grid.set_vexpand(true);
     let indicators = gtk::Box::builder()
         .css_classes(["page-indicators"])
@@ -503,25 +978,20 @@ pub fn build(services: &Rc<Services>) -> AppDisplay {
 
     let inner = Rc::new(Inner {
         services: Rc::clone(services),
+        view,
         grid: grid.clone(),
         arrows,
         indicators,
         shown: RefCell::new(Vec::new()),
+        drop_on: RefCell::new(None),
     });
 
     let turn = |by: isize| {
         let inner = Rc::downgrade(&inner);
         move || {
-            let Some(inner) = inner.upgrade() else {
-                return;
-            };
-            let pages = inner.grid.pages();
-            inner.services.overview.update(|overview| {
-                overview.page = overview
-                    .page
-                    .saturating_add_signed(by)
-                    .min(pages.saturating_sub(1));
-            });
+            if let Some(inner) = inner.upgrade() {
+                inner.turn(by);
+            }
         }
     };
     inner.arrows[0].connect_clicked({
@@ -577,41 +1047,67 @@ pub fn build(services: &Rc<Services>) -> AppDisplay {
             }
         }
     };
+    let selected_here = move |overview: &super::Overview| {
+        let shows = match view {
+            View::Apps => overview.apps && !overview.searching() && overview.folder.is_none(),
+            View::Folder => overview.folder.is_some(),
+        };
+        overview.selected.filter(|_| shows)
+    };
     let subscriptions = vec![
-        services.apps.state.select(|apps| apps.installed.clone(), {
-            let refresh = refresh.clone();
-            move |_| refresh()
-        }),
+        services
+            .apps
+            .state
+            .select(|apps| (apps.installed.clone(), apps.layout.clone()), {
+                let refresh = refresh.clone();
+                move |_| refresh()
+            }),
         services.niri.select(|niri| niri.windows.clone(), {
             let refresh = refresh.clone();
             move |_| refresh()
         }),
-        services.overview.select(|overview| overview.page, {
-            let inner = Rc::downgrade(&inner);
-            move |page| {
-                if let Some(inner) = inner.upgrade() {
-                    inner.show_page(*page);
+        services
+            .config
+            .select(|config| config.dash.favorites.clone(), {
+                let refresh = refresh.clone();
+                move |_| refresh()
+            }),
+        services
+            .overview
+            .select(|overview| overview.folder.clone(), {
+                let inner = Rc::downgrade(&inner);
+                move |_| {
+                    if let Some(inner) = inner.upgrade() {
+                        inner.sync();
+                        inner.hide_open_folder();
+                    }
                 }
-            }
-        }),
+            }),
         services.overview.select(
-            |overview| {
-                overview
-                    .selected
-                    .filter(|_| overview.apps && !overview.searching())
+            move |overview| match view {
+                View::Apps => overview.page,
+                View::Folder => overview.folder_page,
             },
             {
                 let inner = Rc::downgrade(&inner);
-                move |selected| {
+                move |page| {
                     if let Some(inner) = inner.upgrade() {
-                        inner.select(*selected);
+                        inner.show_page(*page);
                     }
                 }
             },
         ),
+        services.overview.select(selected_here, {
+            let inner = Rc::downgrade(&inner);
+            move |selected| {
+                if let Some(inner) = inner.upgrade() {
+                    inner.select(*selected);
+                }
+            }
+        }),
     ];
 
-    AppDisplay {
+    AppView {
         widget,
         inner,
         _subscriptions: subscriptions,

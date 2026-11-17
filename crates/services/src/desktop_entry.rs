@@ -162,9 +162,51 @@ fn on_path(program: &str) -> bool {
         .is_some_and(|paths| std::env::split_paths(&paths).any(|dir| dir.join(program).is_file()))
 }
 
-/// The directories applications install their entries in, most specific
+/// The name a desktop directory file gives a group of applications, in the
+/// user's language: `file` is "X-GNOME-Shell-Utilities.directory" or the
+/// like, looked for in the `desktop-directories` of the data directories
+/// (`shell_util_get_translated_folder_name`).
+pub fn directory_name(file: &str) -> Option<String> {
+    directory_name_in(file, &data_dirs(), languages())
+}
+
+/// The same in these directories, for these languages.
+pub fn directory_name_in(file: &str, dirs: &[PathBuf], languages: &[String]) -> Option<String> {
+    // A file name, never a path.
+    if file.is_empty() || file.contains('/') {
+        return None;
+    }
+    let text = dirs
+        .iter()
+        .find_map(|dir| std::fs::read_to_string(dir.join("desktop-directories").join(file)).ok())?;
+    let mut plain = None;
+    let mut name = Localized::default();
+    let mut in_group = false;
+    for line in text.lines() {
+        let line = line.trim();
+        if line.starts_with('[') {
+            in_group = line == "[Desktop Entry]";
+            continue;
+        }
+        let Some((key, value)) = line.split_once('=').filter(|_| in_group) else {
+            continue;
+        };
+        let (key, value) = (key.trim(), value.trim());
+        if key == "Name" {
+            plain = Some(value.to_owned());
+        } else if let Some(language) = key
+            .strip_prefix("Name[")
+            .and_then(|rest| rest.strip_suffix(']'))
+        {
+            name.offer(language, value, languages);
+        }
+    }
+    name.take().or(plain).filter(|name| !name.is_empty())
+}
+
+/// The directories applications install their data in, most specific
 /// first (the XDG base directory specification).
-pub fn application_dirs() -> Vec<PathBuf> {
+pub fn data_dirs() -> Vec<PathBuf> {
     let var = |name: &str| std::env::var_os(name).filter(|value| !value.is_empty());
     let mut dirs = Vec::new();
     match var("XDG_DATA_HOME") {
@@ -179,7 +221,13 @@ pub fn application_dirs() -> Vec<PathBuf> {
         Some(list) => dirs.extend(std::env::split_paths(&list)),
         None => dirs.extend(["/usr/local/share", "/usr/share"].map(PathBuf::from)),
     }
-    dirs.into_iter()
+    dirs
+}
+
+/// The directories applications install their entries in.
+pub fn application_dirs() -> Vec<PathBuf> {
+    data_dirs()
+        .into_iter()
         .map(|dir| dir.join("applications"))
         .collect()
 }
@@ -481,6 +529,31 @@ Exec=gnome-software --search
         assert!(languages(&[("LANG", "C.UTF-8"), ("LANGUAGE", "de")]).is_empty());
         assert!(languages(&[("LC_ALL", "POSIX"), ("LANG", "de_DE")]).is_empty());
         assert!(languages(&[]).is_empty());
+    }
+
+    #[test]
+    fn a_desktop_directory_names_a_folder() {
+        let dir = std::env::temp_dir().join(format!("gniri-directories-{}", std::process::id()));
+        let directories = dir.join("desktop-directories");
+        std::fs::create_dir_all(&directories).unwrap();
+        std::fs::write(
+            directories.join("X-Test.directory"),
+            "[Desktop Entry]\nName=Utilities\nName[de]=Dienstprogramme\nType=Directory\n",
+        )
+        .unwrap();
+        let dirs = [dir.clone()];
+        let german = ["de_DE".to_owned(), "de".to_owned()];
+        assert_eq!(
+            directory_name_in("X-Test.directory", &dirs, &german).as_deref(),
+            Some("Dienstprogramme")
+        );
+        assert_eq!(
+            directory_name_in("X-Test.directory", &dirs, &[]).as_deref(),
+            Some("Utilities")
+        );
+        assert_eq!(directory_name_in("X-Other.directory", &dirs, &[]), None);
+        assert_eq!(directory_name_in("../X-Test.directory", &dirs, &[]), None);
+        std::fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]

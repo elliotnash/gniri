@@ -5,6 +5,7 @@
 mod check;
 mod diff;
 mod install;
+mod pointer;
 mod report;
 mod scene;
 mod session;

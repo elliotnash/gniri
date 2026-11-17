@@ -25,8 +25,9 @@ use gtk4_layer_shell::{KeyboardMode, Layer, LayerShell};
 use niri_ipc::Action;
 
 use super::layer::{self, Anchor, Zone};
+use crate::overview::app_grid::{self, Shown, View};
 use crate::overview::controls::{Controls, Parts};
-use crate::overview::{self, Direction, app_grid, dash, search_entry, search_results};
+use crate::overview::{self, Direction, dash, drag, folder, search_entry, search_results};
 use crate::services::Services;
 
 /// overviewControls.js `SIDE_CONTROLS_ANIMATION_TIME`: how long the dash
@@ -41,7 +42,9 @@ struct Inner {
     monitor: gdk::Monitor,
     entry: search_entry::SearchEntry,
     dash: Rc<dash::Dash>,
-    app_display: app_grid::AppDisplay,
+    app_display: Rc<app_grid::AppView>,
+    folder: Rc<folder::FolderDialog>,
+    dragging: drag::Dragging,
     search_results: search_results::SearchResults,
     cover: gtk::Widget,
     /// Counts opens and closes, so a close that was overtaken by a new
@@ -179,6 +182,15 @@ impl Inner {
             self.services
                 .overview
                 .update(|overview| overview.selected = selected);
+        } else if state.folder.is_some() {
+            let (count, shape) = self.folder.view.shape();
+            let selected = overview::move_in_grid(count, shape, state.selected, direction);
+            self.services.overview.update(|overview| {
+                overview.selected = selected;
+                if let Some(selected) = selected {
+                    overview.folder_page = selected / (shape.0 * shape.1).max(1);
+                }
+            });
         } else if state.apps {
             let (count, shape) = self.app_display.shape();
             let selected = overview::move_in_grid(count, shape, state.selected, direction);
@@ -208,13 +220,24 @@ impl Inner {
             if let Some(found) = found.get(state.selected.unwrap_or(0)) {
                 overview::activate_found(&self.services, found, &state.terms());
             }
-        } else if state.apps {
-            let app = state
-                .selected
-                .and_then(|selected| self.app_display.app_at(selected))
-                .and_then(|id| self.services.apps.state.with(|apps| apps.app(&id).cloned()));
-            if let Some(app) = app {
-                overview::activate_app(&self.services, &app);
+        } else if state.folder.is_some() || state.apps {
+            let view = if state.folder.is_some() {
+                &self.folder.view
+            } else {
+                &*self.app_display
+            };
+            match state.selected.and_then(|selected| view.item_at(selected)) {
+                Some(Shown::App { id, .. }) => {
+                    let app = self.services.apps.state.with(|apps| apps.app(&id).cloned());
+                    if let Some(app) = app {
+                        overview::activate_app(&self.services, &app);
+                    }
+                }
+                Some(Shown::Folder { id, .. }) => self
+                    .services
+                    .overview
+                    .update(|overview| overview.open_folder(&id)),
+                None => {}
             }
         } else {
             // As in niri: back to the window that has the focus.
@@ -228,6 +251,21 @@ impl Inner {
                 | gdk::ModifierType::ALT_MASK
                 | gdk::ModifierType::SUPER_MASK,
         );
+        // A drag ends where it began.
+        if self.dragging.active() {
+            if key == gdk::Key::Escape {
+                self.dragging.cancel();
+            }
+            return glib::Propagation::Stop;
+        }
+        // The folder's name has the keyboard while it is changed.
+        if self.folder.renaming() {
+            if key == gdk::Key::Escape {
+                self.folder.cancel_rename();
+                return glib::Propagation::Stop;
+            }
+            return glib::Propagation::Proceed;
+        }
         let used = match key {
             gdk::Key::Escape => {
                 let mut handled = false;
@@ -249,7 +287,7 @@ impl Inner {
             gdk::Key::Down if plain => self.arrow(Direction::Down),
             gdk::Key::Page_Up | gdk::Key::Page_Down => {
                 let state = self.services.overview.get();
-                if state.apps && !state.searching() {
+                if state.apps && !state.searching() && state.folder.is_none() {
                     let forward = key == gdk::Key::Page_Down;
                     let (count, shape) = self.app_display.shape();
                     let pages = count.div_ceil((shape.0 * shape.1).max(1)).max(1);
@@ -300,8 +338,21 @@ pub fn build(
 
     let entry = search_entry::build(services);
     let dash = Rc::new(dash::build(services));
-    let app_display = app_grid::build(services);
+    let app_display = Rc::new(app_grid::build(services, View::Apps));
     let search_results = search_results::build(services);
+    let folder = Rc::new(folder::build(services));
+    let drag_layer = gtk::Fixed::builder()
+        .css_classes(["drag-layer"])
+        .can_target(false)
+        .build();
+    // Behind the folder's dialog: what is drawn under it, blurred.
+    folder.set_backdrop(vec![
+        cover.clone(),
+        entry.widget.clone().upcast(),
+        app_display.widget.clone().upcast(),
+        dash.widget.clone().upcast(),
+    ]);
+    folder.on_focus_back(entry.focuser());
     let controls = Controls::new(
         Parts {
             cover: cover.clone(),
@@ -310,12 +361,22 @@ pub fn build(
             search_results: search_results.widget.clone().upcast(),
             dash: dash.widget.clone().upcast(),
             dash_label: dash.label().upcast(),
+            folder: folder.widget.clone(),
+            drag_layer: drag_layer.clone().upcast(),
         },
         {
             let dash = Rc::downgrade(&dash);
             move |width, height| {
                 if let Some(dash) = dash.upgrade() {
                     dash.set_max_size(width, height);
+                }
+            }
+        },
+        {
+            let folder = Rc::downgrade(&folder);
+            move |width, height| {
+                if let Some(folder) = folder.upgrade() {
+                    folder.fit(width, height);
                 }
             }
         },
@@ -332,6 +393,14 @@ pub fn build(
     );
     window.set_child(Some(&controls));
 
+    let dragging = drag::Dragging::new(
+        services,
+        &controls,
+        &drag_layer,
+        &app_display,
+        &folder,
+        &dash,
+    );
     let inner = Rc::new(Inner {
         window: window.clone(),
         controls,
@@ -340,6 +409,8 @@ pub fn build(
         entry,
         dash,
         app_display,
+        folder,
+        dragging,
         search_results,
         cover,
         generation: Cell::new(0),

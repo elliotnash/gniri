@@ -784,6 +784,69 @@ was unlocked by `loginctl unlock-session`.
 - **The niri fragment is validated by a test**, as written and as
   installed, where the plan had it as a rule to remember.
 
+## M7: what the folders, the drags, the languages and the light style taught
+
+### Looks
+
+- **The compositor cannot blur part of a surface under another part of
+  it.** blur-my-shell blurs the app grid behind an open folder; the grid
+  and the dialog are on the same surface here. The dialog draws the
+  overview's parts again behind itself (`GtkWidgetPaintable`), through a
+  GSK blur, dimmed by the extension's brightness and the shade: since
+  the blur is linear, the shade's black is one more factor.
+- **A widget that is not blurred may be scaled.** The rule of S3 is for
+  blurred widgets: an icon that shows it would become a folder shrinks
+  as GNOME's does.
+- **The light style is the same theme compiled again**, as upstream's
+  is; blur-my-shell's light colours mostly swap white for black at the
+  same strength (`bms-ink()`), with a few values of its own
+  (`bms-pick()`). The dark stylesheet came out byte for byte the same
+  after the theme was split in two.
+
+### Structure
+
+- **GNOME's drags never reach the compositor, and neither do gniri's.**
+  One `GtkGestureDrag` on the overview's whole surface finds the icon
+  under the press, and once the pointer has moved past GTK's drag
+  threshold claims the sequence, which ends the icon's own click. Icons
+  can then be rebuilt during a drag without losing it, which per-icon
+  gestures could not survive.
+- **Places are those of the grid as it shows**, with the dragged icon
+  already moved, as in GNOME, which moves the icon itself during a drag.
+  A drop's arithmetic (`reorder_target`) is a port of
+  `_getDropTarget`'s, and is tested as such.
+- **The arrangement is one value**, where GNOME has three settings
+  (`app-picker-layout`, the app folders, `favorite-apps`). Every change
+  writes the grid's whole order out, as `_savePages` does, so that what
+  moved stays where it was put and what is new comes after it.
+- **Favourites have two homes.** The config file's list stays the user's
+  to write; a drag's result is kept beside the list it was made from,
+  and a config file given another list is the newer word.
+- **State the shell writes has a file of its own** (`state.toml`), so
+  that the config file is never written by the shell. One that cannot be
+  read is set aside, never overwritten.
+- **Texts are looked up by GNOME's English** in GNOME's catalogs, so
+  gniri's texts have to be GNOME's character for character, ellipsis and
+  dashes included: a test reads every one out of the source and finds it
+  in the installed catalogs. Writing it took one fix (the Wi-Fi menu's
+  heading has an en dash).
+- **Dates are written with strftime formats, which are texts like any
+  other**, and with the C library's names for months and weekdays.
+
+### Harness
+
+- **wlrctl can click but not drag.** The harness has a virtual pointer
+  of its own (`pointer.rs`), which also moves to a place rather than by
+  an offset.
+- **A host that is niri needs the nested window sized.** niri makes a
+  new window as wide as a column and as high as the output; the harness
+  floats it and gives it the reference size, then grows it by whatever
+  the host's border takes.
+- **A scene that extends another merges its fixture service by
+  service**, one level down, which changed none of the scenes there were.
+- **Behind gniri's own lock screen a nested session goes on, slowly**,
+  where behind GNOME's it stalls; the harness waits longer then.
+
 ## Standing rules
 
 - Nested niri: never `--session`; find the instance through the `NIRI_SOCKET`

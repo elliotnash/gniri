@@ -107,7 +107,18 @@ impl Scene {
             anyhow::bail!("scene {name} extends itself");
         }
         let mut merged = Self::load(base)?;
-        merged.fixture.extend(scene.fixture);
+        // A service's table is merged with the base scene's, so that a
+        // scene can add one setting of a service (the applications'
+        // arrangement) and keep the rest; what is in a setting is replaced
+        // whole.
+        for (key, value) in scene.fixture {
+            match (merged.fixture.get_mut(&key), value) {
+                (Some(toml::Value::Table(base)), toml::Value::Table(table)) => base.extend(table),
+                (_, value) => {
+                    merged.fixture.insert(key, value);
+                }
+            }
+        }
         merged.variants.extend(scene.variants);
         merged.steps.extend(scene.steps);
         Ok(merged)

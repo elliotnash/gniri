@@ -13,7 +13,7 @@ use gniri_services::keyboard::LayoutNames;
 use gniri_services::user::User;
 use gniri_services::{
     Bus, Fixture, Link, Model, apps, audio, bluetooth, brightness, idle, logind, mpris, network,
-    night_light, niri, notifications, power, rfkill, search, session, toggles,
+    night_light, niri, notifications, power, rfkill, search, session, state, toggles,
 };
 use gtk::glib;
 
@@ -235,6 +235,8 @@ pub struct Services {
     layout_names: OnceCell<LayoutNames>,
     /// Keeps the notification state in step with the Do Not Disturb toggle.
     _do_not_disturb_link: gniri_core::Subscription,
+    /// Writes what is to be found again after a restart to the state file.
+    _saving: RefCell<Vec<gniri_core::Subscription>>,
 }
 
 impl Services {
@@ -287,7 +289,15 @@ impl Services {
                 let notifications =
                     Service::fake("notifications", fixture.notifications, scheduler, log_ref);
                 let link = link_do_not_disturb(&do_not_disturb, &notifications);
-                let apps = Service::fake("apps", apps::State::default(), scheduler, log_ref);
+                let apps = Service::fake(
+                    "apps",
+                    apps::State {
+                        layout: fixture.apps.layout,
+                        ..apps::State::default()
+                    },
+                    scheduler,
+                    log_ref,
+                );
                 // Through the event, which puts a scene's list in order.
                 apps.inject(apps::Event::Installed(fixture.apps.installed));
                 Self {
@@ -330,6 +340,7 @@ impl Services {
                     idle: Service::fake("idle", fixture.idle, scheduler, log_ref),
                     user: fixture.user,
                     _do_not_disturb_link: link,
+                    _saving: RefCell::default(),
                     config: Store::new(config, Rc::clone(scheduler)),
                     night_light_tuner: night_light::backend::Tuner::default(),
                     ticker,
@@ -391,20 +402,31 @@ impl Services {
                 session_bus.start();
                 let notifications =
                     Service::live("notifications", notifications, scheduler, log_ref);
-                // GNOME keeps this in a setting; here it lasts until gniri
-                // restarts, like Night Light.
+                // What the shell set itself the last time it ran.
+                let saved = state::default_path()
+                    .map(|path| state::load(&path))
+                    .unwrap_or_default();
+                // GNOME keeps this in a setting; here it is in the state
+                // file.
                 let do_not_disturb = Service::fake(
                     "do-not-disturb",
                     toggles::State {
                         available: true,
-                        on: false,
+                        on: saved.do_not_disturb,
                     },
                     scheduler,
                     log_ref,
                 );
                 let link = link_do_not_disturb(&do_not_disturb, &notifications);
+                let apps = Service::live("apps", apps::backend::spawn(), scheduler, log_ref);
+                apps.state
+                    .update(|state| state.layout = saved.apps.clone().unwrap_or_default());
+                let night_light = Service::live("night-light", night_light, scheduler, log_ref);
+                if saved.night_light {
+                    night_light.send(toggles::Command::Set(true));
+                }
                 Self {
-                    apps: Service::live("apps", apps::backend::spawn(), scheduler, log_ref),
+                    apps,
                     search,
                     power: Service::live("power", power, scheduler, log_ref),
                     audio: Service::live("audio", audio::backend::spawn(), scheduler, log_ref),
@@ -431,7 +453,7 @@ impl Services {
                         scheduler,
                         log_ref,
                     ),
-                    night_light: Service::live("night-light", night_light, scheduler, log_ref),
+                    night_light,
                     night_light_tuner,
                     do_not_disturb,
                     notifications,
@@ -444,6 +466,7 @@ impl Services {
                     ),
                     user: User::current(),
                     _do_not_disturb_link: link,
+                    _saving: RefCell::default(),
                     config: Store::new(config, Rc::clone(scheduler)),
                     ticker,
                     time,
@@ -459,7 +482,83 @@ impl Services {
                 }
             }
         };
-        Rc::new(services)
+        let services = Rc::new(services);
+        if !services.sandboxed
+            && let Some(path) = state::default_path()
+        {
+            services.keep_saving(path);
+        }
+        services
+    }
+
+    /// Writes the state file whenever something in it changes. Under a
+    /// fixture nothing is written: a scene's state is the scene's.
+    fn keep_saving(self: &Rc<Self>, path: std::path::PathBuf) {
+        let save = {
+            let services = Rc::downgrade(self);
+            move || {
+                let Some(services) = services.upgrade() else {
+                    return;
+                };
+                let layout = services.apps.state.with(|apps| apps.layout.clone());
+                let mut saved = state::load(&path);
+                saved.do_not_disturb = services.do_not_disturb.state.with(|state| state.on);
+                // While it is not available nothing says whether it was on.
+                if let Some(on) = services
+                    .night_light
+                    .state
+                    .with(|state| state.available.then_some(state.on))
+                {
+                    saved.night_light = on;
+                }
+                saved.apps = (layout != apps::Layout::default()).then_some(layout);
+                if let Err(error) = state::save(&path, &saved) {
+                    eprintln!("gniri: cannot write {}: {error}", path.display());
+                }
+            }
+        };
+        // `select` calls back at once with the present value; that is no
+        // change to write down.
+        let after_first = |save: Rc<dyn Fn()>| {
+            let first = Cell::new(true);
+            move || {
+                if !first.replace(false) {
+                    save();
+                }
+            }
+        };
+        let save: Rc<dyn Fn()> = Rc::new(save);
+        let subscriptions = vec![
+            self.apps.state.select(|apps| apps.layout.clone(), {
+                let save = after_first(Rc::clone(&save));
+                move |_| save()
+            }),
+            self.do_not_disturb.state.select(|state| state.on, {
+                let save = after_first(Rc::clone(&save));
+                move |_| save()
+            }),
+            self.night_light
+                .state
+                .select(|state| state.available.then_some(state.on), {
+                    let save = after_first(Rc::clone(&save));
+                    move |_| save()
+                }),
+        ];
+        self._saving.replace(subscriptions);
+    }
+
+    /// The dash's applications: the config file's list, or what the user
+    /// has dragged it into since.
+    pub fn favorites(&self) -> Vec<String> {
+        let config = self.config.with(|config| config.dash.favorites.clone());
+        self.apps.state.with(|apps| apps.favorites(&config))
+    }
+
+    /// Takes a new arrangement of the applications into use.
+    pub fn arrange(&self, layout: apps::Layout) {
+        if self.apps.state.with(|apps| apps.layout != layout) {
+            self.apps.send(apps::Command::Arrange(layout));
+        }
     }
 
     /// Takes a changed config file's settings into use.

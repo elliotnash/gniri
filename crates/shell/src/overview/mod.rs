@@ -10,6 +10,8 @@
 pub mod app_grid;
 pub mod controls;
 pub mod dash;
+pub mod drag;
+pub mod folder;
 pub mod icon;
 pub mod layout;
 pub mod search_entry;
@@ -32,6 +34,10 @@ pub struct Overview {
     pub query: String,
     /// The page of the app grid that shows.
     pub page: usize,
+    /// The folder whose dialog is open over the app grid.
+    pub folder: Option<String>,
+    /// The page of its applications that shows.
+    pub folder_page: usize,
     /// The item the arrow keys have moved to: an index into the search
     /// results, or into the app grid when nothing is searched for.
     pub selected: Option<usize>,
@@ -76,17 +82,35 @@ impl Overview {
         self.query.clear();
         self.quiet = false;
         self.selected = None;
+        self.close_folder();
         if self.apps != apps {
             self.apps = apps;
             self.page = 0;
         }
     }
 
-    /// What Escape does (`SearchController._onStageKeyPress`): ends the
-    /// search, or else leaves the app grid. False if there was neither,
-    /// which is when Escape closes the overview.
+    /// Opens a folder's dialog (`FolderIcon.open`), on its first page.
+    pub fn open_folder(&mut self, id: &str) {
+        self.folder = Some(id.to_owned());
+        self.folder_page = 0;
+        self.selected = None;
+    }
+
+    pub fn close_folder(&mut self) {
+        if self.folder.take().is_some() {
+            self.folder_page = 0;
+            self.selected = None;
+        }
+    }
+
+    /// What Escape does (`SearchController._onStageKeyPress`): closes a
+    /// folder, or ends the search, or else leaves the app grid. False if
+    /// there was none of them, which is when Escape closes the overview.
     pub fn back(&mut self) -> bool {
-        if self.searching() || !self.query.is_empty() {
+        if self.folder.is_some() {
+            self.close_folder();
+            true
+        } else if self.searching() || !self.query.is_empty() {
             self.set_query("");
             true
         } else if self.apps {
@@ -221,7 +245,7 @@ pub fn activate_dash_item(services: &Rc<Services>, item: &DashItem) {
 /// Starts an application, or shows it if it is running, and leaves the
 /// overview.
 pub fn activate_app(services: &Rc<Services>, app: &App) {
-    let favorites = &services.config.with(|config| config.dash.favorites.clone());
+    let favorites = &services.favorites();
     let window = services.niri.with(|niri| {
         let dash = services
             .apps
@@ -277,6 +301,24 @@ mod tests {
         assert!(overview.back());
         assert_eq!(overview, Overview::default());
         assert!(!overview.back());
+    }
+
+    #[test]
+    fn escape_closes_a_folder_before_anything_else() {
+        let mut overview = Overview::default();
+        overview.set_apps(true);
+        overview.page = 1;
+        overview.open_folder("Utilities");
+        overview.folder_page = 1;
+        overview.selected = Some(2);
+        assert!(overview.back());
+        assert_eq!(overview.folder, None);
+        assert_eq!((overview.folder_page, overview.selected), (0, None));
+        assert!(overview.apps && overview.page == 1, "the grid is as it was");
+        // Leaving the grid closes it too.
+        overview.open_folder("System");
+        overview.set_apps(false);
+        assert_eq!(overview.folder, None);
     }
 
     #[test]

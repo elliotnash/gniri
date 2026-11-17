@@ -44,13 +44,17 @@ pub fn spawn_for(dirs: Vec<PathBuf>, desktops: Vec<String>) -> Link<State> {
                         return;
                     }
                 }
-                match commands.recv_blocking() {
-                    Ok(Command::Refresh) => {
-                        // Several may have queued up; one look answers all.
-                        while commands.try_recv().is_ok() {}
+                // Whatever is asked, the answer is another look; several
+                // requests may have queued up, and one look answers all.
+                // (How the applications are arranged is not kept here.)
+                loop {
+                    match commands.recv_blocking() {
+                        Ok(Command::Refresh) => break,
+                        Ok(Command::Arrange(_)) => {}
+                        Err(_) => return,
                     }
-                    Err(_) => return,
                 }
+                while commands.try_recv().is_ok() {}
             }
         });
     if let Err(error) = spawned {

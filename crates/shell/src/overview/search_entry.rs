@@ -41,6 +41,16 @@ impl SearchEntry {
     pub fn grab_focus(&self) {
         self.text.grab_focus_without_selecting();
     }
+
+    /// Does what [`SearchEntry::grab_focus`] does, from anywhere.
+    pub fn focuser(&self) -> impl Fn() + 'static {
+        let text = self.text.downgrade();
+        move || {
+            if let Some(text) = text.upgrade() {
+                text.grab_focus_without_selecting();
+            }
+        }
+    }
 }
 
 fn icon(name: &str) -> gtk::Image {

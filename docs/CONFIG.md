@@ -130,7 +130,7 @@ the compositor to stay awake holds all of it off.
 
 | Key | Default | |
 |---|---|---|
-| `favorites` | GNOME's | The applications that are always in the dash, in order, by desktop entry: the name of a file in `/usr/share/applications` or `~/.local/share/applications`, with or without `.desktop`. One that is not installed is left out. |
+| `favorites` | GNOME's | The applications that are always in the dash, in order, by desktop entry: the name of a file in `/usr/share/applications` or `~/.local/share/applications`, with or without `.desktop`. One that is not installed is left out. Dragging applications to and from the dash changes the list the dash shows (kept in the state file, below) until this setting is changed. |
 | `icon_size` | as large as fits | The size of the dash's icons: 16, 22, 24, 32, 48 or 64. |
 
 GNOME's favourites are Firefox, Calendar, Files, Software, Text Editor and
@@ -148,6 +148,14 @@ Calculator.
 | Key | Default | |
 |---|---|---|
 | `settings` | `"gnome-control-center"` | The settings application, started as `<settings> <panel>` by entries such as "Power Settings" (the panels are `power`, `wifi`, `bluetooth` and `sound`). `""` hides those entries, as does a program that is not installed. |
+
+## What the shell keeps itself
+
+`~/.local/state/gniri/state.toml` (`$XDG_STATE_HOME/gniri/`) is the
+shell's own: the arrangement of the app grid and its folders, the dash's
+favourites once something has been dragged to or from it, and whether Do
+Not Disturb and Night Light are on. Delete it to start again from GNOME's
+arrangement and the config file's favourites.
 
 ## What is not in this file
 

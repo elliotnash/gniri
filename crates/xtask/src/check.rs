@@ -549,9 +549,10 @@ fn panel_and_overview() -> Result<(usize, usize)> {
 type Part = fn() -> Result<(usize, usize)>;
 
 /// The parts, by the names `cargo xtask check <part>` takes.
-const PARTS: [(&str, Part); 12] = [
+const PARTS: [(&str, Part); 13] = [
     ("panel", panel_and_overview),
     ("overview", overview),
+    ("folders", folders_and_dragging),
     ("quick-settings", quick_settings),
     ("notifications", notifications),
     ("notifications-bus", notifications_over_the_bus),
@@ -583,6 +584,306 @@ pub fn run(only: Option<&str>) -> Result<bool> {
     }
     println!("{passed} of {} checks passed", passed + failed);
     Ok(failed == 0)
+}
+
+/// The middle of the node called `name` below the node `within` picks on
+/// the overview's surface, on the output.
+fn overview_spot(session: &Session, within: &str, name: &str) -> Result<(f64, f64)> {
+    let found =
+        surface(session, "gniri-overview")?.ok_or_else(|| anyhow!("the overview is not mapped"))?;
+    let (left, top) = surface_origin(session, &found)?;
+    let root = tree::select(&found["tree"], within)?;
+    let mut spot = None;
+    tree::walk(root, &mut |node| {
+        if spot.is_none() && node["name"] == name {
+            spot = tree::rect(node, "box").ok();
+        }
+    });
+    let [x, y, width, height] = spot.ok_or_else(|| anyhow!("nothing called {name:?} shows"))?;
+    Ok((left + x + width / 2.0, top + y + height / 2.0))
+}
+
+/// The names of the tiles below the node `within` picks on the overview,
+/// in their order.
+fn tile_names(session: &Session, within: &str) -> Result<Vec<String>> {
+    let Some(found) = surface(session, "gniri-overview")? else {
+        return Ok(Vec::new());
+    };
+    let Ok(root) = tree::select(&found["tree"], within) else {
+        return Ok(Vec::new());
+    };
+    let mut names = Vec::new();
+    tree::walk(root, &mut |node| {
+        if tree::classes(node).contains(&"overview-tile")
+            && let Some(name) = node["name"].as_str()
+        {
+            names.push(name.to_owned());
+        }
+    });
+    Ok(names)
+}
+
+/// App folders, and dragging icons in the overview, with the harness's own
+/// pointer: GNOME's drags are a pointer held down and moved, which
+/// `wlrctl` cannot do.
+fn folders_and_dragging() -> Result<(usize, usize)> {
+    const GRID: &str = ".app-display";
+    const DIALOG: &str = ".app-folder-dialog";
+    const DASH: &str = "#dash";
+    /// Long enough for the icons to make room, or another to show a folder
+    /// would be made, before letting go.
+    const REST: std::time::Duration = std::time::Duration::from_millis(800);
+
+    let fixture = Scene::load("app-grid-folders")?.write_fixture("check-folders", None)?;
+    let session = Session::start(&SessionOptions {
+        name: "check-folders".to_owned(),
+        niri_config: None,
+        renderer: "vulkan".to_owned(),
+        gniri_args: scene::gniri_args(Some(&fixture), Some(WALLPAPER)),
+    })?;
+    let (width, height) = output_size(&session)?;
+    let mut pointer =
+        crate::pointer::Pointer::connect(&session.wayland_display, (width as u32, height as u32))?;
+    let mut checker = Checker {
+        session,
+        passed: 0,
+        failed: 0,
+    };
+    let grid = |session: &Session| tile_names(session, GRID);
+    let dialog = |session: &Session| tile_names(session, DIALOG);
+    let dash = |session: &Session| tile_names(session, DASH);
+    let arranged = |session: &Session| -> Result<usize> {
+        Ok(commands(session)?
+            .iter()
+            .filter(|command| command.starts_with("apps: Arrange"))
+            .count())
+    };
+    let click = |pointer: &mut crate::pointer::Pointer, spot: (f64, f64)| -> Result<()> {
+        pointer.move_to(spot)?;
+        std::thread::sleep(std::time::Duration::from_millis(60));
+        pointer.press()?;
+        std::thread::sleep(std::time::Duration::from_millis(30));
+        pointer.release()
+    };
+
+    checker.session.action(Action::OpenOverview {})?;
+    checker.session.gniri_msg(&["debug", "show-apps"])?;
+    println!("folders");
+    checker.expect("folders are in the grid where they were put", |session| {
+        Ok(grid(session)?.starts_with(&[
+            "Maps".to_owned(),
+            "Utilities".to_owned(),
+            "Boxes".to_owned(),
+            "Office".to_owned(),
+        ]))
+    });
+    checker.expect("and what is in them is not beside them", |session| {
+        Ok(!grid(session)?
+            .iter()
+            .any(|name| name == "Fonts" || name == "Writer"))
+    });
+    checker.session.gniri_msg(&["debug", "sync"])?;
+    let spot = overview_spot(&checker.session, GRID, "Utilities")?;
+    click(&mut pointer, spot)?;
+    checker.expect("a click on a folder opens it", |session| {
+        Ok(dialog(session)?
+            == [
+                "Document Viewer",
+                "Fonts",
+                "Image Viewer",
+                "Passwords",
+                "Zip Archives",
+            ])
+    });
+    checker.expect("under its name, in the user's language", |session| {
+        Ok(on_surface(session, "gniri-overview", ".folder-name-label")?
+            .and_then(|label| label["text"].as_str().map(str::to_owned))
+            .is_some_and(|name| !name.is_empty()))
+    });
+    click(&mut pointer, (20.0, f64::from(height) / 2.0))?;
+    checker.expect("a click beside it closes it", |session| {
+        Ok(dialog(session)?.is_empty())
+    });
+
+    println!("dragging in the grid");
+    checker.session.gniri_msg(&["debug", "sync"])?;
+    let (camera, characters) = (
+        overview_spot(&checker.session, GRID, "Camera")?,
+        overview_spot(&checker.session, GRID, "Characters")?,
+    );
+    // Held over the other one a moment: it shows the folder it would
+    // make. The picture is for looking at
+    // (target/visual/drag-folder-preview.png).
+    pointer.move_to(camera)?;
+    pointer.press()?;
+    std::thread::sleep(std::time::Duration::from_millis(50));
+    pointer.glide_to(characters)?;
+    std::thread::sleep(REST);
+    checker.expect("held over another, that one shows the folder", |session| {
+        Ok(on_surface(session, "gniri-overview", ".overview-tile.drop")?.is_some())
+    });
+    checker
+        .session
+        .screenshot(&session::visual_dir()?.join("drag-folder-preview.png"))?;
+    pointer.release()?;
+    checker.expect(
+        "an application dropped on another makes a folder of the two",
+        |session| {
+            let grid = grid(session)?;
+            Ok(grid.get(4).is_some_and(|name| name == "Unnamed Folder")
+                && !grid
+                    .iter()
+                    .any(|name| name == "Camera" || name == "Characters"))
+        },
+    );
+    checker.expect("and the arrangement is the shell's to keep", |session| {
+        Ok(arranged(session)? == 1)
+    });
+
+    checker.session.gniri_msg(&["debug", "sync"])?;
+    let maps = overview_spot(&checker.session, GRID, "Maps")?;
+    let boxes = overview_spot(&checker.session, GRID, "Boxes")?;
+    // Beside Boxes, towards the icon after it: the place after it.
+    let tile = 145.0_f64.min(f64::from(width) / 10.0);
+    pointer.move_to(maps)?;
+    pointer.press()?;
+    std::thread::sleep(std::time::Duration::from_millis(50));
+    pointer.glide_to((boxes.0 + tile * 0.45, boxes.1))?;
+    std::thread::sleep(REST);
+    // Room made where it would go (target/visual/drag-room.png).
+    checker
+        .session
+        .screenshot(&session::visual_dir()?.join("drag-room.png"))?;
+    pointer.release()?;
+    checker.expect("one dropped beside another goes there", |session| {
+        Ok(grid(session)?.starts_with(&[
+            "Utilities".to_owned(),
+            "Boxes".to_owned(),
+            "Maps".to_owned(),
+        ]))
+    });
+
+    checker.session.gniri_msg(&["debug", "sync"])?;
+    let clocks = overview_spot(&checker.session, GRID, "Clocks")?;
+    let office = overview_spot(&checker.session, GRID, "Office")?;
+    pointer.drag(clocks, office, REST)?;
+    checker.expect("one dropped on a folder goes into it", |session| {
+        Ok(!grid(session)?.iter().any(|name| name == "Clocks"))
+    });
+    checker
+        .session
+        .gniri_msg(&["debug", "open-folder", "folder-1"])?;
+    checker.expect("last, after what was there", |session| {
+        Ok(dialog(session)? == ["Writer", "Spreadsheets", "Presentations", "Clocks"])
+    });
+
+    println!("a folder's dialog");
+    checker.session.gniri_msg(&["debug", "sync"])?;
+    let spreadsheets = overview_spot(&checker.session, DIALOG, "Spreadsheets")?;
+    let writer = overview_spot(&checker.session, DIALOG, "Writer")?;
+    pointer.drag(spreadsheets, (writer.0 - tile * 0.45, writer.1), REST)?;
+    checker.expect("its applications are put in another order", |session| {
+        Ok(dialog(session)? == ["Spreadsheets", "Writer", "Presentations", "Clocks"])
+    });
+    checker.session.gniri_msg(&["debug", "sync"])?;
+    let presentations = overview_spot(&checker.session, DIALOG, "Presentations")?;
+    // Out of the dialog, long enough for it to close, and into the grid.
+    pointer.move_to(presentations)?;
+    pointer.press()?;
+    std::thread::sleep(std::time::Duration::from_millis(50));
+    pointer.glide_to((30.0, f64::from(height) / 2.0))?;
+    std::thread::sleep(std::time::Duration::from_millis(900));
+    checker.expect("dragged out of it, it closes", |session| {
+        Ok(dialog(session)?.is_empty())
+    });
+    pointer.release()?;
+    checker.expect("and the application is in the grid again", |session| {
+        Ok(grid(session)?.iter().any(|name| name == "Presentations"))
+    });
+
+    checker
+        .session
+        .gniri_msg(&["debug", "open-folder", "folder-1"])?;
+    checker.session.gniri_msg(&["debug", "sync"])?;
+    let edit = {
+        let found = surface(&checker.session, "gniri-overview")?
+            .ok_or_else(|| anyhow!("the overview is not mapped"))?;
+        let (left, top) = surface_origin(&checker.session, &found)?;
+        let [x, y, w, h] = tree::rect(
+            tree::select(&found["tree"], ".folder-name-container .icon-button")?,
+            "box",
+        )?;
+        (left + x + w / 2.0, top + y + h / 2.0)
+    };
+    click(&mut pointer, edit)?;
+    checker.expect("its name can be changed", |session| {
+        Ok(on_surface(session, "gniri-overview", ".folder-name-entry")?.is_some())
+    });
+    if on_path("wtype") {
+        type_text(&checker.session, "Work")?;
+        key(&checker.session, "Return")?;
+        checker.expect("and the new name is the folder's", |session| {
+            Ok(on_surface(session, "gniri-overview", ".folder-name-label")?
+                .is_some_and(|label| label["text"] == "Work"))
+        });
+        key(&checker.session, "Escape")?;
+        checker.expect("in the grid too", |session| {
+            Ok(dialog(session)?.is_empty() && grid(session)?.iter().any(|name| name == "Work"))
+        });
+    } else {
+        println!("  skip wtype is not installed");
+        checker.session.gniri_msg(&["debug", "close-folder"])?;
+    }
+
+    println!("the dash");
+    checker.session.gniri_msg(&["debug", "sync"])?;
+    let favorites = dash(&checker.session)?.len();
+    let help = overview_spot(&checker.session, GRID, "Help")?;
+    let first = overview_spot(&checker.session, DASH, "Zen Browser")?;
+    pointer.drag(help, (first.0 + 10.0, first.1), REST)?;
+    checker.expect(
+        "an application dragged to the dash is pinned there",
+        |session| {
+            let dash = dash(session)?;
+            Ok(dash.len() == favorites + 1 && dash.get(1).is_some_and(|name| name == "Help"))
+        },
+    );
+    checker.expect("and is no longer in the grid", |session| {
+        Ok(!grid(session)?.iter().any(|name| name == "Help"))
+    });
+    checker.session.gniri_msg(&["debug", "sync"])?;
+    let pinned = overview_spot(&checker.session, DASH, "Help")?;
+    let show_apps = {
+        let found = surface(&checker.session, "gniri-overview")?
+            .ok_or_else(|| anyhow!("the overview is not mapped"))?;
+        let (left, top) = surface_origin(&checker.session, &found)?;
+        let [x, y, w, h] = tree::rect(tree::select(&found["tree"], ".show-apps")?, "box")?;
+        (left + x + w / 2.0, top + y + h / 2.0)
+    };
+    pointer.drag(pinned, show_apps, REST)?;
+    checker.expect("dropped on the apps button, it is unpinned", |session| {
+        Ok(dash(session)?.len() == favorites && grid(session)?.iter().any(|name| name == "Help"))
+    });
+
+    println!("a drag let go of nowhere");
+    checker.session.gniri_msg(&["debug", "sync"])?;
+    let before = arranged(&checker.session)?;
+    let order = grid(&checker.session)?;
+    let boxes = overview_spot(&checker.session, GRID, "Boxes")?;
+    // The search entry takes nothing.
+    pointer.drag(boxes, (f64::from(width) / 2.0, 70.0), REST)?;
+    checker.expect("changes nothing", |session| {
+        Ok(arranged(session)? == before && grid(session)? == order)
+    });
+
+    let Checker {
+        session,
+        passed,
+        failed,
+    } = checker;
+    drop(pointer);
+    session.quit()?;
+    Ok((passed, failed))
 }
 
 /// gniri in German: the texts are GNOME Shell's own translations, the

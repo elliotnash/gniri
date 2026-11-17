@@ -53,6 +53,63 @@ $page_indicator_inactive_opacity: 0.5;
     }
 }
 
+// app folders: their icon is four of their applications' (code).
+
+// An application something dragged onto would make a folder with: its
+// icon shrinks to the size it would have in the folder's icon
+// (`AppIcon._showFolderPreview`, eased as Clutter eases by default).
+.overview-tile image.folder-preview {
+    transform: scale(0.4);
+}
+
+.overview-tile image {
+    transition: transform 250ms $ease_out_quad;
+}
+
+// The dialog an app folder opens in (overview/folder.rs). Its size and
+// corners are in the code too, which draws the blur behind it.
+$app_folder_size: 720px;
+$app_folder_radius: $modal_radius * 4;
+// appDisplay.js FOLDER_DIALOG_ANIMATION_TIME
+$app_folder_animation_time: 200ms;
+
+.app-folder-dialog-container {
+    opacity: 0;
+    transition: opacity $app_folder_animation_time $ease_out_quad,
+                background-color $app_folder_animation_time $ease_out_quad;
+
+    &.open { opacity: 1; }
+}
+
+.app-folder-dialog {
+    border-radius: $app_folder_radius;
+    padding: 0 1px;
+
+    .folder-name-container {
+        padding: ($base_padding * 4) ($base_padding * 6) 0;
+
+        .folder-name-label,
+        .folder-name-entry {
+            // %title_1
+            font-weight: 800;
+            font-size: 20pt;
+        }
+
+        .folder-name-entry {
+            all: unset;
+            min-width: 12em;
+            border-radius: $base_border_radius;
+            padding: 9px;
+        }
+    }
+
+    .icon-button { min-width: em_at_most(16px); }
+
+    .page-indicators {
+        margin-bottom: $base_padding * 4;
+    }
+}
+
 // Running app indicator (also shown in dash)
 .app-grid-running-dot {
     min-height: $running_dot_size;
@@ -104,6 +161,8 @@ $page_indicator_inactive_opacity: 0.5;
 }
 
 :root {
+    --gniri-app-folder-size: #{$app_folder_size};
+    --gniri-app-folder-radius: #{$app_folder_radius};
     // .icon-grid
     --gniri-icon-grid-row-spacing: #{$base_padding * 2};
     --gniri-icon-grid-column-spacing: #{$base_padding * 2};

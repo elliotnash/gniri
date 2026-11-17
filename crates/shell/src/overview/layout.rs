@@ -118,6 +118,27 @@ pub const GRID_ICON_SIZES: [i32; 6] = [96, 64, 48, 32, 24, 16];
 
 /// iconGrid.js `defaultGridModes`: (columns, rows).
 const GRID_MODES: [(usize, usize); 4] = [(3, 8), (4, 6), (6, 4), (8, 3)];
+/// `FolderGrid`'s one mode.
+const FOLDER_MODES: [(usize, usize); 1] = [(3, 3)];
+
+/// Which of GNOME's two icon grids: the app grid, which spreads its icons
+/// over the page (`page_halign` and `page_valign` FILL), or a folder's,
+/// three by three in the middle of the page (CENTER).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum GridKind {
+    #[default]
+    Apps,
+    Folder,
+}
+
+impl GridKind {
+    fn modes(self) -> &'static [(usize, usize)] {
+        match self {
+            Self::Apps => &GRID_MODES,
+            Self::Folder => &FOLDER_MODES,
+        }
+    }
+}
 
 /// appDisplay.js `PAGE_PREVIEW_RATIO`.
 const PAGE_PREVIEW_RATIO: f64 = 0.20;
@@ -150,6 +171,32 @@ pub struct Grid {
     row_step: f64,
 }
 
+/// iconGrid.js `LEFT_DIVIDER_LEEWAY` and `RIGHT_DIVIDER_LEEWAY`: how far
+/// into an icon its edge reaches, for a drop.
+const DIVIDER_LEEWAY: f64 = 20.0;
+
+/// Where on an icon something dragged is (iconGrid.js `DragLocation`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DragLocation {
+    /// Its left edge: the place before it.
+    StartEdge,
+    /// The icon itself: something to drop onto it.
+    OnIcon,
+    /// Its right edge: the place after it.
+    EndEdge,
+}
+
+/// What is under a point of a page of the grid.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DropTarget {
+    /// Above or below the icons: nowhere to drop.
+    Invalid,
+    /// Among the icons, but on none: after the last.
+    Empty,
+    /// On or beside the icon at this place of the page.
+    Item(usize, DragLocation),
+}
+
 impl Grid {
     pub fn per_page(&self) -> usize {
         self.columns * self.rows
@@ -169,6 +216,77 @@ impl Grid {
             (self.top + row as f64 * self.row_step).floor() as i32,
         )
     }
+
+    /// What is at `(x, y)` of a page that shows `count` items
+    /// (`IconGridLayout.getDropTarget`).
+    pub fn drop_target(&self, (x, y): (f64, f64), count: usize) -> DropTarget {
+        let child = self.child_size;
+        let (column_spacing, row_spacing) = (self.column_step - child, self.row_step - child);
+        let width = child * self.columns as f64 + column_spacing * (self.columns as f64 - 1.0);
+        let height = child * self.rows as f64 + row_spacing * (self.rows as f64 - 1.0);
+        if y < self.top || y > self.top + height {
+            return DropTarget::Invalid;
+        }
+        let in_left_space = x < self.left;
+        let in_right_space = x > self.left + width;
+        let (half_column, half_row) = (column_spacing / 2.0, row_spacing / 2.0);
+        for position in 0..count.min(self.per_page()) {
+            let (left, top) = self.origin(position);
+            let (left, top) = (f64::from(left), f64::from(top));
+            let (right, bottom) = (left + child, top + child);
+            let first_in_row = position % self.columns == 0;
+            let last_in_row = position % self.columns == self.columns - 1;
+            let outside_row = y < top - half_row || y > bottom + half_row;
+            let outside = if (in_left_space && first_in_row) || (in_right_space && last_in_row) {
+                outside_row
+            } else {
+                outside_row || x < left - half_column || x > right + half_column
+            };
+            if outside {
+                continue;
+            }
+            let location = if x < left + DIVIDER_LEEWAY {
+                DragLocation::StartEdge
+            } else if x > right - DIVIDER_LEEWAY {
+                DragLocation::EndEdge
+            } else {
+                DragLocation::OnIcon
+            };
+            return DropTarget::Item(position, location);
+        }
+        DropTarget::Empty
+    }
+}
+
+/// Where in the grid's order an item dragged from `source` ends up when it
+/// is let go over the item at `target`, both counted through every page
+/// (`AppDisplay._getDropTarget` and `_moveItem`, with pages that are always
+/// full). `source` is `None` for an item from elsewhere, which comes in
+/// after everything. The item is taken out first and put in at the place
+/// this returns.
+pub fn reorder_target(
+    source: Option<usize>,
+    target: usize,
+    location: DragLocation,
+    columns: usize,
+) -> usize {
+    let column = target % columns;
+    match source {
+        // Taking it out moves everything after it back by one: dropped at
+        // the start of the icon it is the place before it, unless that
+        // icon starts a row.
+        Some(source) if source < target => match location {
+            DragLocation::StartEdge if column > 0 => target - 1,
+            _ => target,
+        },
+        Some(source) if source == target => target,
+        // Before the item, or from elsewhere: its end edge is the place
+        // after it, unless it ends a row.
+        _ => match location {
+            DragLocation::EndEdge if column < columns - 1 => target + 1,
+            _ => target,
+        },
+    }
 }
 
 /// `BaseAppViewGridLayout._getIndicatorsWidth`: a tenth of the width, or
@@ -179,13 +297,20 @@ fn indicators_width(width: f64, arrow_width: f64) -> f64 {
 
 /// `IconGrid._findBestModeForSize`: the mode whose shape is nearest the
 /// page's, the page's padding left out.
-fn grid_mode(width: f64, height: f64, style: &GridStyle, indicators: f64) -> (usize, usize) {
+fn grid_mode(
+    width: f64,
+    height: f64,
+    style: &GridStyle,
+    indicators: f64,
+    kind: GridKind,
+) -> (usize, usize) {
     let width = width - style.page_padding_left - style.page_padding_right - 2.0 * indicators;
     let height = height - style.page_padding_top - style.page_padding_bottom;
     let ratio = width / height;
     let mut closest = f64::INFINITY;
-    let mut best = GRID_MODES[0];
-    for mode in GRID_MODES {
+    let modes = kind.modes();
+    let mut best = modes[0];
+    for &mode in modes {
         let mode_ratio = mode.0 as f64 / mode.1 as f64;
         if (ratio - mode_ratio).abs() < (ratio - closest).abs() {
             closest = mode_ratio;
@@ -227,10 +352,11 @@ pub fn grid_icon_size(
     size: (f64, f64),
     style: &GridStyle,
     arrow_width: f64,
+    kind: GridKind,
     item_size: impl Fn(i32) -> f64,
 ) -> i32 {
     let indicators = indicators_width(size.0, arrow_width);
-    let mode = grid_mode(size.0, size.1, style, indicators);
+    let mode = grid_mode(size.0, size.1, style, indicators, kind);
     GRID_ICON_SIZES
         .into_iter()
         .find(|&icon| {
@@ -244,10 +370,29 @@ pub fn grid_icon_size(
 /// Lays a page of `size` out for items `child_size` wide and tall
 /// (`IconGridLayout._calculateSpacing`, with the page filled both ways as
 /// the app grid has it). `arrow_width` is what a page-turning arrow needs.
-pub fn grid(size: (f64, f64), style: &GridStyle, arrow_width: f64, child_size: f64) -> Grid {
+pub fn grid(
+    size: (f64, f64),
+    style: &GridStyle,
+    arrow_width: f64,
+    child_size: f64,
+    kind: GridKind,
+) -> Grid {
     let indicators = indicators_width(size.0, arrow_width);
-    let mode = grid_mode(size.0, size.1, style, indicators);
+    let mode = grid_mode(size.0, size.1, style, indicators, kind);
     let (empty_horizontal, empty_vertical) = empty_space(size, mode, child_size, style, indicators);
+    if kind == GridKind::Folder {
+        // CENTER both ways: the spacing stays, the room goes around.
+        return Grid {
+            columns: mode.0,
+            rows: mode.1,
+            child_size,
+            indicators_width: indicators,
+            left: style.page_padding_left + indicators + (empty_horizontal / 2.0).floor(),
+            top: style.page_padding_top + (empty_vertical / 2.0).floor(),
+            column_step: child_size + style.column_spacing,
+            row_step: child_size + style.row_spacing,
+        };
+    }
 
     // The spare room goes between the items, up to the theme's limit; what
     // is left after that goes around them.
@@ -382,10 +527,11 @@ mod tests {
         // the page dots.
         let size = (1792.0, 674.0);
         assert_eq!(
-            grid_icon_size(size, &STYLE, ARROW, |icon| f64::from(icon) + 49.0),
+            grid_icon_size(size, &STYLE, ARROW, GridKind::Apps, |icon| f64::from(icon)
+                + 49.0),
             96
         );
-        let grid = grid(size, &STYLE, ARROW, 145.0);
+        let grid = grid(size, &STYLE, ARROW, 145.0, GridKind::Apps);
         assert_eq!((grid.columns, grid.rows), (8, 3));
         // The first tile of each column and row, less the display's own
         // origin (0, 294).
@@ -454,13 +600,16 @@ mod tests {
         let size = (view[2], view[3]);
         // An item is 49px larger than its icon: 96px icons give 145.
         assert_eq!(
-            f64::from(grid_icon_size(size, &STYLE, arrow_room, |icon| f64::from(
-                icon
-            ) + 49.0))
-                + 49.0,
+            f64::from(grid_icon_size(
+                size,
+                &STYLE,
+                arrow_room,
+                GridKind::Apps,
+                |icon| f64::from(icon) + 49.0
+            )) + 49.0,
             child
         );
-        let grid = grid(size, &STYLE, arrow_room, child);
+        let grid = grid(size, &STYLE, arrow_room, child, GridKind::Apps);
         assert_eq!(grid.per_page(), 24);
         assert_eq!(grid.pages(tiles.len()), 2);
         for (index, tile) in tiles.iter().enumerate() {
@@ -491,14 +640,17 @@ mod tests {
         // The nested test output: the scroll view is 1280x423.
         let size = (1280.0, 423.0);
         let item = |icon: i32| f64::from(icon) + 49.0;
-        assert_eq!(grid_icon_size(size, &STYLE, ARROW, item), 64);
-        let grid = grid(size, &STYLE, ARROW, item(64));
+        assert_eq!(
+            grid_icon_size(size, &STYLE, ARROW, GridKind::Apps, item),
+            64
+        );
+        let grid = grid(size, &STYLE, ARROW, item(64), GridKind::Apps);
         assert_eq!((grid.columns, grid.rows), (8, 3));
     }
 
     #[test]
     fn a_tall_page_takes_the_tall_mode() {
-        let grid = grid((600.0, 1200.0), &STYLE, ARROW, 113.0);
+        let grid = grid((600.0, 1200.0), &STYLE, ARROW, 113.0, GridKind::Apps);
         assert_eq!((grid.columns, grid.rows), (3, 8));
     }
 
@@ -510,5 +662,82 @@ mod tests {
         assert_eq!(search_columns(145, 145, 30), 0);
         assert_eq!(search_columns(146, 145, 30), 1);
         assert_eq!(search_columns(0, 0, 30), 0);
+    }
+
+    #[test]
+    fn a_folder_has_three_rows_of_three_in_the_middle() {
+        // A 720px dialog's view: its own spacing, the rest around.
+        let grid = grid((718.0, 600.0), &STYLE, ARROW, 120.0, GridKind::Folder);
+        assert_eq!((grid.columns, grid.rows), (3, 3));
+        let (first, second) = (grid.origin(0), grid.origin(1));
+        assert_eq!(second.0 - first.0, 132, "120 and the 12 between them");
+        let width = 3 * 120 + 2 * 12;
+        let indicators = 71.8_f64.max(ARROW);
+        let left = 18.0
+            + indicators
+            + ((718.0 - 36.0 - 2.0 * indicators - f64::from(width)) / 2.0).floor();
+        assert_eq!(first.0, left as i32);
+    }
+
+    /// The page of the app grid on the reference screen: 8 by 3 items of
+    /// 145, as `the_app_grid_is_laid_out_as_on_the_reference_screen` has it.
+    fn reference_page() -> Grid {
+        grid((1792.0, 674.0), &STYLE, ARROW, 145.0, GridKind::Apps)
+    }
+
+    #[test]
+    fn a_drop_is_on_an_icon_or_beside_it() {
+        let grid = reference_page();
+        let (left, top) = grid.origin(9);
+        let (left, top) = (f64::from(left), f64::from(top));
+        let middle = top + 72.0;
+        assert_eq!(
+            grid.drop_target((left + 72.0, middle), 24),
+            DropTarget::Item(9, DragLocation::OnIcon)
+        );
+        assert_eq!(
+            grid.drop_target((left + 5.0, middle), 24),
+            DropTarget::Item(9, DragLocation::StartEdge)
+        );
+        assert_eq!(
+            grid.drop_target((left + 140.0, middle), 24),
+            DropTarget::Item(9, DragLocation::EndEdge)
+        );
+        // Half the spacing beside it still counts as its edge.
+        assert_eq!(
+            grid.drop_target((left - 2.0, middle), 24),
+            DropTarget::Item(9, DragLocation::StartEdge)
+        );
+        // Above the icons there is nothing; past the last one there is
+        // room after it.
+        assert_eq!(grid.drop_target((left, 2.0), 24), DropTarget::Invalid);
+        assert_eq!(
+            grid.drop_target((left + 72.0, middle), 5),
+            DropTarget::Empty
+        );
+        // The room at the side of a row belongs to its first icon.
+        let (_, row_top) = grid.origin(8);
+        assert_eq!(
+            grid.drop_target((1.0, f64::from(row_top) + 72.0), 24),
+            DropTarget::Item(8, DragLocation::StartEdge)
+        );
+    }
+
+    #[test]
+    fn a_dragged_icon_lands_before_or_after_the_one_it_was_let_go_on() {
+        use DragLocation::{EndEdge, StartEdge};
+        // Eight columns. From before the target, its start edge is the
+        // place before it, which after taking the item out is one less.
+        assert_eq!(reorder_target(Some(2), 5, StartEdge, 8), 4);
+        assert_eq!(reorder_target(Some(2), 5, EndEdge, 8), 5);
+        // From after it, its end edge is the place after it.
+        assert_eq!(reorder_target(Some(9), 5, StartEdge, 8), 5);
+        assert_eq!(reorder_target(Some(9), 5, EndEdge, 8), 6);
+        // From elsewhere, as from after it.
+        assert_eq!(reorder_target(None, 5, EndEdge, 8), 6);
+        // At the ends of a row GNOME does not reach into the next.
+        assert_eq!(reorder_target(Some(2), 8, StartEdge, 8), 8);
+        assert_eq!(reorder_target(Some(9), 7, EndEdge, 8), 7);
+        assert_eq!(reorder_target(Some(5), 5, EndEdge, 8), 5);
     }
 }

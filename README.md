@@ -20,7 +20,8 @@ What it is:
   sleep, the dialog that asks before restarting, powering off or logging
   out, and the polkit authentication agent;
 - GNOME's dress for niri's overview: the search entry, the dash with the
-  favourite and the running applications, the app grid, and a search that
+  favourite and the running applications, the app grid with its folders
+  (icons are dragged about as in GNOME), and a search that
   finds applications and asks the ones that offer results of their own
   (Files, Calculator, Characters, Software and so on);
 - the dialogs the system asks through: for a Wi-Fi network's password, and
@@ -138,7 +139,11 @@ arrow keys do what niri's own do there. Keys you have bound in niri's
 config work as always.
 
 Which applications are always in the dash is in the config file
-(`[dash]`); the default is GNOME's. A search asks the applications that
+(`[dash]`); the default is GNOME's. Dragging an application to the dash,
+within it or onto the apps button changes that, as does dragging icons in
+the app grid; gniri keeps what was dragged where in
+`~/.local/state/gniri/state.toml`. A config file given another list of
+favourites wins again. A search asks the applications that
 offer GNOME Shell results over D-Bus, starting them as GNOME does;
 `[search]` turns that off or leaves some out.
 

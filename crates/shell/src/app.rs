@@ -644,6 +644,13 @@ fn handle(
             services.overview.update(|overview| overview.page = page);
             Ok(Value::Null)
         }
+        ipc::Request::Folder(folder) => {
+            services.overview.update(|overview| match &folder {
+                Some(folder) => overview.open_folder(folder),
+                None => overview.close_folder(),
+            });
+            Ok(Value::Null)
+        }
         ipc::Request::Pairing(pairing) => {
             use gniri_services::bluetooth::agent::Event;
             services

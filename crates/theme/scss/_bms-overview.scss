@@ -125,6 +125,88 @@ $bms_dash_checked_hover: bms-ink(0.25);
     .list-search-result-description { color: $bms_overview_description_fg; }
 }
 
+// What something dragged would be dropped onto: the extension's active
+// colour, and upstream's ring in the accent colour, which it leaves.
+$bms_drop_ring: inset 0 0 0 2px st-transparentize(-st-accent-color, 0.2);
+
+.controls-manager .icon-grid .overview-tile.drop {
+    background-color: $bms_overview_active;
+    box-shadow: $bms_drop_ring;
+}
+
+// An app folder in the grid: appfolders.css and overview.css.
+.controls-manager .icon-grid .overview-tile.app-folder {
+    background-color: rgba(255, 255, 255, bms-pick(0.1, 0.58));
+
+    &:hover, &.selected { background-color: rgba(255, 255, 255, bms-pick(0.13, 0.78)); }
+    &:active, &.drop { background-color: rgba(255, 255, 255, bms-pick(0.19, 0.9)); }
+
+    @if $bms_light {
+        label { color: rgba(0, 0, 0, 0.85); }
+    }
+}
+
+// The folder's dialog: appfolders.css `.appfolder-dialogs-dark` and
+// `-light`. The shade is `DIALOG_SHADE_NORMAL` and `_HIGHLIGHT` at a
+// quarter, as the extension has them.
+$bms_folder_shade: rgba(0, 0, 0, 51 / 255);
+$bms_folder_shade_lighter: rgba(0, 0, 0, 21 / 255);
+$bms_folder_tint: bms-pick(rgba(30, 30, 33, 0.5), rgba(255, 255, 255, 0.65));
+$bms_folder_fg: bms-pick(rgba(255, 255, 255, 0.9), rgba(0, 0, 0, 0.85));
+
+.app-folder-dialog-container {
+    background-color: $bms_folder_shade;
+
+    &.lighter { background-color: $bms_folder_shade_lighter; }
+}
+
+.app-folder-dialog {
+    color: $bms_folder_fg;
+    background-color: $bms_folder_tint;
+    border: 1px solid bms-pick(rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0.05));
+
+    .folder-name-label,
+    .folder-name-entry {
+        color: $bms_folder_fg;
+        background-color: transparent;
+        caret-color: currentColor;
+    }
+
+    .icon-button,
+    .page-navigation-arrow {
+        color: $bms_folder_fg;
+        background-color: bms-ink(0.1);
+        border: 1px solid bms-ink(0.05);
+
+        &:hover { background-color: bms-ink(0.15); border-color: bms-ink(bms-pick(0.12, 0.08)); }
+        &:active, &:checked { background-color: bms-ink(0.3); border-color: bms-ink(bms-pick(0.16, 0.12)); }
+        &:focus-visible { box-shadow: inset 0 0 0 2px $bms_focus_ring_color; }
+    }
+
+    .overview-tile {
+        color: $bms_folder_fg;
+        background-color: transparent;
+
+        &:hover, &.selected { background-color: bms-ink(0.13); }
+        &:active { background-color: bms-ink(0.19); }
+    }
+
+    .page-indicator-icon {
+        background-color: bms-pick(rgba(255, 255, 255, 0.45), rgba(34, 34, 38, 0.55));
+    }
+    .page-indicator:hover .page-indicator-icon {
+        background-color: bms-pick(rgba(255, 255, 255, 0.7), rgba(34, 34, 38, 0.75));
+    }
+    .page-indicator.current .page-indicator-icon {
+        background-color: bms-pick(rgba(255, 255, 255, 0.9), #222226);
+    }
+
+    .app-grid-running-dot { background-color: bms-pick($system_fg_color, #222226); }
+}
+
+// The dash's items, as an application dragged over them would land.
+#dash .overview-tile.drop .overview-icon { background-color: $bms_dash_active; }
+
 // What light.css says beyond the colours above: black on the cards, and
 // the states of what lies on one.
 @if $bms_light {
@@ -173,6 +255,9 @@ $bms_dash_checked_hover: bms-ink(0.25);
 }
 
 :root {
+    --gniri-bms-folder-shade: #{$bms_folder_shade};
+    --gniri-bms-folder-shade-lighter: #{$bms_folder_shade_lighter};
+    --gniri-bms-folder-tint: #{$bms_folder_tint};
     --gniri-bms-dash-tint: #{$bms_dash_tint};
     --gniri-bms-dash-border: #{$bms_dash_border};
     --gniri-bms-dash-separator: #{$bms_dash_separator};

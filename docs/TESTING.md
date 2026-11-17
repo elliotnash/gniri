@@ -150,7 +150,13 @@ at: `cargo xtask shot look --scene date-menu-media --wallpaper '#808080'`
 (a media player's card), `date-menu-group` (an opened group),
 `date-menu-empty`, `quick-settings-busy`, `end-session` (the dialog that
 asks before powering off), `wifi-password` (the one that asks for a
-network's password) and `bluetooth-pairing` (a number to compare).
+network's password), `bluetooth-pairing` (a number to compare),
+`app-grid-folders` and `app-folder` (a folder's dialog open).
+
+A scene that `extends` another adds to its fixture service by service:
+`[fixture.apps.layout]` keeps the base scene's installed applications. A
+scene's applications are in name order unless it gives an arrangement;
+the real shell starts from GNOME's.
 
 ### The lock screen and the dialogs
 
@@ -190,6 +196,7 @@ part's name after `check` runs that one alone.
 | `agents` | The Wi-Fi password and Bluetooth pairing dialogs |
 | `config` | The config file changing under a running shell |
 | `outputs` | Outputs going and coming back, and one changing its scale |
+| `folders` | App folders, and dragging icons in the grid, a folder and the dash |
 | `language` | gniri in German: GNOME's translations, dates, sentences with numbers |
 
 `language` asks gettext what each text should read and compares, so it
@@ -199,6 +206,12 @@ installed. A unit test beside it (`cargo test -p xtask`) reads every text
 gniri asks a translation for out of the source and looks for it in GNOME's
 installed catalogs: a text that is a character off would never be
 translated, and nobody reading English would see why.
+
+`folders` drags with a pointer of the harness's own
+(`crates/xtask/src/pointer.rs`, a client of the nested compositor's
+virtual pointer), since `wlrctl` can click but not hold a button down. It
+leaves two pictures of drags under way, `target/visual/drag-room.png` and
+`drag-folder-preview.png`, to look at.
 
 Two of the others need saying more about.
 

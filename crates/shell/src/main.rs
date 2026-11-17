@@ -176,6 +176,11 @@ enum DebugRequest {
     },
     /// Turn to a page of the app grid, counting from 0.
     Page { page: usize },
+    /// Open an app folder's dialog, by the folder's id, as a click on its
+    /// icon does.
+    OpenFolder { folder: String },
+    /// Close the folder's dialog.
+    CloseFolder,
     /// Ask a Bluetooth pairing question, as if BlueZ had asked.
     Pairing(ipc::Pairing),
     /// Behave as if every output had been unplugged, or with `--back` as
@@ -221,6 +226,8 @@ impl Message {
                 DebugRequest::ShowApps { off } => ipc::Request::ShowApps(!off),
                 DebugRequest::Search { text, quiet } => ipc::Request::Search { text, quiet },
                 DebugRequest::Page { page } => ipc::Request::Page(page),
+                DebugRequest::OpenFolder { folder } => ipc::Request::Folder(Some(folder)),
+                DebugRequest::CloseFolder => ipc::Request::Folder(None),
                 DebugRequest::Pairing(pairing) => ipc::Request::Pairing(pairing),
                 DebugRequest::Unplug { back } => ipc::Request::Outputs(back),
             },

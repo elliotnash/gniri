@@ -11,6 +11,8 @@
 //!   box#searchResults                   SearchResultsView
 //!   box#dash                            Dash
 //!   label.dash-label                    the name of a dash item
+//!   box.app-folder-dialog-container     AppFolderDialog (overview/folder.rs)
+//!   fixed.drag-layer                    what a drag's icon moves on
 //! ```
 //!
 //! The cover is gniri's own. GNOME shrinks the workspaces to a strip when
@@ -35,6 +37,23 @@ pub struct Parts {
     pub search_results: gtk::Widget,
     pub dash: gtk::Widget,
     pub dash_label: gtk::Widget,
+    pub folder: gtk::Widget,
+    pub drag_layer: gtk::Widget,
+}
+
+impl Parts {
+    fn all(&self) -> [&gtk::Widget; 8] {
+        [
+            &self.cover,
+            &self.entry,
+            &self.app_display,
+            &self.search_results,
+            &self.dash,
+            &self.dash_label,
+            &self.folder,
+            &self.drag_layer,
+        ]
+    }
 }
 
 /// `.dash-label { -y-offset }`: how far above its item the label floats.
@@ -57,6 +76,9 @@ mod imp {
         pub(super) above: Cell<i32>,
         /// Told how much room the dash may take, before it is measured.
         pub(super) on_dash_room: RefCell<Option<DashRoom>>,
+        /// Told how much room the folder dialog has, before it is laid
+        /// out.
+        pub(super) on_folder_room: RefCell<Option<DashRoom>>,
         pub(super) label_anchor: RefCell<Option<LabelAnchor>>,
     }
 
@@ -70,14 +92,7 @@ mod imp {
     impl ObjectImpl for Controls {
         fn dispose(&self) {
             if let Some(parts) = self.parts.take() {
-                for part in [
-                    parts.cover,
-                    parts.entry,
-                    parts.app_display,
-                    parts.search_results,
-                    parts.dash,
-                    parts.dash_label,
-                ] {
+                for part in parts.all() {
                     part.unparent();
                 }
             }
@@ -123,6 +138,13 @@ mod imp {
 
             let above = self.above.get();
             place(&parts.cover, -above, height + above);
+            // Over everything of the overview, as GNOME's covers the
+            // monitor under the panel.
+            if let Some(folder_room) = self.on_folder_room.borrow().as_ref() {
+                folder_room(width, height);
+            }
+            place(&parts.folder, 0, height);
+            place(&parts.drag_layer, 0, height);
 
             // `DashItemContainer.showLabel`: centred over its item, kept
             // on the screen.
@@ -156,18 +178,12 @@ impl Controls {
     pub fn new(
         parts: Parts,
         dash_room: impl Fn(i32, i32) + 'static,
+        folder_room: impl Fn(i32, i32) + 'static,
         label_anchor: impl Fn() -> Option<(i32, i32, i32)> + 'static,
     ) -> Self {
         let controls: Self = glib::Object::new();
         controls.add_css_class("controls-manager");
-        for part in [
-            &parts.cover,
-            &parts.entry,
-            &parts.app_display,
-            &parts.search_results,
-            &parts.dash,
-            &parts.dash_label,
-        ] {
+        for part in parts.all() {
             part.set_parent(&controls);
         }
         controls
@@ -179,6 +195,10 @@ impl Controls {
             .imp()
             .on_dash_room
             .replace(Some(Box::new(dash_room)));
+        controls
+            .imp()
+            .on_folder_room
+            .replace(Some(Box::new(folder_room)));
         controls
     }
 
