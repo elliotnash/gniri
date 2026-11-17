@@ -29,6 +29,17 @@ use crate::overview::app_grid::{self, Shown, View};
 use crate::overview::controls::{Controls, Parts};
 use crate::overview::{self, Direction, dash, drag, folder, search_entry, search_results};
 use crate::services::Services;
+use crate::widgets::motion::Eased;
+
+/// An opacity, eased.
+fn opacity_of(widget: &impl IsA<gtk::Widget>) -> Eased {
+    let target = widget.clone().upcast::<gtk::Widget>().downgrade();
+    Eased::new(widget, 1.0, move |opacity| {
+        if let Some(widget) = target.upgrade() {
+            widget.set_opacity(opacity);
+        }
+    })
+}
 
 /// overviewControls.js `SIDE_CONTROLS_ANIMATION_TIME`: how long the dash
 /// and the entry take to come and go. The theme's transitions last as
@@ -50,6 +61,12 @@ struct Inner {
     /// Counts opens and closes, so a close that was overtaken by a new
     /// open does not unmap the surface.
     generation: Cell<u64>,
+    /// The grid rising (`_stateAdjustment`), and the opacities of the
+    /// cover, the grid and the search results (`_onSearchChanged`).
+    rising: Eased,
+    covering: Eased,
+    grid_fade: Eased,
+    search_fade: Eased,
 }
 
 /// One output's overview surface. Dropping it stops it following the
@@ -105,15 +122,81 @@ impl Inner {
     }
 
     /// Shows what the state says: the windows, the app grid or the search
-    /// results.
-    fn show_view(&self) {
+    /// results. The grid rises from below and goes back down
+    /// (`_onShowAppsButtonToggled`), the results and the grid cross-fade
+    /// (`_onSearchChanged`), and the cover over niri's workspaces fades in
+    /// and out where GNOME's workspaces shrink and grow.
+    fn show_view(self: &Rc<Self>) {
         let (apps, searching) = self
             .services
             .overview
             .with(|overview| (overview.apps, overview.searching()));
-        self.cover.set_visible(apps || searching);
-        self.app_display.widget.set_visible(apps && !searching);
-        self.search_results.widget.set_visible(searching);
+        let time = CONTROLS_ANIMATION.as_millis() as u32;
+        let hidden_after = |widget: gtk::Widget, shown: fn(&Self) -> bool| {
+            let inner = Rc::downgrade(self);
+            move || {
+                if let Some(inner) = inner.upgrade()
+                    && !shown(&inner)
+                {
+                    widget.set_visible(false);
+                    inner.update_input_region();
+                }
+            }
+        };
+        fn wants_cover(inner: &Inner) -> bool {
+            inner
+                .services
+                .overview
+                .with(|overview| overview.apps || overview.searching())
+        }
+        fn wants_grid(inner: &Inner) -> bool {
+            inner
+                .services
+                .overview
+                .with(|overview| overview.apps && !overview.searching())
+        }
+        fn wants_results(inner: &Inner) -> bool {
+            inner.services.overview.with(overview::Overview::searching)
+        }
+
+        if apps || searching {
+            self.cover.set_visible(true);
+        }
+        self.covering.ease(
+            if apps || searching { 1.0 } else { 0.0 },
+            time,
+            adw::Easing::EaseOutQuad,
+            hidden_after(self.cover.clone(), wants_cover),
+        );
+        let grid = apps && !searching;
+        if grid {
+            self.app_display.widget.set_visible(true);
+        }
+        // Rising and falling only between the windows and the grid; a
+        // search fades the grid in place.
+        if !searching {
+            self.rising.ease(
+                if apps { 1.0 } else { 0.0 },
+                time,
+                adw::Easing::EaseOutSine,
+                hidden_after(self.app_display.widget.clone().upcast(), wants_grid),
+            );
+        }
+        self.grid_fade.ease(
+            if searching { 0.0 } else { 1.0 },
+            time,
+            adw::Easing::EaseOutQuad,
+            hidden_after(self.app_display.widget.clone().upcast(), wants_grid),
+        );
+        if searching {
+            self.search_results.widget.set_visible(true);
+        }
+        self.search_fade.ease(
+            if searching { 1.0 } else { 0.0 },
+            time,
+            adw::Easing::EaseOutQuad,
+            hidden_after(self.search_results.widget.clone().upcast(), wants_results),
+        );
         self.update_input_region();
     }
 
@@ -405,6 +488,17 @@ pub fn build(
         &folder,
         &dash,
     );
+    let rising = Eased::new(&controls, 1.0, {
+        let controls = controls.downgrade();
+        move |grid| {
+            if let Some(controls) = controls.upgrade() {
+                controls.set_grid(grid);
+            }
+        }
+    });
+    let covering = opacity_of(&cover);
+    let grid_fade = opacity_of(&app_display.widget);
+    let search_fade = opacity_of(&search_results.widget);
     let inner = Rc::new(Inner {
         window: window.clone(),
         controls,
@@ -416,6 +510,10 @@ pub fn build(
         folder,
         dragging,
         search_results,
+        rising,
+        covering,
+        grid_fade,
+        search_fade,
         cover,
         generation: Cell::new(0),
     });

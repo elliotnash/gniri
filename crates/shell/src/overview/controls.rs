@@ -80,6 +80,10 @@ mod imp {
         /// out.
         pub(super) on_folder_room: RefCell<Option<DashRoom>>,
         pub(super) label_anchor: RefCell<Option<LabelAnchor>>,
+        /// 0 with the windows, 1 with the app grid, between while it
+        /// comes or goes: the grid rises from below the screen
+        /// (`_getAppDisplayBoxForState`, interpolated).
+        pub(super) grid: Cell<f64>,
     }
 
     #[glib::object_subclass]
@@ -125,11 +129,12 @@ mod imp {
             let (_, dash_height, _, _) = parts.dash.measure(gtk::Orientation::Vertical, width);
             let boxes = layout::controls(height, search_height, dash_height);
             place(&parts.dash, boxes.dash.y, boxes.dash.height);
-            place(
-                &parts.app_display,
-                boxes.app_display.y,
-                boxes.app_display.height,
-            );
+            // `ControlsState.WINDOW_PICKER` has the grid's top at the
+            // bottom of the box.
+            let grid = self.grid.get();
+            let grid_y =
+                (f64::from(height) + grid * f64::from(boxes.app_display.y - height)).round() as i32;
+            place(&parts.app_display, grid_y, boxes.app_display.height);
             place(
                 &parts.search_results,
                 boxes.search_results.y,
@@ -182,6 +187,7 @@ impl Controls {
         label_anchor: impl Fn() -> Option<(i32, i32, i32)> + 'static,
     ) -> Self {
         let controls: Self = glib::Object::new();
+        controls.imp().grid.set(1.0);
         controls.add_css_class("controls-manager");
         for part in parts.all() {
             part.set_parent(&controls);
@@ -200,6 +206,13 @@ impl Controls {
             .on_folder_room
             .replace(Some(Box::new(folder_room)));
         controls
+    }
+
+    /// How far the app grid has come up: 0 below the screen, 1 in place.
+    pub fn set_grid(&self, grid: f64) {
+        if self.imp().grid.replace(grid) != grid {
+            self.queue_allocate();
+        }
     }
 
     /// Says how much of the output is above the surface.

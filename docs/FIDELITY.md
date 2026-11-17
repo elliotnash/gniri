@@ -328,9 +328,11 @@ search results to it and takes none of niri's own away.
 - **Opening and closing.** The dash slides up from the screen edge as in
   GNOME, and the entry slides out from under the bar where GNOME fades it
   in (see "Blur": a fading blurred widget is blurred at full strength
-  throughout). The change to the app grid and back is at once; GNOME
-  shrinks the workspaces and fades the grid in over a quarter of a
-  second. None of it follows the fingers of a touchpad swipe.
+  throughout). The app grid rises from below the screen and goes back
+  down over a quarter of a second, as GNOME's; where GNOME's workspaces
+  shrink into a strip, niri's stay, and the overview's background fades in
+  over them instead. The search results and what they replace cross-fade.
+  None of it follows the fingers of a touchpad swipe.
 - **Keys.** While the overview is open gniri has the keyboard, so that
   typing searches. Escape, Enter and the arrow keys do what niri's do
   when nothing is typed; anything else niri handles in its overview
