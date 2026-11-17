@@ -10,6 +10,17 @@
 // blurred and dimmed to its brightness. Here that is the backdrop surface
 // behind niri's workspaces, so what sits on it needs no dimming folded
 // into its colours: they are the extension's own, as written.
+//
+// The entry and the dash blur what is really behind them
+// (data/niri/gniri.kdl). That is mostly the backdrop, but niri's overview
+// also passes the workspace above the active one behind the entry and the
+// one below behind the dash, and nothing has dimmed those or their
+// windows. While one does (the controls are `.workspace-above` or
+// `.workspace-below`), the entry's or the dash's tint has the dimming
+// folded in, as a menu's has (`bms-fold`). Over the cover, behind the app
+// grid and a search, the backdrop is behind them again whatever the
+// workspaces: the controls are `.covered`, and the tint changes as the
+// cover fades.
 
 // overview.css: the fills of a tile, an entry or an arrow, and how they
 // brighten.
@@ -40,14 +51,15 @@ $bms_dash_hover: bms-ink(0.13);
 $bms_dash_active: bms-ink(0.19);
 $bms_dash_checked_hover: bms-ink(0.25);
 
-// The extension blurs the wallpaper behind the dash, whatever window is
-// there. niri's default blur for a layer surface does the same ("xray":
-// it samples the backdrop, not the workspaces), and the backdrop is
-// dimmed already.
 #dash .dash-background {
     @include bms-blur;
     background-color: $bms_dash_tint;
     border: 1px solid $bms_dash_border;
+    transition: background-color $overview_controls_time $ease_out_quad;
+}
+
+.controls-manager.workspace-below:not(.covered) #dash .dash-background {
+    background-color: bms-fold($bms_dash_tint);
 }
 
 // The border is inside the background's box in St and widens it.
@@ -83,6 +95,12 @@ $bms_dash_checked_hover: bms-ink(0.25);
     background-color: $bms_overview_fill;
 
     &.focused { background-color: $bms_overview_entry_focus; }
+
+    .controls-manager.workspace-above:not(.covered) > & {
+        background-color: bms-fold($bms_overview_fill);
+
+        &.focused { background-color: bms-fold($bms_overview_entry_focus); }
+    }
 
     .search-entry-icon,
     > text > placeholder {

@@ -589,9 +589,20 @@ was unlocked by `loginctl unlock-session`.
   dash reads (53,53,55) and the entry (89,89,89), as GNOME's do.
 - **Default ("xray") blur in the overview shows what is behind the
   windows there**: the backdrop where no workspace is, a workspace's own
-  wallpaper where one is, and never a window. The dash has it so that a
-  workspace below never shows its windows through it, which is how
-  blur-my-shell's dash looks; the entry has it for the workspace above.
+  wallpaper where one is, and never a window. The dash and the entry had
+  it at first, as blur-my-shell's dash never shows a window. It read as
+  blurring the wallpaper rather than the overview, beside menus that blur
+  the real thing, so they now blur what is behind them (`xray false`).
+- **What passes behind the entry and the dash is not dimmed.** niri's
+  overview puts the workspace above the active one behind the entry, and
+  the one below behind most of the dash (it spaces them by a tenth of the
+  output's height times the zoom). The backdrop is dimmed already; a
+  workspace and its windows are not, and white windows under the
+  extension's 7% white entry left white text on white. So while there is
+  a workspace above or below, the entry's or the dash's tint has the
+  dimming folded in, as a menu's (S5); with none, and over the cover, it
+  is the extension's own, which is what GNOME's capture is compared
+  with.
 - **GNOME's layout is arithmetic, and reproducing the arithmetic
   reproduces the layout.** Where the overview's parts go, how many icons
   a page holds and at what spacing, and how large the dash's icons are,

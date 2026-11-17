@@ -328,9 +328,12 @@ search results to it and takes none of niri's own away.
   workspaces. niri's stay, so gniri draws the overview's background once
   more in front of them. The bar is not covered: a workspace that
   reaches behind it still shows there.
-- **Behind the search entry** a neighbouring workspace can pass. The
-  entry then shows that workspace's wallpaper, blurred, and never its
-  windows; in GNOME nothing is ever behind it.
+- **Behind the search entry and the dash** a neighbouring workspace can
+  pass: the one above behind the entry, the one below behind the dash.
+  They blur it, windows and all, and while one is there their tint is
+  darker, as a menu's is over windows (the backdrop is dimmed and a
+  workspace is not). In GNOME only the overview's background is ever
+  behind them.
 - **Opening and closing.** The dash slides up from the screen edge as in
   GNOME, and the entry slides out from under the bar where GNOME fades it
   in (see "Blur": a fading blurred widget is blurred at full strength

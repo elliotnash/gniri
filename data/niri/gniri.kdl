@@ -25,10 +25,13 @@ blur {
 }
 
 // Menus, dialogs, banners and the OSD blur what is really behind them, as
-// blur-my-shell's popups do. Without this rule niri blurs only the wallpaper
-// ("xray"), which is what the panel wants and is also much cheaper.
+// blur-my-shell's popups do. So do the overview's search entry and dash,
+// over the workspaces and windows that pass behind them; behind the app
+// grid and a search they lie on gniri's own cover, which hides that blur.
+// Without this rule niri blurs only the wallpaper ("xray"), which is what
+// the panel wants and is also much cheaper.
 layer-rule {
-    match namespace="^gniri-(stage|banner|osd|dialog)$"
+    match namespace="^gniri-(stage|banner|osd|dialog|overview)$"
 
     background-effect {
         xray false

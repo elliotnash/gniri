@@ -27,7 +27,7 @@ use niri_ipc::Action;
 use super::layer::{self, Anchor, Zone};
 use crate::overview::app_grid::{self, Shown, View};
 use crate::overview::controls::{Controls, Parts};
-use crate::overview::{self, Direction, dash, drag, folder, search_entry, search_results};
+use crate::overview::{self, Direction, dash, drag, folder, icon, search_entry, search_results};
 use crate::services::Services;
 use crate::widgets::motion::Eased;
 
@@ -162,6 +162,9 @@ impl Inner {
         if apps || searching {
             self.cover.set_visible(true);
         }
+        // The entry and the dash change their tint as the cover fades in
+        // behind them or out (_bms-overview.scss).
+        icon::set_class(&self.controls, "covered", apps || searching);
         self.covering.ease(
             if apps || searching { 1.0 } else { 0.0 },
             time,
@@ -395,6 +398,27 @@ impl Inner {
     }
 }
 
+/// Whether niri has a workspace above and one below the active workspace
+/// of `output`. In its overview those are the ones that pass behind the
+/// search entry and the dash; with none, only the backdrop is there.
+fn neighbours(niri: &gniri_services::niri::State, output: Option<&str>) -> (bool, bool) {
+    let active: Vec<bool> = match output {
+        Some(output) => niri
+            .workspaces_on(output)
+            .map(|workspace| workspace.active)
+            .collect(),
+        None => niri
+            .workspaces
+            .iter()
+            .map(|workspace| workspace.active)
+            .collect(),
+    };
+    match active.iter().position(|active| *active) {
+        Some(index) => (index > 0, index + 1 < active.len()),
+        None => (false, false),
+    }
+}
+
 /// Builds the overview surface for `monitor`, unmapped. `cover` is the
 /// blurred wallpaper to put in front of niri's workspaces while the app
 /// grid or the search results show.
@@ -579,6 +603,21 @@ pub fn build(
                 let inner = Rc::clone(&inner);
                 move |_| inner.show_view()
             }),
+        // What passes behind the entry and the dash sets their tint
+        // (_bms-overview.scss).
+        services.niri.select(
+            {
+                let output = monitor.connector().map(String::from);
+                move |niri| neighbours(niri, output.as_deref())
+            },
+            {
+                let controls = inner.controls.clone();
+                move |&(above, below)| {
+                    icon::set_class(&controls, "workspace-above", above);
+                    icon::set_class(&controls, "workspace-below", below);
+                }
+            },
+        ),
         services.niri.select(|niri| niri.windows.len(), {
             let tick = tick.clone();
             move |_| tick()
@@ -592,5 +631,50 @@ pub fn build(
     Overview {
         window,
         _subscriptions: subscriptions,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use gniri_services::niri::{State, Workspace};
+
+    use super::neighbours;
+
+    fn workspace(output: &str, active: bool) -> Workspace {
+        Workspace {
+            output: Some(output.to_owned()),
+            active,
+            ..Workspace::default()
+        }
+    }
+
+    #[test]
+    fn neighbours_are_those_of_the_active_workspace_on_the_output() {
+        let niri = State {
+            workspaces: vec![
+                workspace("eDP-1", false),
+                workspace("eDP-1", true),
+                workspace("eDP-1", false),
+                workspace("HDMI-A-1", true),
+            ],
+            ..State::default()
+        };
+        assert_eq!(neighbours(&niri, Some("eDP-1")), (true, true));
+        assert_eq!(neighbours(&niri, Some("HDMI-A-1")), (false, false));
+        assert_eq!(neighbours(&niri, Some("DP-2")), (false, false));
+    }
+
+    #[test]
+    fn the_first_and_last_workspaces_have_one_neighbour() {
+        let first = State {
+            workspaces: vec![workspace("eDP-1", true), workspace("eDP-1", false)],
+            ..State::default()
+        };
+        assert_eq!(neighbours(&first, Some("eDP-1")), (false, true));
+        let last = State {
+            workspaces: vec![workspace("eDP-1", false), workspace("eDP-1", true)],
+            ..State::default()
+        };
+        assert_eq!(neighbours(&last, Some("eDP-1")), (true, false));
     }
 }

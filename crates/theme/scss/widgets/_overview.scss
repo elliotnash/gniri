@@ -32,6 +32,12 @@ $overview_controls_time: 250ms;
         transition: transform $overview_controls_time $ease_out_quad;
     }
 
+    // Its tint changes with the cover behind it (_bms-overview.scss).
+    > .search-entry {
+        transition: transform $overview_controls_time $ease_out_quad,
+            background-color $overview_controls_time $ease_out_quad;
+    }
+
     > .search-entry { transform: translateY(-64px); }
     > #dash { transform: translateY(126px); }
 
