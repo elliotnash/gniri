@@ -121,6 +121,21 @@
         }
     }
 
+    // A day with events has a dot under its number; today's is the light
+    // one whatever the style, on the accent colour.
+    .calendar-day.calendar-day-with-events {
+        background-image: if($variant == 'light',
+            url("resource:///dev/gniri/theme/calendar-today-light.svg"),
+            url("resource:///dev/gniri/theme/calendar-today.svg"));
+        background-size: contain;
+        background-repeat: no-repeat;
+        background-position: center;
+    }
+
+    .calendar-day.calendar-today.calendar-day-with-events {
+        background-image: url("resource:///dev/gniri/theme/calendar-today.svg");
+    }
+
     // day style
     .calendar-day {
         font-feature-settings: "tnum"; // %numeric
@@ -187,6 +202,20 @@
     .events-list {
         border-spacing: $base_padding;
 
+        // container for an event
+        .event-box {
+            border-spacing: $base_padding;
+            border-radius: $base_border_radius;
+
+            .event-summary { @include heading; }
+
+            .event-time {
+                font-feature-settings: "tnum"; // %numeric
+                @include caption;
+                color: $card_insensitive_fg_color;
+            }
+        }
+
         .event-placeholder {
             color: $card_insensitive_fg_color;
             font-style: italic;
@@ -203,6 +232,27 @@
 
         // change style when no world clocks are configured
         &.no-world-clocks { color: $fg_color; }
+    }
+
+    // clocks
+    .world-clocks-grid {
+        border-spacing: ($base_padding * 2) $base_padding;
+
+        // the header is one line of a heading; it takes its pixel back
+        .world-clocks-header { padding-bottom: 1px; }
+
+        // timezone time
+        .world-clocks-time {
+            font-feature-settings: "tnum"; // %numeric
+            font-weight: bold;
+        }
+
+        // timezone offset label
+        .world-clocks-timezone {
+            font-feature-settings: "tnum"; // %numeric
+            @include caption;
+            color: $card_insensitive_fg_color;
+        }
     }
 }
 

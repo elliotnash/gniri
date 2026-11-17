@@ -29,6 +29,11 @@ pub trait Catalog: Send + Sync {
 
     /// The form of a text for `count` things.
     fn plural(&self, singular: &str, plural: &str, count: u64) -> Option<String>;
+
+    /// One of the wall clock's formats, which are gnome-desktop's and not
+    /// GNOME Shell's: the two have some of the same originals, translated
+    /// apart.
+    fn clock_format(&self, original: &str) -> Option<String>;
 }
 
 /// The names dates are written with.
@@ -47,6 +52,8 @@ pub struct Names {
     pub weekdays_short: [String; 7],
     pub am: String,
     pub pm: String,
+    /// The locale's way of writing a date in numbers (`%x`).
+    pub date_format: String,
 }
 
 impl Default for Names {
@@ -84,6 +91,7 @@ impl Default for Names {
             weekdays_short: weekdays.map(short),
             am: "AM".to_owned(),
             pm: "PM".to_owned(),
+            date_format: "%m/%d/%Y".to_owned(),
         }
     }
 }
@@ -107,6 +115,14 @@ pub fn tr(original: &str) -> String {
     LANGUAGE
         .get()
         .and_then(|language| language.catalog.text(original))
+        .unwrap_or_else(|| original.to_owned())
+}
+
+/// A format of the wall clock (gnome-desktop's) in the user's language.
+pub fn tr_clock(original: &str) -> String {
+    LANGUAGE
+        .get()
+        .and_then(|language| language.catalog.clock_format(original))
         .unwrap_or_else(|| original.to_owned())
 }
 
@@ -192,6 +208,7 @@ const FIGURE_SPACE: char = '\u{2007}';
 /// - `%a %A %b %h %B %OB`: the names of the weekday and the month;
 /// - `%d %e %m %y %Y`: the date in numbers;
 /// - `%H %k %I %l %M %S %p %P %R %T`: the time;
+/// - `%x`: the date as the locale writes it in numbers;
 /// - `%-d` and the like: without padding.
 ///
 /// `%e`, `%k` and `%l` pad with a figure space where C pads with a plain
@@ -265,6 +282,10 @@ pub fn format_time(pattern: &str, time: &LocalTime) -> String {
                 written.push_str(&half.to_lowercase());
             }
             'R' => written.push_str(&format!("{:02}:{:02}", time.hour, time.minute)),
+            // The locale's date, which is no `%x` of its own.
+            'x' if !names.date_format.contains("%x") => {
+                written.push_str(&format_time(&names.date_format, time));
+            }
             'T' => written.push_str(&format!(
                 "{:02}:{:02}:{:02}",
                 time.hour, time.minute, time.second

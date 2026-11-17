@@ -12,9 +12,9 @@ What it is:
   display, and the services behind them: sound, Wi-Fi and wired networks,
   Bluetooth, battery and power mode, brightness, airplane mode, dark style
   and night light;
-- notifications (gniri is the notification server: banners, do not
-  disturb), and the date menu with the calendar, the notification list and
-  media player controls;
+- notifications (gniri is the notification server: banners, sounds, do
+  not disturb), and the date menu with the calendar and its events, world
+  clocks, the notification list and media player controls;
 - what a session needs to be lived in: the lock screen (password and
   fingerprint), dimming, blanking and locking when idle, locking before
   sleep, the dialog that asks before restarting, powering off or logging

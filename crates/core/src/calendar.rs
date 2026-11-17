@@ -275,6 +275,80 @@ pub fn time_span_text(seconds_ago: i64) -> String {
     }
 }
 
+/// What separates the two ends of a span (`EN_CHAR` in dateMenu.js).
+const EN_DASH: char = '\u{2013}';
+
+/// A time of day as the date menu writes it beside an event:
+/// `formatTime` with `timeOnly`.
+pub fn time_of_day_text(time: &LocalTime, hour12: bool) -> String {
+    format_time(&tr(if hour12 { "%l:%M %p" } else { "%H:%M" }), time)
+}
+
+/// How far ahead of the local time a place is, as a world clock writes it
+/// (`_getTimezoneOffsetAtLocation`): "+9", "-5", "+5:30", "+0".
+pub fn offset_text(seconds: i64) -> String {
+    let sign = if seconds >= 0 { '+' } else { '-' };
+    let (hours, minutes) = (seconds.abs() / 3600, seconds.abs() % 3600 / 60);
+    if minutes == 0 {
+        format!("{sign}{hours}")
+    } else {
+        format!("{sign}{hours}:{minutes}")
+    }
+}
+
+/// When an event is, as the date menu writes it under its summary on
+/// `day` (`EventsSection._formatEventTime`): "All Day", a span of days for
+/// one that reaches beyond the day, else its time or span of times.
+/// `this_year` is the year it is now.
+pub fn event_time_text(
+    start: &LocalTime,
+    end: &LocalTime,
+    day: Date,
+    this_year: i32,
+    hour12: bool,
+) -> String {
+    let day_start = day.midnight();
+    let day_end = day.plus_days(1).midnight();
+    let key = |time: &LocalTime| {
+        (
+            time.date().day_number(),
+            time.hour,
+            time.minute,
+            time.second,
+        )
+    };
+    if key(start) == key(&day_start) && key(end) == key(&day_end) {
+        return tr_in("event list time", "All Day");
+    }
+    let start_time = time_of_day_text(start, hour12);
+    let end_time = time_of_day_text(end, hour12);
+    if key(start) < key(&day_start) || key(end) > key(&day_end) {
+        let at_midnight = |time: &LocalTime| (time.hour, time.minute, time.second) == (0, 0, 0);
+        // An event that ends at midnight ends the day before.
+        let last_day = if at_midnight(end) {
+            end.date().plus_days(-1)
+        } else {
+            end.date()
+        };
+        let format = if start.year == this_year && last_day.year == this_year {
+            tr("%m/%d")
+        } else {
+            "%x".to_owned()
+        };
+        let start_date = format_time(&format, &start.date().midnight());
+        let end_date = format_time(&format, &last_day.midnight());
+        if at_midnight(start) && at_midnight(end) {
+            format!("{start_date} {EN_DASH} {end_date}")
+        } else {
+            format!("{start_date} {start_time} {EN_DASH} {end_date} {end_time}")
+        }
+    } else if key(start) == key(end) {
+        start_time
+    } else {
+        format!("{start_time} {EN_DASH} {end_time}")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -398,5 +472,56 @@ mod tests {
         assert_eq!(time_span_text(15 * 86_400), "2 weeks ago");
         assert_eq!(time_span_text(60 * 86_400), "2 months ago");
         assert_eq!(time_span_text(400 * 86_400), "1 year ago");
+    }
+
+    fn at(text: &str) -> LocalTime {
+        LocalTime::parse(text).unwrap()
+    }
+
+    #[test]
+    fn an_events_time_is_written_as_gnome_writes_it() {
+        let day = date(2026, 11, 14);
+        let text = |start: &str, end: &str, hour12| {
+            event_time_text(&at(start), &at(end), day, 2026, hour12)
+        };
+        assert_eq!(
+            text("2026-11-14T00:00:00", "2026-11-15T00:00:00", true),
+            "All Day"
+        );
+        assert_eq!(
+            text("2026-11-14T09:00:00", "2026-11-14T10:30:00", false),
+            "09:00 \u{2013} 10:30"
+        );
+        assert_eq!(
+            text("2026-11-14T09:00:00", "2026-11-14T13:00:00", true),
+            "\u{2007}9:00 AM \u{2013} \u{2007}1:00 PM"
+        );
+        assert_eq!(
+            text("2026-11-14T09:00:00", "2026-11-14T09:00:00", false),
+            "09:00"
+        );
+        // Days on end: the days, the last that it takes part of.
+        assert_eq!(
+            text("2026-11-13T00:00:00", "2026-11-16T00:00:00", false),
+            "11/13 \u{2013} 11/15"
+        );
+        assert_eq!(
+            text("2026-11-13T20:00:00", "2026-11-14T02:00:00", false),
+            "11/13 20:00 \u{2013} 11/14 02:00"
+        );
+        // Into another year: the locale's whole date.
+        assert_eq!(
+            text("2026-12-31T00:00:00", "2027-01-02T00:00:00", false).replace("2026-12-31", ""),
+            "12/31/2026 \u{2013} 01/01/2027"
+        );
+    }
+
+    #[test]
+    fn an_offset_is_written_in_hours_and_minutes() {
+        assert_eq!(offset_text(9 * 3600), "+9");
+        assert_eq!(offset_text(-5 * 3600), "-5");
+        assert_eq!(offset_text(5 * 3600 + 30 * 60), "+5:30");
+        assert_eq!(offset_text(-(3 * 3600 + 30 * 60)), "-3:30");
+        assert_eq!(offset_text(0), "+0");
     }
 }

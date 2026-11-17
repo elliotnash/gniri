@@ -131,13 +131,22 @@ BlueZ's agent all the time.
 
 ## Date menu
 
-- **Events, world clocks, weather.** gniri has no calendar, clock or
-  weather backend. The three cards under the calendar are GNOME's as they
-  look before anything is set up: the events card always says "No Events",
-  and the other two only start GNOME Clocks and GNOME Weather. Those two are
-  hidden when their application is not installed, as in GNOME, and can be
-  turned off in the config file. The calendar marks no days as having
-  events and has no week numbers.
+- **Events** come from GNOME Shell's own calendar server, as in GNOME:
+  the calendars of Evolution Data Server, set up in GNOME Calendar,
+  Evolution or GNOME Online Accounts. The events card shows while there
+  are calendars, the calendar marks the days that have events, and a
+  click on the card starts GNOME Calendar (GNOME starts whichever
+  application opens calendar files). Reminders are the calendar
+  server's own business, as in GNOME. There are no week numbers.
+- **World clocks** are GNOME Clocks' places. GNOME Shell asks
+  libgweather for each place's time zone; gniri takes the zone whose
+  principal city is nearest the place, from the time zone database,
+  which for the cities clocks are kept for is their own. Their names are
+  shown as GNOME Clocks stored them, in English: their translations are
+  libgweather's, by a context the stored place does not carry.
+- **Weather** is not there: the card only starts GNOME Weather, as
+  GNOME's does before a place is chosen. A forecast would have to be
+  fetched from a weather service, which libgweather does for GNOME.
 - **First day of the week** is the locale's, as in GNOME, unless the config
   file names one.
 - **Opening.** As for quick settings: it fades and slides, and does not
@@ -158,8 +167,10 @@ BlueZ's agent all the time.
   them.
 - **Which screen.** Banners appear on the output with the focused
   workspace; GNOME uses its primary monitor, which niri does not have.
-- **Sound.** gniri plays no notification sounds, and does not claim to: an
-  application that asks may play its own.
+- **Sound.** A notification's sound plays when its banner shows, as in
+  GNOME: a sound of the desktop's sound theme by name, or a file, unless
+  event sounds are turned off. `canberra-gtk-play` plays it, or with it
+  missing `pw-play` or `paplay` a file of the theme.
 - **Per-application settings.** GNOME Settings can silence one application,
   keep its banners away or always show them in full. gniri treats all
   alike.

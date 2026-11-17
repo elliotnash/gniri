@@ -21,7 +21,8 @@ use zbus::names::BusName;
 use zbus::object_server::SignalEmitter;
 
 use super::{
-    Action, ClosedReason, Command, Event, Image, Incoming, Notification, Pixels, State, Urgency,
+    Action, ClosedReason, Command, Event, Image, Incoming, Notification, Pixels, Sound, State,
+    Urgency,
 };
 use crate::bus::{Wakes, merge};
 use crate::desktop_entry::DesktopEntry;
@@ -103,8 +104,7 @@ impl Server {
         let _ = self.requests.send(Request::Close(id)).await;
     }
 
-    /// What `FdoNotificationDaemon.GetCapabilities` lists, less "sound":
-    /// gniri plays none, and an application that asks may play its own.
+    /// What `FdoNotificationDaemon.GetCapabilities` lists.
     fn get_capabilities(&self) -> Vec<&'static str> {
         vec![
             "actions",
@@ -112,6 +112,7 @@ impl Server {
             "body-markup",
             "icon-static",
             "persistence",
+            "sound",
         ]
     }
 
@@ -266,6 +267,13 @@ pub fn incoming(
             resident: hint_bool(&call.hints, "resident"),
             transient: hint_bool(&call.hints, "transient"),
             acknowledged: false,
+            // A sound of the theme wins over a file, as in
+            // `MessageTray.Sound.play`.
+            sound: hint_string(&call.hints, "sound-name")
+                .map(Sound::Name)
+                .or_else(|| {
+                    hint_string(&call.hints, "sound-file").map(|path| Sound::File(path.into()))
+                }),
             time,
         },
         source_key,
@@ -537,6 +545,7 @@ mod tests {
                     ("resident", Value::Bool(true)),
                     ("transient", Value::Bool(true)),
                     ("image-path", Value::from("file:///tmp/face.png")),
+                    ("sound-file", Value::from("/tmp/ding.oga")),
                 ],
             ),
             1,
@@ -557,6 +566,10 @@ mod tests {
         assert_eq!(
             notification.image,
             Some(Image::File("/tmp/face.png".into()))
+        );
+        assert_eq!(
+            notification.sound,
+            Some(Sound::File("/tmp/ding.oga".into()))
         );
 
         // An urgency sent as a plain integer still counts.

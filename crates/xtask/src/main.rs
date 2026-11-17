@@ -379,6 +379,11 @@ mod tests {
                     .map(|a| a[0].clone()),
             );
             asked.extend(
+                literals(&source, "tr_clock(", 1)
+                    .into_iter()
+                    .map(|a| a[0].clone()),
+            );
+            asked.extend(
                 literals(&source, "tr_in(", 2)
                     .into_iter()
                     .map(|a| format!("{}\u{4}{}", a[0], a[1])),

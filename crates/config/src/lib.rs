@@ -132,8 +132,7 @@ impl Panel {
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct DateMenu {
-    /// Show the "Add World Clocks…" card. gniri does not show the clocks
-    /// themselves; the card only starts GNOME Clocks.
+    /// Show the world clocks card: GNOME Clocks' places and their times.
     pub world_clocks: bool,
     /// Show the "Select Weather Location…" card. gniri shows no forecast;
     /// the card only starts GNOME Weather.

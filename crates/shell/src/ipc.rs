@@ -182,6 +182,9 @@ pub struct Notify {
     pub transient: bool,
     #[arg(long)]
     pub resident: bool,
+    /// A sound of the sound theme to play when its banner shows.
+    #[arg(long)]
+    pub sound: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, clap::ValueEnum)]

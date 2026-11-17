@@ -50,10 +50,10 @@
 # "saturday". Unset, it is the day your locale starts a week on.
 # week_start = "monday"
 
-# The "Add World Clocks…" and "Select Weather Location…" cards under the
-# calendar. gniri shows neither clocks nor a forecast: the cards only start
-# GNOME Clocks and GNOME Weather, and are hidden when those are not
-# installed. Default: true.
+# The world clocks card under the calendar (the places GNOME Clocks keeps
+# clocks for), and the "Select Weather Location…" card, which only starts
+# GNOME Weather: gniri shows no forecast. Each is hidden when its
+# application is not installed. Default: true.
 # world_clocks = false
 # weather = false
 

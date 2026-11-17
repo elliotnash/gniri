@@ -12,8 +12,8 @@ use gniri_services::desktop_entry::DesktopEntry;
 use gniri_services::keyboard::LayoutNames;
 use gniri_services::user::User;
 use gniri_services::{
-    Bus, Fixture, Link, Model, apps, audio, bluetooth, brightness, idle, logind, mpris, network,
-    night_light, niri, notifications, power, rfkill, search, session, state, toggles,
+    Bus, Fixture, Link, Model, apps, audio, bluetooth, brightness, events, idle, logind, mpris,
+    network, night_light, niri, notifications, power, rfkill, search, session, state, toggles,
 };
 use gtk::glib;
 
@@ -51,6 +51,34 @@ pub fn scheduler() -> Rc<dyn Scheduler> {
 pub struct SystemClock;
 
 impl SystemClock {
+    /// Seconds since the epoch of a local time.
+    pub fn unix_of(time: &LocalTime) -> i64 {
+        glib::DateTime::from_local(
+            time.year,
+            i32::from(time.month),
+            i32::from(time.day),
+            i32::from(time.hour),
+            i32::from(time.minute),
+            f64::from(time.second),
+        )
+        .map_or(0, |time| time.to_unix())
+    }
+
+    /// The local time of seconds since the epoch.
+    pub fn local_of(unix: i64) -> LocalTime {
+        let time = glib::DateTime::from_unix_local(unix)
+            .or_else(|_| glib::DateTime::now_local())
+            .expect("the local time is representable");
+        LocalTime {
+            year: time.year(),
+            month: time.month() as u8,
+            day: time.day_of_month() as u8,
+            hour: time.hour() as u8,
+            minute: time.minute() as u8,
+            second: time.second() as u8,
+        }
+    }
+
     pub fn read() -> (LocalTime, u32) {
         let now = glib::DateTime::now_local().expect("the local time is representable");
         let time = LocalTime {
@@ -214,6 +242,12 @@ pub struct Services {
     /// The applications that answer the overview's search, and what they
     /// found.
     pub search: Service<search::State>,
+    /// The calendar's events.
+    pub events: Service<events::State>,
+    /// The places there are world clocks for.
+    pub world_clocks: Store<Vec<gniri_services::world_clocks::Clock>>,
+    /// Keeps `world_clocks` following GNOME Clocks' setting.
+    _world_clocks_watch: Vec<gtk::gio::Settings>,
     /// Which menu is open, and where.
     pub menus: Store<Menus>,
     /// What shows on top of niri's overview while it is open.
@@ -302,6 +336,14 @@ impl Services {
                 apps.inject(apps::Event::Installed(fixture.apps.installed));
                 Self {
                     apps,
+                    events: Service::fake(
+                        "events",
+                        scene_events(&fixture.events),
+                        scheduler,
+                        log_ref,
+                    ),
+                    world_clocks: Store::new(fixture.world_clocks, Rc::clone(scheduler)),
+                    _world_clocks_watch: Vec::new(),
                     search: Service::live(
                         "search",
                         canned_search(fixture.search),
@@ -390,6 +432,9 @@ impl Services {
                         })
                     });
                 let mpris = session_bus.add("mpris", mpris::backend::run);
+                let calendar = session_bus.add("events", events::backend::run);
+                let world_clocks = Store::new(Vec::new(), Rc::clone(scheduler));
+                let world_clocks_watch = settings::world_clocks(&world_clocks);
                 let search = {
                     let options = search_options(&config);
                     session_bus.add("search", move |connection, events, commands| {
@@ -427,6 +472,9 @@ impl Services {
                 }
                 Self {
                     apps,
+                    events: Service::live("events", calendar, scheduler, log_ref),
+                    world_clocks,
+                    _world_clocks_watch: world_clocks_watch,
                     search,
                     power: Service::live("power", power, scheduler, log_ref),
                     audio: Service::live("audio", audio::backend::spawn(), scheduler, log_ref),
@@ -792,6 +840,33 @@ fn link_do_not_disturb(
         |state| state.on,
         move |on| notifications.update(|state| state.do_not_disturb = *on),
     )
+}
+
+/// A scene's events, at the times it gives in the session's time zone.
+fn scene_events(scene: &events::Fixture) -> events::State {
+    let unix = |text: &str| {
+        LocalTime::parse(text)
+            .map(|time| SystemClock::unix_of(&time))
+            .unwrap_or_else(|error| {
+                eprintln!("gniri: fixture events: {error}");
+                0
+            })
+    };
+    events::State {
+        has_calendars: scene.has_calendars,
+        events: scene
+            .events
+            .iter()
+            .enumerate()
+            .map(|(index, event)| events::CalendarEvent {
+                id: format!("scene\n{index}\n"),
+                summary: event.summary.clone(),
+                start: unix(&event.start),
+                end: unix(&event.end),
+            })
+            .collect(),
+        range: None,
+    }
 }
 
 /// A stand-in for the search providers under a fixture: whatever is

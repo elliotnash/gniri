@@ -57,6 +57,10 @@ skips each of these with a note when its tools are not installed:
   polkit and a shell script for its helper
   (`crates/services/tests/polkit_bus.rs`).
 
+- **Calendar events**: the test itself owns GNOME Shell's calendar
+  server's name on a private bus and answers as it does
+  (`crates/services/tests/events_bus.rs`). Needs only `dbus-daemon`.
+
 - **Search providers**: a bare python-dbusmock object standing in for an
   application that answers searches, with its key file and desktop entry
   in a directory of the test's own
@@ -68,7 +72,8 @@ runs on request: `cargo test -p gniri-services -- --ignored real_pam`.
 To see what a backend reports from the real system, without changing
 anything: `cargo run -p gniri-services --example watch -- power` (or
 `network`, `bluetooth`, `brightness`, `audio`, `rfkill`, `mpris`,
-`session`, `idle`, `apps`). `-- search calc` asks the installed search
+`session`, `idle`, `apps`, `events`). `events` asks the calendar server
+for the next thirty days, which starts it and Evolution Data Server. `-- search calc` asks the installed search
 providers for "calc", which starts them, as GNOME Shell's search does.
 
 ## What is compared
@@ -151,7 +156,8 @@ at: `cargo xtask shot look --scene date-menu-media --wallpaper '#808080'`
 `date-menu-empty`, `quick-settings-busy`, `end-session` (the dialog that
 asks before powering off), `wifi-password` (the one that asks for a
 network's password), `bluetooth-pairing` (a number to compare),
-`app-grid-folders` and `app-folder` (a folder's dialog open).
+`app-grid-folders` and `app-folder` (a folder's dialog open), and
+`date-menu-events` (a calendar with events, and world clocks).
 
 A scene that `extends` another adds to its fixture service by service:
 `[fixture.apps.layout]` keeps the base scene's installed applications. A
@@ -188,7 +194,8 @@ part's name after `check` runs that one alone.
 | `panel` | Workspace dots, the overview's look, fullscreen, with real services |
 | `overview` | The dash, the app grid, the search and its keys |
 | `quick-settings` | The menu, its toggles and sliders, the on-screen display |
-| `notifications` | Banners, the list, do not disturb |
+| `notifications` | Banners, the list, do not disturb, sounds |
+| `calendar` | The date menu's events and world clocks |
 | `notifications-bus` | The same over D-Bus, with `notify-send` |
 | `session` | The end-session dialog and what idleness does |
 | `lock` | The lock screen, locking the nested session for real |

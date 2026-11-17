@@ -21,6 +21,7 @@ mod quick_settings;
 mod ready;
 mod services;
 mod settings;
+mod sound;
 mod style;
 mod surfaces;
 mod widgets;

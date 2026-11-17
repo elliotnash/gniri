@@ -7,7 +7,7 @@ pub mod window;
 
 use std::rc::Rc;
 
-use gniri_services::notifications::{Action, Event, Image, Incoming, Notification, Urgency};
+use gniri_services::notifications::{Action, Event, Image, Incoming, Notification, Sound, Urgency};
 
 use crate::ipc;
 use crate::services::Services;
@@ -51,6 +51,7 @@ pub fn notify(services: &Rc<Services>, notify: ipc::Notify) -> u32 {
             resident: notify.resident,
             transient: notify.transient,
             acknowledged: false,
+            sound: notify.sound.map(Sound::Name),
             time: services.time.get(),
         },
         source_key: format!("debug:{}", notify.app),

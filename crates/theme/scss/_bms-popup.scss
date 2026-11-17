@@ -353,7 +353,9 @@ $bms_lower_in_stack_color: rgba(255, 255, 255, bms-pick(0.02, 0.44));
 
 .events-button .events-title,
 .events-button .events-list .event-placeholder,
+.events-button .events-list .event-box .event-time,
 .world-clocks-button .world-clocks-header,
+.world-clocks-button .world-clocks-grid .world-clocks-timezone,
 .weather-button .weather-header {
     color: $bms_dim_fg_color;
 }

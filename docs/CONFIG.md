@@ -93,7 +93,7 @@ The menu under the clock.
 | Key | Default | |
 |---|---|---|
 | `week_start` | the locale's | The day a week starts on in the calendar: `"sunday"`, `"monday"` or `"saturday"`. Unset, it is the day the locale starts a week on. |
-| `world_clocks` | `true` | The "Add World Clocks…" card. It only starts GNOME Clocks, and is hidden when that is not installed. |
+| `world_clocks` | `true` | The world clocks card: the places GNOME Clocks keeps clocks for, their times, or "Add World Clocks…" without any. A click starts GNOME Clocks; the card is hidden when that is not installed. |
 | `weather` | `true` | The "Select Weather Location…" card, likewise for GNOME Weather. |
 
 ### `[night_light]`

@@ -1,17 +1,27 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! The month calendar. Port of `Calendar` in `js/ui/calendar.js`, without
-//! events: gniri has no calendar backend.
+//! The month calendar. Port of `Calendar` in `js/ui/calendar.js`. It asks
+//! the calendar's events for the days it shows, and marks those that have
+//! any.
 
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
-use gniri_core::{Date, Weekday, month_grid};
+use gniri_core::{Date, Subscription, Weekday, month_grid};
+use gniri_services::events;
 use gtk::prelude::*;
+
+use crate::services::{Services, SystemClock};
+
+/// Seconds since the epoch at the start of `date`, in the local time zone.
+pub fn day_start(date: Date) -> i64 {
+    SystemClock::unix_of(&date.midnight())
+}
 
 type DateCallback = Rc<dyn Fn(Date)>;
 
 struct Inner {
+    services: Rc<Services>,
     grid: gtk::Grid,
     month_label: gtk::Label,
     /// The 42 day buttons with the date each shows.
@@ -23,6 +33,7 @@ struct Inner {
     /// marked.
     built: Cell<Option<(Date, Date)>>,
     selected_changed: RefCell<Option<DateCallback>>,
+    events: RefCell<Option<Subscription>>,
 }
 
 #[derive(Clone)]
@@ -108,6 +119,33 @@ impl Inner {
         self.days.replace(days);
         self.built
             .set(Some((Date::new(selected.year, selected.month, 1), today)));
+
+        // `requestRange`: the events of the days that show.
+        let days = self.days.borrow();
+        if let (Some((_, first)), Some((_, last))) = (days.first(), days.last()) {
+            let range = (day_start(*first), day_start(last.plus_days(1)));
+            if self.services.events.state.with(|state| state.range) != Some(range) {
+                self.services
+                    .events
+                    .send(events::Command::SetRange(range.0, range.1));
+            }
+        }
+        drop(days);
+        self.mark_events();
+    }
+
+    /// Marks the days that have events (`calendar-day-with-events`).
+    fn mark_events(&self) {
+        self.services.events.state.with(|state| {
+            for (button, date) in self.days.borrow().iter() {
+                let has = state.any_between(day_start(*date), day_start(date.plus_days(1)));
+                if has {
+                    button.add_css_class("calendar-day-with-events");
+                } else {
+                    button.remove_css_class("calendar-day-with-events");
+                }
+            }
+        });
     }
 
     /// `Calendar._update`
@@ -131,7 +169,7 @@ impl Inner {
 impl Calendar {
     /// A calendar showing `today`'s month, with weeks starting on
     /// `week_start`.
-    pub fn new(today: Date, week_start: Weekday) -> Self {
+    pub fn new(services: &Rc<Services>, today: Date, week_start: Weekday) -> Self {
         let grid = gtk::Grid::builder().css_classes(["calendar"]).build();
 
         // `Calendar._buildHeader`
@@ -159,6 +197,7 @@ impl Calendar {
         }
 
         let inner = Rc::new(Inner {
+            services: Rc::clone(services),
             grid: grid.clone(),
             month_label,
             days: RefCell::default(),
@@ -167,8 +206,17 @@ impl Calendar {
             selected: Cell::new(today),
             built: Cell::new(None),
             selected_changed: RefCell::default(),
+            events: RefCell::default(),
         });
         inner.update();
+        inner.events.replace(Some(services.events.state.subscribe({
+            let inner = Rc::downgrade(&inner);
+            move |_| {
+                if let Some(inner) = inner.upgrade() {
+                    inner.mark_events();
+                }
+            }
+        })));
 
         let step = |months: i32| {
             let inner = Rc::downgrade(&inner);

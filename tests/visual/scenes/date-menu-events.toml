@@ -1,0 +1,28 @@
+# The date menu with a calendar that has events: today's three, and two on
+# other days of the month, which the calendar marks. GNOME was captured
+# with an empty calendar: for looking at, and for `cargo xtask check
+# notifications`.
+
+extends = "date-menu"
+
+[fixture.events]
+events = [
+    { summary = "Standup", start = "2026-11-14T09:30:00", end = "2026-11-14T09:45:00" },
+    { summary = "Lunch with a very long name that does not fit the card at all", start = "2026-11-14T12:00:00", end = "2026-11-14T13:00:00" },
+    { summary = "Conference", start = "2026-11-13T00:00:00", end = "2026-11-16T00:00:00" },
+    { summary = "Dentist", start = "2026-11-20T15:00:00", end = "2026-11-20T15:30:00" },
+    { summary = "Birthday", start = "2026-11-27T00:00:00", end = "2026-11-28T00:00:00" },
+]
+
+# GNOME Clocks' places: the menu shows them in order of their offset.
+[[fixture.world_clocks]]
+city = "Tokyo"
+zone = "Asia/Tokyo"
+
+[[fixture.world_clocks]]
+city = "New York"
+zone = "America/New_York"
+
+[[fixture.world_clocks]]
+city = "Kolkata"
+zone = "Asia/Kolkata"

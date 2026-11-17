@@ -14,6 +14,7 @@ pub mod bluetooth;
 pub mod brightness;
 pub mod bus;
 pub mod desktop_entry;
+pub mod events;
 pub mod fixture;
 pub mod idle;
 pub mod keyboard;
@@ -32,6 +33,7 @@ pub mod session;
 pub mod state;
 pub mod toggles;
 pub mod user;
+pub mod world_clocks;
 
 pub use bus::Bus;
 pub use fixture::Fixture;

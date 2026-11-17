@@ -4,10 +4,12 @@
 //!
 //! gniri's texts are GNOME's texts, word for word, so where GNOME Shell's
 //! translations are installed gniri is translated: a text is looked up in
-//! GNOME Shell's catalog, then in gnome-desktop's (the clock's formats),
-//! gnome-bluetooth's (the pairing dialog) and NetworkManager's (the names
-//! of the kinds of network, which GNOME Shell has from libnm). gniri has no
-//! catalog of its own; the few texts that are only gniri's stay English.
+//! GNOME Shell's catalog, then in gnome-bluetooth's (the pairing dialog)
+//! and NetworkManager's (the names of the kinds of network, which GNOME
+//! Shell has from libnm). The wall clock's formats are gnome-desktop's and
+//! are looked up there alone: the two catalogs have some of the same
+//! originals, translated apart. gniri has no catalog of its own; the few
+//! texts that are only gniri's stay English.
 //!
 //! The names of months and weekdays are the C library's, which go by
 //! `LC_TIME`; the texts go by `LC_MESSAGES` and `LANGUAGE`.
@@ -16,12 +18,9 @@ use gniri_core::i18n::{Catalog, Names};
 use gtk::glib;
 
 /// The catalogs, in the order they are asked.
-const DOMAINS: [&str; 4] = [
-    "gnome-shell",
-    "gnome-desktop-3.0",
-    "gnome-bluetooth-3.0",
-    "NetworkManager",
-];
+const DOMAINS: [&str; 3] = ["gnome-shell", "gnome-bluetooth-3.0", "NetworkManager"];
+/// Whose the wall clock's formats are.
+const CLOCK_DOMAIN: &str = "gnome-desktop-3.0";
 
 struct Gettext;
 
@@ -38,6 +37,11 @@ impl Catalog for Gettext {
             let text = glib::dpgettext2(Some(domain), context, original);
             (text != original).then(|| text.into())
         })
+    }
+
+    fn clock_format(&self, original: &str) -> Option<String> {
+        let text = glib::dgettext(Some(CLOCK_DOMAIN), original);
+        (text != original).then(|| text.into())
     }
 
     fn plural(&self, singular: &str, plural: &str, count: u64) -> Option<String> {
@@ -77,7 +81,19 @@ fn names() -> Names {
         // A locale that divides no day in two has no names for the halves.
         am: written(1, 1, 1, "%p", &english.am),
         pm: written(1, 1, 13, "%p", &english.pm),
+        date_format: locale_value("d_fmt").unwrap_or(english.date_format),
     }
+}
+
+/// One of the C library's values for the user's locale, as `locale`
+/// prints it.
+fn locale_value(key: &str) -> Option<String> {
+    let output = std::process::Command::new("locale")
+        .arg(key)
+        .output()
+        .ok()?;
+    let value = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+    (output.status.success() && !value.is_empty()).then_some(value)
 }
 
 /// Takes the user's language into use. After GTK is initialised, which

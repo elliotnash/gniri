@@ -317,6 +317,10 @@ impl Inner {
             message.expand();
         }
         banner.show(message.root());
+        // `_updateShowingNotification`: its sound plays as it shows.
+        if let Some(sound) = &notification.sound {
+            crate::sound::play(&self.services, sound);
+        }
         self.pointer_in.set(false);
         self.clear_left_timeout();
         self.start_timeout(critical);

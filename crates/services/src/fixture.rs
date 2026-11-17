@@ -13,8 +13,8 @@ use gniri_core::{FixedClock, LocalTime};
 use serde::Deserialize;
 
 use crate::{
-    apps, audio, bluetooth, brightness, idle, mpris, network, notifications, polkit, power, rfkill,
-    search, session, toggles, user,
+    apps, audio, bluetooth, brightness, events, idle, mpris, network, notifications, polkit, power,
+    rfkill, search, session, toggles, user, world_clocks,
 };
 
 #[derive(Clone, Debug, Default, PartialEq, Deserialize)]
@@ -43,6 +43,10 @@ pub struct Fixture {
     /// The search providers, with what each finds whatever is searched
     /// for: nothing answers a scene's search.
     pub search: search::State,
+    /// The calendar's events.
+    pub events: events::Fixture,
+    /// The places GNOME Clocks keeps clocks for.
+    pub world_clocks: Vec<world_clocks::Clock>,
     /// Who the lock screen and the authentication dialog show.
     pub user: user::User,
     /// For `gniri lock`.

@@ -549,12 +549,13 @@ fn panel_and_overview() -> Result<(usize, usize)> {
 type Part = fn() -> Result<(usize, usize)>;
 
 /// The parts, by the names `cargo xtask check <part>` takes.
-const PARTS: [(&str, Part); 13] = [
+const PARTS: [(&str, Part); 14] = [
     ("panel", panel_and_overview),
     ("overview", overview),
     ("folders", folders_and_dragging),
     ("quick-settings", quick_settings),
     ("notifications", notifications),
+    ("calendar", calendar_and_clocks),
     ("notifications-bus", notifications_over_the_bus),
     ("session", end_session_and_idle),
     ("lock", lock_screen),
@@ -882,6 +883,93 @@ fn folders_and_dragging() -> Result<(usize, usize)> {
         failed,
     } = checker;
     drop(pointer);
+    session.quit()?;
+    Ok((passed, failed))
+}
+
+/// The date menu's calendar events and world clocks, from the
+/// `date-menu-events` scene: the calendar server and GNOME Clocks are
+/// stood in for by the fixture.
+fn calendar_and_clocks() -> Result<(usize, usize)> {
+    let fixture = Scene::load("date-menu-events")?.write_fixture("check-calendar", None)?;
+    let session = Session::start(&SessionOptions {
+        name: "check-calendar".to_owned(),
+        niri_config: None,
+        renderer: "vulkan".to_owned(),
+        gniri_args: scene::gniri_args(Some(&fixture), Some(WALLPAPER)),
+    })?;
+    let mut checker = Checker {
+        session,
+        passed: 0,
+        failed: 0,
+    };
+    let texts_of = |session: &Session, selector: &str| -> Result<Vec<String>> {
+        Ok(on_stage(session, selector)?
+            .map(|node| texts(&node))
+            .unwrap_or_default())
+    };
+
+    println!("calendar events");
+    checker
+        .session
+        .gniri_msg(&["debug", "open-menu", "date-menu"])?;
+    checker.expect("today's events are listed, in order", |session| {
+        let list = texts_of(session, ".events-list")?;
+        Ok(list.first().is_some_and(|text| text == "Conference")
+            && list.iter().position(|text| text == "Standup")
+                < list.iter().position(|text| text.starts_with("Lunch")))
+    });
+    checker.expect("with when they are", |session| {
+        let list = texts_of(session, ".events-list")?;
+        Ok(list.iter().any(|text| text == "11/13 \u{2013} 11/15")
+            && list
+                .iter()
+                .any(|text| text == "\u{2007}9:30 AM \u{2013} \u{2007}9:45 AM"))
+    });
+    checker.expect("and the days that have events are marked", |session| {
+        Ok(count_on_stage(session, "calendar-day-with-events")? == 5)
+    });
+    if on_path("wlrctl") {
+        click(&checker.session, ".calendar-day.calendar-day-with-events:3")?;
+        checker.expect("another day shows its own", |session| {
+            let list = texts_of(session, ".events-list")?;
+            Ok(
+                list == ["Dentist", "\u{2007}3:00 PM \u{2013} \u{2007}3:30 PM"]
+                    && texts_of(session, ".events-title")? == ["November 20"],
+            )
+        });
+    } else {
+        println!("  skip wlrctl is not installed");
+    }
+
+    println!("world clocks");
+    checker.expect("the clocks are in the order of their offset", |session| {
+        let cities: Vec<String> = texts_of(session, ".world-clocks-grid")?
+            .into_iter()
+            .filter(|text| ["Tokyo", "New York", "Kolkata"].contains(&text.as_str()))
+            .collect();
+        Ok(cities == ["New York", "Kolkata", "Tokyo"])
+    });
+    checker.expect("each with its time and how far ahead it is", |session| {
+        let grid = texts_of(session, ".world-clocks-grid")?;
+        Ok(grid.first().is_some_and(|text| text == "World Clocks")
+            && grid
+                .iter()
+                .filter(|text| text.starts_with('+') || text.starts_with('-'))
+                .count()
+                == 3
+            && grid
+                .iter()
+                .filter(|text| text.ends_with(" AM") || text.ends_with(" PM"))
+                .count()
+                == 3)
+    });
+
+    let Checker {
+        session,
+        passed,
+        failed,
+    } = checker;
     session.quit()?;
     Ok((passed, failed))
 }
@@ -1535,12 +1623,35 @@ fn notifications() -> Result<(usize, usize)> {
         });
         checker.session.gniri_msg(&["debug", "close-menu"])?;
         checker.expect("(the menu is closed)", menu_is_closed);
-        notify(&checker.session, &["--app", "Tester", "Hush", "Not now"])?;
-        notify(&checker.session, &["--urgency", "critical", "Fire", "Now"])?;
+        notify(
+            &checker.session,
+            &["--app", "Tester", "--sound", "bell", "Hush", "Not now"],
+        )?;
+        notify(
+            &checker.session,
+            &[
+                "--urgency",
+                "critical",
+                "--sound",
+                "alarm-clock-elapsed",
+                "Fire",
+                "Now",
+            ],
+        )?;
         checker.expect(
             "then only a critical notification gets a banner",
             |session| Ok(banner_title(session)?.as_deref() == Some("Fire")),
         );
+        checker.expect("and only its sound plays", |session| {
+            let sounds: Vec<String> = commands(session)?
+                .into_iter()
+                .filter(|command| command.starts_with("sound: "))
+                .collect();
+            Ok(sounds
+                .last()
+                .is_some_and(|sound| sound.contains("alarm-clock-elapsed"))
+                && !sounds.iter().any(|sound| sound.contains("\"bell\"")))
+        });
     } else {
         println!("  skip wlrctl is not installed");
     }

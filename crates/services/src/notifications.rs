@@ -162,6 +162,8 @@ pub struct Notification {
     pub transient: bool,
     /// Seen: shown as a banner, or listed while the date menu was open.
     pub acknowledged: bool,
+    /// What to play when its banner shows (`MessageTray.Sound`).
+    pub sound: Option<Sound>,
     /// When it arrived or last changed, `YYYY-MM-DDTHH:MM:SS` in a scene.
     #[serde(deserialize_with = "deserialize_time")]
     pub time: LocalTime,
@@ -180,9 +182,19 @@ impl Default for Notification {
             resident: false,
             transient: false,
             acknowledged: false,
+            sound: None,
             time: epoch(),
         }
     }
+}
+
+/// A notification's sound: a sound of the sound theme by name (the
+/// `sound-name` hint), or a file (`sound-file`).
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Sound {
+    Name(String),
+    File(PathBuf),
 }
 
 /// An application's notifications: one group in the list.

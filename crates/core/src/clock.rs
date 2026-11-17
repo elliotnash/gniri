@@ -8,7 +8,7 @@
 use std::fmt;
 
 use crate::calendar::days_in_month;
-use crate::i18n::{format_time, tr};
+use crate::i18n::{format_time, tr, tr_clock};
 
 /// A date and time of day in the user's time zone.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -191,7 +191,7 @@ fn wall_clock_format(format: &ClockFormat) -> &'static str {
 /// padded with a figure space (U+2007), which is as wide as a digit.
 pub fn panel_clock_text(time: &LocalTime, format: &ClockFormat) -> String {
     const EN_SPACE: &str = "\u{2002}";
-    format_time(&tr(wall_clock_format(format)), time).replace('_', EN_SPACE)
+    format_time(&tr_clock(wall_clock_format(format)), time).replace('_', EN_SPACE)
 }
 
 /// The time on the lock screen: the wall clock without the date, as
@@ -206,7 +206,7 @@ pub fn lock_clock_time(time: &LocalTime, hour12: bool) -> String {
         show_weekday: false,
         show_seconds: false,
     };
-    format_time(&tr(wall_clock_format(&format)), time)
+    format_time(&tr_clock(wall_clock_format(&format)), time)
         .replace(':', RATIO)
         // The padding of a one-digit hour: nothing stands in a column here.
         .trim()

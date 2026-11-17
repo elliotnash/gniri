@@ -7,12 +7,16 @@
 //! ```
 //!
 //! Services: power, network, bluetooth, brightness, audio, rfkill, mpris,
-//! session, idle, apps, search.
+//! session, idle, apps, search, events.
 //!
 //! It only listens; it never sends a command. `session` shows what logind
 //! would let this session do and never locks: a request to lock is only
 //! printed. `idle` reports five and ten seconds without input. `apps`
 //! lists the installed applications once.
+//!
+//! `events` asks the calendar server for the events of the next thirty
+//! days, which starts it and Evolution Data Server, as GNOME Shell's date
+//! menu does.
 //!
 //! `search` is the exception: it searches for the words after it, which
 //! starts the applications that answer searches, as GNOME Shell's own
@@ -27,8 +31,8 @@ use std::time::Duration;
 use gniri_services::session::locker::{Locker, Report};
 use gniri_services::{Bus, Link, Model};
 use gniri_services::{
-    apps, audio, bluetooth, brightness, idle, logind, mpris, network, power, rfkill, search,
-    session,
+    apps, audio, bluetooth, brightness, events, idle, logind, mpris, network, power, rfkill,
+    search, session,
 };
 
 /// A locker that locks nothing.
@@ -98,6 +102,18 @@ fn main() {
             (idle::Timer::Blank, Duration::from_secs(10)),
         ])),
         "apps" => print(apps::backend::spawn()),
+        "events" => {
+            let mut bus = Bus::session();
+            let link = bus.add::<events::State, _, _>("events", events::backend::run);
+            bus.start();
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_or(0, |since| since.as_secs() as i64);
+            let _ = link
+                .commands
+                .send_blocking(events::Command::SetRange(now, now + 30 * 86_400));
+            print(link);
+        }
         "search" => {
             let terms: Vec<String> = std::env::args().skip(2).collect();
             let mut bus = Bus::session();
@@ -124,7 +140,7 @@ fn main() {
         }
         _ => eprintln!(
             "usage: watch power|network|bluetooth|brightness|audio|rfkill|mpris|session|idle|\
-             apps|search <words>"
+             apps|events|search <words>"
         ),
     }
 }

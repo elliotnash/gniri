@@ -5,16 +5,15 @@
 
 mod calendar;
 
-use gniri_core::tr;
 use std::rc::Rc;
 
-use gniri_core::{Date, Subscription};
+use gniri_core::{Date, Subscription, tr};
 use gniri_services::notifications::Command;
 use gtk::prelude::*;
 
 use self::calendar::Calendar;
 use crate::messages::MessageList;
-use crate::services::Services;
+use crate::services::{Services, SystemClock};
 
 /// The applications the cards under the calendar start, by desktop entry.
 const CALENDAR_APP: &str = "org.gnome.Calendar";
@@ -54,6 +53,134 @@ fn card(
     button
 }
 
+/// The world clocks, nearest offset first (`WorldClocksSection._clocksChanged`
+/// and `_updateTimeLabels`): a city, its time and how far ahead of the
+/// local time it is. Without any, an offer to add some.
+fn fill_world_clocks(services: &Services, grid: &gtk::Grid) {
+    while let Some(child) = grid.first_child() {
+        grid.remove(&child);
+    }
+    let hour12 = services
+        .config
+        .with(|config| config.clock.format == gniri_config::HourFormat::H12);
+    let now = gtk::glib::DateTime::now_local().expect("the local time is representable");
+    let local_offset = now.utc_offset().as_seconds();
+    let mut clocks: Vec<(i64, String, gniri_core::LocalTime, i64)> =
+        services.world_clocks.with(|clocks| {
+            clocks
+                .iter()
+                .filter_map(|clock| {
+                    // An unknown name gives UTC, whose name is "UTC".
+                    let zone = gtk::glib::TimeZone::new(Some(&clock.zone));
+                    if zone.identifier() != clock.zone.as_str() {
+                        return None;
+                    }
+                    let there = now.to_timezone(&zone).ok()?;
+                    let interval = zone.find_interval(gtk::glib::TimeType::Standard, now.to_unix());
+                    let standard = i64::from(zone.offset(interval));
+                    let time = gniri_core::LocalTime {
+                        year: there.year(),
+                        month: there.month() as u8,
+                        day: there.day_of_month() as u8,
+                        hour: there.hour() as u8,
+                        minute: there.minute() as u8,
+                        second: there.second() as u8,
+                    };
+                    let ahead = there.utc_offset().as_seconds() - local_offset;
+                    Some((standard, clock.city.clone(), time, ahead))
+                })
+                .collect()
+        });
+    // Under a scene the clock stands still at the scene's time.
+    if services.sandboxed {
+        let scene = services.time.get();
+        for (_, _, time, ahead) in &mut clocks {
+            let unix = SystemClock::unix_of(&scene) + *ahead;
+            *time = SystemClock::local_of(unix);
+        }
+    }
+    clocks.sort_by_key(|(standard, ..)| *standard);
+
+    let header = header_label(
+        &["world-clocks-header"],
+        &if clocks.is_empty() {
+            tr("Add World Clocks…")
+        } else {
+            tr("World Clocks")
+        },
+    );
+    if clocks.is_empty() {
+        header.add_css_class("no-world-clocks");
+    }
+    grid.attach(&header, 0, 0, 2, 1);
+    for (row, (_, city, time, ahead)) in clocks.iter().enumerate() {
+        let row = row as i32 + 1;
+        let city = header_label(&["world-clocks-city"], city);
+        city.set_hexpand(true);
+        city.set_ellipsize(gtk::pango::EllipsizeMode::End);
+        city.set_max_width_chars(1);
+        let time = gtk::Label::builder()
+            .label(gniri_core::calendar::time_of_day_text(time, hour12))
+            .css_classes(["world-clocks-time"])
+            .xalign(1.0)
+            .build();
+        let zone = gtk::Label::builder()
+            .label(gniri_core::offset_text(*ahead))
+            .css_classes(["world-clocks-timezone"])
+            .xalign(1.0)
+            .build();
+        grid.attach(&city, 0, row, 1, 1);
+        grid.attach(&time, 1, row, 1, 1);
+        grid.attach(&zone, 2, row, 1, 1);
+    }
+}
+
+/// Lists `day`'s events in `list` (`EventsSection._reloadEvents`).
+fn fill_events(services: &Services, list: &gtk::Box, day: Date) {
+    while let Some(child) = list.first_child() {
+        list.remove(&child);
+    }
+    let (begin, end) = (
+        calendar::day_start(day),
+        calendar::day_start(day.plus_days(1)),
+    );
+    let hour12 = services
+        .config
+        .with(|config| config.clock.format == gniri_config::HourFormat::H12);
+    let this_year = services.time.with(|time| time.year);
+    let shown = services.events.state.with(|state| {
+        state
+            .between(begin, end)
+            .into_iter()
+            .map(|event| {
+                let (start, end) = (
+                    SystemClock::local_of(event.start),
+                    SystemClock::local_of(event.end),
+                );
+                (
+                    event.summary.clone(),
+                    gniri_core::event_time_text(&start, &end, day, this_year, hour12),
+                )
+            })
+            .collect::<Vec<_>>()
+    });
+    for (summary, time) in &shown {
+        let row = gtk::Box::builder()
+            .orientation(gtk::Orientation::Vertical)
+            .css_classes(["event-box"])
+            .build();
+        let summary = header_label(&["event-summary"], summary);
+        summary.set_ellipsize(gtk::pango::EllipsizeMode::End);
+        summary.set_max_width_chars(1);
+        row.append(&summary);
+        row.append(&header_label(&["event-time"], time));
+        list.append(&row);
+    }
+    if shown.is_empty() {
+        list.append(&header_label(&["event-placeholder"], &tr("No Events")));
+    }
+}
+
 fn header_label(classes: &[&str], text: &str) -> gtk::Label {
     gtk::Label::builder()
         .label(text)
@@ -76,7 +203,7 @@ pub fn build(services: &Rc<Services>) -> DateMenu {
         .map(gniri_config::WeekStart::weekday)
         .or_else(crate::i18n::week_start)
         .unwrap_or(gniri_core::Weekday::Sunday);
-    let calendar = Calendar::new(today, week_start);
+    let calendar = Calendar::new(services, today, week_start);
 
     // `TodayButton`: the date in words. It takes the calendar back to
     // today, so it only reacts while another day is selected.
@@ -104,14 +231,29 @@ pub fn build(services: &Rc<Services>) -> DateMenu {
         move |_| calendar.set_date(services.time.with(|time| time.date()))
     });
 
-    // `EventsSection`, as GNOME shows it with no events. Without a
-    // calendar application to open it is only a label.
+    // `EventsSection`: the selected day's events. Without a calendar
+    // application to open it is only a label; without calendars it does
+    // not show.
     let events_title = header_label(&["events-title"], &tr("Today"));
     let events_list = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
         .css_classes(["events-list"])
         .build();
-    events_list.append(&header_label(&["event-placeholder"], &tr("No Events")));
+    let selected_day = Rc::new(std::cell::Cell::new(today));
+    let list_events = {
+        let (services, list, selected_day) = (
+            Rc::clone(services),
+            events_list.downgrade(),
+            Rc::clone(&selected_day),
+        );
+        move || {
+            let Some(list) = list.upgrade() else {
+                return;
+            };
+            fill_events(&services, &list, selected_day.get());
+        }
+    };
+    list_events();
     let events_box = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
         .css_classes(["events-box"])
@@ -125,6 +267,22 @@ pub fn build(services: &Rc<Services>) -> DateMenu {
         events_box.upcast_ref(),
     );
     events.set_can_target(services.has_app(CALENDAR_APP));
+    subscriptions.push(services.events.state.select(|state| state.has_calendars, {
+        let events = events.downgrade();
+        move |has| {
+            if let Some(events) = events.upgrade() {
+                events.set_visible(*has);
+            }
+        }
+    }));
+    subscriptions.push(services.events.state.select(|state| state.events.clone(), {
+        let list_events = list_events.clone();
+        move |_| list_events()
+    }));
+    subscriptions.push(services.config.select(|config| config.clock.format, {
+        let list_events = list_events.clone();
+        move |_| list_events()
+    }));
 
     // `WorldClocksSection` and `WeatherSection`, as GNOME shows them before
     // anything is set up: they start the application that would do so.
@@ -134,16 +292,39 @@ pub fn build(services: &Rc<Services>) -> DateMenu {
         .build();
     displays.append(&events);
     if settings.world_clocks && services.has_app(CLOCKS_APP) {
-        let header = header_label(
-            &["world-clocks-header", "no-world-clocks"],
-            &tr("Add World Clocks…"),
-        );
+        let grid = gtk::Grid::builder()
+            .css_classes(["world-clocks-grid"])
+            .hexpand(true)
+            .build();
         displays.append(&card(
             services,
             "world-clocks-button",
             CLOCKS_APP,
-            header.upcast_ref(),
+            grid.upcast_ref(),
         ));
+        let fill = {
+            let (services, grid) = (Rc::clone(services), grid.downgrade());
+            move || {
+                if let Some(grid) = grid.upgrade() {
+                    fill_world_clocks(&services, &grid);
+                }
+            }
+        };
+        fill();
+        subscriptions.push(services.world_clocks.subscribe({
+            let fill = fill.clone();
+            move |_| fill()
+        }));
+        // Each minute, and with another clock format.
+        subscriptions.push(services.time.select(|time| (time.hour, time.minute), {
+            let fill = fill.clone();
+            move |_| fill()
+        }));
+        subscriptions.push(
+            services
+                .config
+                .select(|config| config.clock.format, move |_| fill()),
+        );
     }
     if settings.weather && services.has_app(WEATHER_APP) {
         let header = header_label(
@@ -186,6 +367,8 @@ pub fn build(services: &Rc<Services>) -> DateMenu {
             today_button.downgrade(),
         );
         move |selected: Date| {
+            selected_day.set(selected);
+            list_events();
             let today = services.time.with(|time| time.date());
             if let Some(events_title) = events_title.upgrade() {
                 events_title.set_label(&selected.events_title(today));

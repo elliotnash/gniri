@@ -14,4 +14,10 @@
     <file preprocess="xml-stripblanks" alias="scalable/status/message-indicator-symbolic.svg">icons/scalable/status/message-indicator-symbolic.svg</file>
     <file preprocess="xml-stripblanks" alias="scalable/status/no-notifications-symbolic.svg">icons/scalable/status/no-notifications-symbolic.svg</file>
   </gresource>
+  <!-- Pictures the theme draws with, copied unchanged from gnome-shell's
+       data/theme. -->
+  <gresource prefix="/dev/gniri/theme">
+    <file preprocess="xml-stripblanks" alias="calendar-today.svg">theme/calendar-today.svg</file>
+    <file preprocess="xml-stripblanks" alias="calendar-today-light.svg">theme/calendar-today-light.svg</file>
+  </gresource>
 </gresources>
