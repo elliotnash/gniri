@@ -1,0 +1,41 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+// The whole theme, for the variant its includer has set. Mirrors
+// gnome-shell-sass/_widgets.scss and the files beside it upstream.
+
+@import 'st';
+@import 'upstream/colors';
+
+// Upstream's light accent is St's accent colour itself, a word St reads at
+// run time. In the dark variant it only ever appears inside an st-*()
+// function, which turns it into libadwaita's variable.
+@if $variant == 'light' {
+    $accent_color: _st-color($accent_color) !global;
+}
+@import 'drawing';
+@import 'common';
+@import 'tokens';
+@import 'base';
+@import 'widgets/buttons';
+@import 'widgets/panel';
+@import 'widgets/popovers';
+@import 'widgets/slider';
+@import 'widgets/quick-settings';
+@import 'widgets/osd';
+@import 'widgets/message-list';
+@import 'widgets/notifications';
+@import 'widgets/calendar';
+@import 'widgets/misc';
+@import 'widgets/entries';
+@import 'widgets/dialogs';
+@import 'widgets/login-lock';
+@import 'widgets/overview';
+@import 'widgets/dash';
+@import 'widgets/search-entry';
+@import 'widgets/app-grid';
+@import 'widgets/search-results';
+
+// Last, so it overrides the stock look above.
+@import 'bms';
+@import 'bms-popup';
+@import 'bms-overview';

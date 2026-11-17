@@ -14,7 +14,7 @@ use std::os::unix::net::UnixStream;
 use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, mpsc};
 use std::time::{Duration, Instant};
 
@@ -104,8 +104,18 @@ pub fn visual_dir() -> Result<PathBuf> {
 /// the timeout (docs/DECISIONS.md, S8). Hosts without the GNOME screensaver
 /// interface are not checked, nor asked: a call to a name nobody has waits
 /// for the bus to give up on starting its owner.
+///
+/// A host that is niri with gniri's lock screen up is another matter: the
+/// nested session goes on, only slowly, since the host draws it a frame
+/// now and then. A run then waits longer for everything.
 fn check_host_is_showing() -> Result<()> {
     if !session_bus_has("org.gnome.ScreenSaver") {
+        if host_session_is_locked() && PATIENCE.swap(LOCKED_PATIENCE, Ordering::Relaxed) == 1 {
+            eprintln!(
+                "xtask: the screen is locked: the nested session runs slowly, \
+                 and every wait is {LOCKED_PATIENCE} times as long"
+            );
+        }
         return Ok(());
     }
     let output = Command::new("gdbus")
@@ -215,6 +225,24 @@ fn ask_host(request: Request) -> Option<Response> {
         .send(request)
         .ok()?
         .ok()
+}
+
+/// How many times as long [`wait_until_within`] waits as it was asked to.
+static PATIENCE: AtomicU32 = AtomicU32::new(1);
+/// The same while the host's screen is locked.
+const LOCKED_PATIENCE: u32 = 5;
+
+/// What logind says of the session this process is in.
+fn host_session_is_locked() -> bool {
+    let Some(session) = std::env::var_os("XDG_SESSION_ID") else {
+        return false;
+    };
+    Command::new("loginctl")
+        .arg("show-session")
+        .arg(session)
+        .args(["--property", "LockedHint", "--value"])
+        .output()
+        .is_ok_and(|output| output.stdout.starts_with(b"yes"))
 }
 
 /// True if `program` is on PATH.
@@ -768,6 +796,7 @@ pub fn wait_until_within(
     limit: Duration,
     mut done: impl FnMut() -> Result<bool>,
 ) -> Result<()> {
+    let limit = limit * PATIENCE.load(Ordering::Relaxed);
     let started = Instant::now();
     loop {
         if done()? {

@@ -19,6 +19,12 @@ private D-Bus session bus, and a fixture in place of the system: no click in
 a test turns your Wi-Fi off. It also runs in American English whatever your
 own language is, since that is what the reference was captured in.
 
+A run needs the screen unlocked. Behind GNOME's lock screen a nested
+session stalls, and the harness refuses to start; behind gniri's own it
+goes on slowly, the harness says so and waits five times as long for
+everything, and what depends on the nested output's size (the
+comparisons with the reference) is not to be trusted.
+
 The session around it can be GNOME's or niri's own (with gniri as its
 shell or without). Under niri the harness takes the nested session's
 window out of the columns and sizes it itself, since niri would make it
@@ -134,6 +140,10 @@ application with `window = { color = "…", app-id = "…" }`.
 
 The test session uses a smaller overview zoom than `data/niri/gniri.kdl`
 sets (`tests/visual/niri/test.kdl` says why).
+
+Any scene can be looked at in the light style, which GNOME was never
+captured in: `cargo xtask shot look --scene quick-settings --light
+--wallpaper '#808080'`.
 
 Some scenes have no GNOME capture to compare with and exist to be looked
 at: `cargo xtask shot look --scene date-menu-media --wallpaper '#808080'`

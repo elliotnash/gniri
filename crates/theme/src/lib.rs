@@ -8,12 +8,44 @@
 /// The compiled dark stylesheet, ready for `gtk::CssProvider`.
 pub const DARK_CSS: &str = include_str!(concat!(env!("OUT_DIR"), "/gniri-dark.css"));
 
+/// The compiled light stylesheet.
+pub const LIGHT_CSS: &str = include_str!(concat!(env!("OUT_DIR"), "/gniri-light.css"));
+
 /// Design tokens as `(name, value)`, without the `--gniri-` prefix.
 pub const TOKENS: &[(&str, &str)] = include!(concat!(env!("OUT_DIR"), "/tokens.rs"));
 
-/// Looks up one design token.
+/// The same of the light stylesheet.
+pub const LIGHT_TOKENS: &[(&str, &str)] = include!(concat!(env!("OUT_DIR"), "/tokens-light.rs"));
+
+/// Which of the two stylesheets: GNOME Shell's "style variant".
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Variant {
+    #[default]
+    Dark,
+    Light,
+}
+
+impl Variant {
+    pub fn css(self) -> &'static str {
+        match self {
+            Self::Dark => DARK_CSS,
+            Self::Light => LIGHT_CSS,
+        }
+    }
+}
+
+/// Looks up one design token of the dark stylesheet.
 pub fn token(name: &str) -> Option<&'static str> {
-    TOKENS
+    lookup(TOKENS, name)
+}
+
+/// Looks up one design token of the light stylesheet.
+pub fn light_token(name: &str) -> Option<&'static str> {
+    lookup(LIGHT_TOKENS, name)
+}
+
+fn lookup(tokens: &'static [(&str, &str)], name: &str) -> Option<&'static str> {
+    tokens
         .iter()
         .find(|(key, _)| *key == name)
         .map(|(_, value)| *value)
@@ -45,6 +77,62 @@ mod tests {
         for (name, value) in expected {
             assert_eq!(token(name), Some(value), "token {name}");
         }
+    }
+
+    /// The same for the light stylesheet, against GNOME Shell 51.1's
+    /// compiled `gnome-shell-light.css`. GNOME was never captured in its
+    /// light style, so there are no computed values to go by.
+    #[test]
+    fn light_base_tokens_match_gnome_shell_51() {
+        let expected = [
+            ("bg-color", "#fafafb"),            // .popup-menu-content background
+            ("fg-color", "#222226"),            // .message color
+            ("outer-borders-color", "#e6e6eb"), // .popup-menu-content border
+            ("card-bg-color", "#ffffff"),       // .message background
+            // What is dark whatever the style: the display and the overview.
+            ("osd-bg-color", "#2e2e33"),      // .osd-window background
+            ("system-base-color", "#222226"), // #overviewGroup background
+            ("system-fg-color", "#fafafb"),
+        ];
+        for (name, value) in expected {
+            assert_eq!(light_token(name), Some(value), "token {name}");
+        }
+        // Upstream's light accent is the accent itself.
+        assert_eq!(light_token("accent-color"), Some("var(--accent-bg-color)"));
+    }
+
+    /// blur-my-shell keeps its blur as it is on the light style and
+    /// changes the tint: rgba(255,255,255,0.58) for the bar, folded like
+    /// the dark one.
+    #[test]
+    fn the_light_tint_is_folded_too() {
+        assert_eq!(
+            light_token("bms-panel-tint"),
+            Some("rgba(255, 255, 255, 0.58)")
+        );
+        let folded = light_token("bms-surface-color").expect("bms-surface-color token");
+        let numbers: Vec<f64> = folded
+            .trim_start_matches("rgba(")
+            .trim_end_matches(')')
+            .split(',')
+            .map(|part| part.trim().parse().expect("a number"))
+            .collect();
+        let [r, g, b, a] = numbers[..] else {
+            panic!("unexpected colour {folded}")
+        };
+        assert!((a - (1.0 - 0.42 * 0.6)).abs() < 1e-9, "{folded}");
+        for channel in [r, g, b] {
+            assert!((a * channel - 0.58 * 255.0).abs() < 0.5, "{folded}");
+        }
+        // Black on it where the dark style has white.
+        assert_eq!(
+            light_token("bms-popup-fg-color"),
+            Some("rgba(0, 0, 0, 0.85)")
+        );
+        assert_eq!(
+            token("bms-popup-fg-color"),
+            Some("rgba(255, 255, 255, 0.9)")
+        );
     }
 
     #[test]
@@ -86,10 +174,12 @@ mod tests {
             "st-transparentize(",
             "-st-accent",
         ] {
-            assert!(
-                !DARK_CSS.contains(function),
-                "{function} left in the compiled CSS"
-            );
+            for css in [DARK_CSS, LIGHT_CSS] {
+                assert!(
+                    !css.contains(function),
+                    "{function} left in the compiled CSS"
+                );
+            }
         }
     }
 }

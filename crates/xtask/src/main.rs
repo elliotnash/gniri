@@ -94,12 +94,19 @@ struct SessionArgs {
     /// GTK renderer (GSK_RENDERER).
     #[arg(long, default_value = "vulkan")]
     renderer: String,
+    /// Show the scene in the shell's light style.
+    #[arg(long, requires = "scene")]
+    light: bool,
 }
 
 impl SessionArgs {
     /// Starts the session, with the scene (if any) played.
     fn start(&self, name: &str) -> Result<Session> {
         let scene = self.scene.as_deref().map(Scene::load).transpose()?;
+        let scene = match scene {
+            Some(scene) if self.light => Some(scene.in_light_style()),
+            scene => scene,
+        };
         let fixture = match &scene {
             Some(scene) => Some(scene.write_fixture(name, None)?),
             None => None,

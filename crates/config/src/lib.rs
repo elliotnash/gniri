@@ -17,6 +17,7 @@ use serde::Deserialize;
 #[derive(Clone, Debug, Default, PartialEq, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Config {
+    pub appearance: Appearance,
     pub wallpaper: Wallpaper,
     pub clock: Clock,
     pub panel: Panel,
@@ -27,6 +28,33 @@ pub struct Config {
     pub dash: Dash,
     pub search: Search,
     pub commands: Commands,
+}
+
+/// How the shell itself looks.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct Appearance {
+    pub style: Style,
+}
+
+/// Which of its two styles the shell has: its bar, its menus and the rest.
+/// Not the applications' style, which the Dark Style switch in the quick
+/// settings sets. The names of the middle two are GNOME Shell's own for
+/// its two rules.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Style {
+    /// Always dark.
+    Dark,
+    /// Always light.
+    Light,
+    /// GNOME's rule: dark, unless the desktop's colour scheme says
+    /// "prefer light", which no switch sets. In effect dark.
+    #[default]
+    PreferDark,
+    /// GNOME Classic's rule: light, unless the desktop's colour scheme
+    /// says "prefer dark". The shell then follows the Dark Style switch.
+    PreferLight,
 }
 
 /// What gniri draws behind the windows. With neither key set it draws no
@@ -414,6 +442,7 @@ mod tests {
         assert_eq!(config.wallpaper.image, None);
         // The locale's.
         assert_eq!(config.date_menu.week_start, None);
+        assert_eq!(config.appearance.style, Style::PreferDark);
         assert_eq!(config.commands.settings, "gnome-control-center");
         // GNOME's defaults: blank and lock after five minutes.
         assert_eq!(config.idle.blank_after, 300);
@@ -430,6 +459,9 @@ mod tests {
     fn reads_every_key() {
         let config = parse(
             r##"
+            [appearance]
+            style = "prefer-light"
+
             [wallpaper]
             image = "~/Pictures/wall.jxl"
             color = "#241F31"
@@ -474,6 +506,7 @@ mod tests {
             "##,
         )
         .unwrap();
+        assert_eq!(config.appearance.style, Style::PreferLight);
         assert_eq!(
             config.dash,
             Dash {
@@ -565,6 +598,10 @@ mod tests {
 
         assert!(matches!(
             parse("[clock]\nformat = \"13h\""),
+            Err(Error::Parse(_))
+        ));
+        assert!(matches!(
+            parse("[appearance]\nstyle = \"sepia\""),
             Err(Error::Parse(_))
         ));
         assert!(matches!(

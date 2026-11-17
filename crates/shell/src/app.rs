@@ -120,8 +120,8 @@ fn application(role: ipc::Role) -> adw::Application {
     app.connect_startup(|_| {
         // GTK has set the locale by now; nothing has been written yet.
         crate::i18n::init();
-        // GNOME Shell's own chrome is dark whatever the app colour scheme is.
-        adw::StyleManager::default().set_color_scheme(adw::ColorScheme::ForceDark);
+        // Dark, as GNOME Shell's own chrome is whatever the applications'
+        // colour scheme: `style::follow` changes it where it is not.
         style::load();
     });
     app
@@ -189,6 +189,10 @@ pub fn run_helper(
             if cli.no_pointer {
                 crate::surfaces::layer::ignore_pointer();
             }
+            kept.borrow_mut().push(Box::new(style::follow(
+                config.appearance.style,
+                fixture.as_ref(),
+            )));
             match activate(app, &config, fixture.as_ref()) {
                 Some(state) => {
                     kept.borrow_mut().push(state);
@@ -381,6 +385,9 @@ fn activate(
     }
     // Not under a fixture: a scene starts the agent it wants to look at.
     let polkit = fixture.is_none().then(PolkitAgent::start).flatten();
+    // Before anything is built: nothing is to show in the wrong style
+    // first.
+    let appearance = style::follow(config.appearance.style, fixture.as_ref());
     let services = Services::start(config, fixture, cli.locker_arguments());
 
     let ready = ReadyTracker::new();
@@ -483,7 +490,19 @@ fn activate(
             }
         }
     });
-    let mut subscriptions = vec![close_menus, close_menus_for_dialog, close_for_lock, search];
+    let restyle = services.config.select(
+        |config| config.appearance.style,
+        move |style| {
+            appearance.set_style(*style);
+        },
+    );
+    let mut subscriptions = vec![
+        close_menus,
+        close_menus_for_dialog,
+        close_for_lock,
+        search,
+        restyle,
+    ];
     subscriptions.extend(idle::start(&services));
 
     Some(Running {

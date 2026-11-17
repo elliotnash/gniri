@@ -2,8 +2,9 @@
 
 // blur-my-shell's overview and dash components: what the extension
 // changes about the overview's parts. Ported from its
-// `src/styles/overview.css` (`.overview-components-dark`) and `dash.css`
-// (`.dark-dash`), v78, for the default settings.
+// `src/styles/overview.css` (`.overview-components-dark` and `-light`) and
+// `dash.css` (`.dark-dash`, `.light-dash`), v78, for the default settings:
+// each in the shell's style.
 //
 // The extension draws the overview's background itself: the wallpaper,
 // blurred and dimmed to its brightness. Here that is the backdrop surface
@@ -12,21 +13,32 @@
 
 // overview.css: the fills of a tile, an entry or an arrow, and how they
 // brighten.
-$bms_overview_fill: rgba(255, 255, 255, 0.07);
-$bms_overview_border: rgba(255, 255, 255, 0.05);
+//
+// On the light style the cards (the entry, a list of results, an arrow)
+// are nearly white with black on them, while an icon in the grid still
+// brightens: it lies on the overview's background, which is as dark as
+// ever.
+$bms_overview_fill: rgba(255, 255, 255, bms-pick(0.07, 0.58));
+$bms_overview_border: bms-pick(rgba(255, 255, 255, 0.05), rgba(0, 0, 0, 0.05));
 $bms_overview_hover: rgba(255, 255, 255, 0.13);
-$bms_overview_active: rgba(255, 255, 255, 0.19);
-$bms_overview_selected_active: rgba(255, 255, 255, 0.24);
-$bms_overview_entry_focus: rgba(255, 255, 255, 0.12);
-$bms_overview_dim_fg: rgba(255, 255, 255, 0.65);
-$bms_overview_description_fg: rgba(255, 255, 255, 0.5);
+$bms_overview_active: rgba(255, 255, 255, bms-pick(0.19, 0.25));
+$bms_overview_selected_active: rgba(255, 255, 255, bms-pick(0.24, 0.38));
+$bms_overview_entry_fg: bms-pick(white, rgba(0, 0, 0, 0.85));
+$bms_overview_entry_focus: rgba(255, 255, 255, bms-pick(0.12, 0.78));
+$bms_overview_dim_fg: bms-ink(0.65);
+$bms_overview_description_fg: bms-ink(bms-pick(0.5, 0.55));
+// What is on a card.
+$bms_overview_card_hover: bms-pick($bms_overview_hover, rgba(255, 255, 255, 0.78));
+$bms_overview_card_active: bms-pick($bms_overview_active, rgba(255, 255, 255, 0.9));
 
-// dash.css `.dark-dash`
-$bms_dash_tint: rgba(30, 30, 33, 0.5);
-$bms_dash_border: rgba(255, 255, 255, 0.06);
-$bms_dash_separator: rgba(255, 255, 255, 0.12);
-$bms_dash_fg: rgba(255, 255, 255, 0.9);
-$bms_dash_checked_hover: rgba(255, 255, 255, 0.25);
+// dash.css `.dark-dash` and `.light-dash`
+$bms_dash_tint: bms-pick(rgba(30, 30, 33, 0.5), rgba(255, 255, 255, 0.65));
+$bms_dash_border: bms-pick(rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0.25));
+$bms_dash_separator: bms-ink(0.12);
+$bms_dash_fg: bms-pick(rgba(255, 255, 255, 0.9), #222226);
+$bms_dash_hover: bms-ink(0.13);
+$bms_dash_active: bms-ink(0.19);
+$bms_dash_checked_hover: bms-ink(0.25);
 
 // The extension blurs the wallpaper behind the dash, whatever window is
 // there. niri's default blur for a layer surface does the same ("xray":
@@ -53,12 +65,12 @@ $bms_dash_checked_hover: rgba(255, 255, 255, 0.25);
 
     // Hover on the icon box, not on the button around it.
     .overview-tile, .show-apps {
-        &:hover .overview-icon { background-color: $bms_overview_hover; }
-        &:active .overview-icon { background-color: $bms_overview_active; }
+        &:hover .overview-icon { background-color: $bms_dash_hover; }
+        &:active .overview-icon { background-color: $bms_dash_active; }
     }
 
     .show-apps:checked {
-        .overview-icon { background-color: $bms_overview_active; }
+        .overview-icon { background-color: $bms_dash_active; }
         &:hover .overview-icon { background-color: $bms_dash_checked_hover; }
     }
 }
@@ -67,7 +79,7 @@ $bms_dash_checked_hover: rgba(255, 255, 255, 0.25);
 // passes behind it. One of niri's workspaces can, so here it is.
 .search-entry {
     @include bms-blur;
-    color: white;
+    color: $bms_overview_entry_fg;
     background-color: $bms_overview_fill;
 
     &.focused { background-color: $bms_overview_entry_focus; }
@@ -104,13 +116,60 @@ $bms_dash_checked_hover: rgba(255, 255, 255, 0.25);
     }
 
     .page-navigation-arrow {
-        &:hover { background-color: $bms_overview_hover; }
-        &:active { background-color: $bms_overview_active; }
+        &:hover { background-color: $bms_overview_card_hover; }
+        &:active { background-color: $bms_overview_card_active; }
     }
 
     .page-indicator-icon { background-color: $system_fg_color; }
 
     .list-search-result-description { color: $bms_overview_description_fg; }
+}
+
+// What light.css says beyond the colours above: black on the cards, and
+// the states of what lies on one.
+@if $bms_light {
+    .controls-manager {
+        // An icon the keyboard is on is brighter than one pointed at.
+        .icon-grid .overview-tile.selected {
+            background-color: rgba(255, 255, 255, 0.19);
+        }
+
+        // The app grid's names, as the extension has them: black, whatever
+        // is behind them.
+        .icon-grid .overview-tile label { color: rgba(0, 0, 0, 0.85); }
+
+        .search-section-content,
+        .search-section-content label,
+        .search-provider-icon,
+        .page-navigation-arrow {
+            color: rgba(0, 0, 0, 0.85);
+        }
+
+        .search-statustext { color: rgba(0, 0, 0, 0.65); }
+
+        .search-section-content .app-grid-running-dot {
+            background-color: rgba(0, 0, 0, 0.65);
+        }
+
+        // An application among the results: the extension writes its
+        // name in black and has it brighten as what lies on a card does.
+        .grid-search-result {
+            label { color: rgba(0, 0, 0, 0.85); }
+
+            &:hover, &.selected { background-color: $bms_overview_card_hover; }
+            &:active, &.selected:hover { background-color: $bms_overview_card_active; }
+        }
+
+        .list-search-result,
+        .search-provider-icon {
+            &:hover, &.selected { background-color: rgba(0, 0, 0, 0.13); }
+            &:active, &.selected:hover, &.selected:active {
+                background-color: rgba(0, 0, 0, 0.19);
+            }
+        }
+
+        .list-search-result-description { color: $bms_overview_description_fg; }
+    }
 }
 
 :root {

@@ -30,6 +30,9 @@ pub struct Fixture {
     pub rfkill: rfkill::State,
     pub session: session::State,
     pub dark_style: toggles::State,
+    /// The desktop's colour scheme, where it is not what `dark_style`
+    /// says: "prefer-light" has the shell show its light style.
+    pub color_scheme: Option<toggles::ColorScheme>,
     pub night_light: toggles::State,
     pub do_not_disturb: toggles::State,
     pub notifications: notifications::State,

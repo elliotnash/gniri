@@ -31,14 +31,42 @@ $bms_brightness: 0.6;
     backdrop-filter: blur(10px);
 }
 
-// stylesheet.css: `#panel.dark-panel { background-color: rgba(30,30,33,0.5);
-// transition-duration: 500ms }`
+// The extension styles each component "automatically" by default: light
+// where the shell's stylesheet is the light one, else dark. Its blur stays
+// the same either way (a pipeline of its own for the light style exists,
+// and is off by default), so only the tints and what is drawn on them
+// change.
+$bms_light: $variant == 'light';
+
+// What is drawn on a tint: white on a dark one, black on a light one. The
+// extension's light.css is its dark.css with the one swapped for the
+// other nearly everywhere, at the same strength.
+@function bms-ink($alpha) {
+    @return if($bms_light, rgba(0, 0, 0, $alpha), rgba(255, 255, 255, $alpha));
+}
+
+// Either of two values, by the variant.
+@function bms-pick($dark, $light) {
+    @return if($bms_light, $light, $dark);
+}
+
+// A state of something in the accent colour: brighter on the dark style,
+// darker on the light one.
+@function bms-accent-state($color, $amount) {
+    @return if($bms_light, st-darken($color, $amount), st-lighten($color, $amount));
+}
+
+// panel.css: `#panel.dark-panel { background-color: rgba(30,30,33,0.5);
+// transition-duration: 500ms }` and `#panel.light-panel { background-color:
+// rgba(255,255,255,0.58) }`
 $bms_dark_tint: rgba(30, 30, 33, 0.5);
+$bms_light_tint: rgba(255, 255, 255, 0.58);
+$bms_panel_tint: bms-pick($bms_dark_tint, $bms_light_tint);
 $bms_panel_transition_duration: 500ms;
 
 .gniri-panel {
     @include bms-blur;
-    background-color: bms-fold($bms_dark_tint);
+    background-color: bms-fold($bms_panel_tint);
     transition-duration: $bms_panel_transition_duration;
 
     // stylesheet.css `#panel.transparent-panel`: with the default "unblur
@@ -51,7 +79,7 @@ $bms_panel_transition_duration: 500ms;
 }
 
 :root {
-    --gniri-bms-surface-color: #{bms-fold($bms_dark_tint)};
-    --gniri-bms-panel-tint: #{$bms_dark_tint};
+    --gniri-bms-surface-color: #{bms-fold($bms_panel_tint)};
+    --gniri-bms-panel-tint: #{$bms_panel_tint};
     --gniri-bms-panel-transition-duration: #{$bms_panel_transition_duration};
 }

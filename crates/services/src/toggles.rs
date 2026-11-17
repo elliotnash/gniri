@@ -12,6 +12,19 @@ use serde::Deserialize;
 
 use crate::model::Model;
 
+/// The desktop's colour scheme: what applications are asked to prefer
+/// (`org.gnome.desktop.interface color-scheme`). The Dark Style toggle
+/// switches between the first two; GNOME Shell's own look only changes
+/// for the third.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ColorScheme {
+    #[default]
+    Default,
+    PreferDark,
+    PreferLight,
+}
+
 /// One on/off setting.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize)]
 #[serde(default, deny_unknown_fields)]

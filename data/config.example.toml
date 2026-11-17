@@ -7,6 +7,15 @@
 # gniri reads the file again whenever it changes: there is nothing to
 # restart. docs/CONFIG.md says more about each setting.
 
+[appearance]
+# The style of the shell itself: its bar, its menus and the rest. (The
+# Dark Style switch in the quick settings is for the applications.)
+#   "prefer-dark" (default): GNOME's rule. Dark, unless the desktop's colour
+#       scheme is "prefer-light", which no switch sets.
+#   "prefer-light": light, and dark while the Dark Style switch is on.
+#   "dark", "light": always that.
+# style = "prefer-light"
+
 [wallpaper]
 # An image, scaled to cover each output. With neither `image` nor `color`,
 # gniri draws no wallpaper (use this if another program draws yours).

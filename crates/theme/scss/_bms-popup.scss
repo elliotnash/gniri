@@ -2,18 +2,27 @@
 
 // blur-my-shell's popup component: what the extension changes about menus,
 // the OSD and (later) dialogs and notifications. Ported from its
-// `src/styles/popup/base.css`, `dark.css` and `menu-items.css` (v78) for the
-// default settings: popups blurred, dark style.
+// `src/styles/popup/base.css`, `dark.css`, `light.css` and `menu-items.css`
+// (v78) for the default settings: popups blurred, in the shell's style.
 //
 // The extension replaces every background colour of the widgets on a popup
-// with a translucent white, so upstream's own button colours for these
-// widgets are never seen and are not ported.
+// with a translucent white (on the light style mostly a translucent black:
+// `bms-ink()`), so upstream's own button colours for these widgets are
+// never seen and are not ported. Where the two styles differ in more than
+// that, the dark value is given first and the light one second
+// (`bms-pick()`).
 
 // base.css: `.bms-popup-background-dark .popup-menu-content, .quick-settings,
 // .osd-window { background: rgba(30,30,33,0.5); border-color: rgba(255,255,255,0.06) }`
-$bms_popup_tint: rgba(30, 30, 33, 0.5);
-$bms_popup_border_color: rgba(255, 255, 255, 0.06);
-$bms_popup_fg_color: rgba(255, 255, 255, 0.9);
+//
+// and for the light style `background: rgba(255,255,255,0.65);
+// border-color: rgba(0,0,0,0.1)`.
+$bms_popup_tint: bms-pick(rgba(30, 30, 33, 0.5), rgba(255, 255, 255, 0.65));
+$bms_popup_border_color: bms-pick(rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0.1));
+$bms_popup_fg_color: bms-pick(rgba(255, 255, 255, 0.9), rgba(0, 0, 0, 0.85));
+// What is said more quietly, what cannot be used, and a hint.
+$bms_dim_fg_color: bms-pick(rgba(255, 255, 255, 0.68), rgba(0, 0, 0, 0.62));
+$bms_disabled_fg_color: bms-ink(bms-pick(0.5, 0.4));
 
 // St paints a menu's box-shadow under the menu as well as around it, so the
 // blurred backdrop of a menu is darkened once more by the shadow's alpha.
@@ -57,22 +66,22 @@ $bms_menu_backdrop: $bms_brightness * (1 - alpha($shadow_color));
         );
         background-color: bms-fold($dimmed_tint, $bms_menu_backdrop);
         border-color: rgba(
-            255 * $quick_settings_dim_brightness,
-            255 * $quick_settings_dim_brightness,
-            255 * $quick_settings_dim_brightness,
+            red($bms_popup_border_color) * $quick_settings_dim_brightness,
+            green($bms_popup_border_color) * $quick_settings_dim_brightness,
+            blue($bms_popup_border_color) * $quick_settings_dim_brightness,
             alpha($bms_popup_border_color)
         );
     }
 }
 
-// A button on a popup: translucent white, brighter when pointed at or
-// pressed. dark.css.
+// A button on a popup: translucent ink, stronger when pointed at or
+// pressed. dark.css and light.css.
 @mixin bms-button($normal, $hover, $active) {
     color: $bms_popup_fg_color;
-    background-color: rgba(255, 255, 255, $normal);
+    background-color: bms-ink($normal);
 
-    &:hover, &:focus-visible { background-color: rgba(255, 255, 255, $hover); }
-    &:active { background-color: rgba(255, 255, 255, $active); }
+    &:hover, &:focus-visible { background-color: bms-ink($hover); }
+    &:active { background-color: bms-ink($active); }
 }
 
 // dark.css: `box-shadow: inset 0 0 0 2px st-transparentize(st-mix(
@@ -83,7 +92,12 @@ $bms_menu_backdrop: $bms_brightness * (1 - alpha($shadow_color));
 // reference. CSS `color-mix` would weigh the white by its alpha and carry
 // the alpha over, which comes out darker and fainter, so the white is
 // given here as the opaque colour St in effect uses.
-$bms_focus_ring_color: st-transparentize(st-mix(-st-accent-color, #ffffff, 60%), 0.2);
+//
+// light.css has the accent itself there.
+$bms_focus_ring_color: bms-pick(
+    st-transparentize(st-mix(-st-accent-color, #ffffff, 60%), 0.2),
+    st-transparentize(-st-accent-color, 0.2)
+);
 
 @mixin bms-focus-ring {
     &:focus-visible {
@@ -104,9 +118,17 @@ $bms_focus_ring_color: st-transparentize(st-mix(-st-accent-color, #ffffff, 60%),
     color: st-transparentize(-st-accent-fg-color, 0);
     background-color: st-transparentize(-st-accent-color, 0);
 
-    &:hover { background-color: st-lighten(-st-accent-color, 4%); }
-    &:active { background-color: st-lighten(-st-accent-color, 9%); }
+    &:hover { background-color: bms-accent-state(-st-accent-color, 4%); }
+    &:active { background-color: bms-accent-state(-st-accent-color, 9%); }
 }
+
+// dark.css mixes the accent with white for the menu button of a toggle
+// that is on, light.css with black (given as `rgba(0,0,0,0.9)`, of which
+// St's mix keeps the colour: see the focus ring above).
+$bms_menu_button_checked: bms-pick(
+    st-mix(-st-accent-color, #ffffff, 85%),
+    st-mix(-st-accent-color, #000000, 92%)
+);
 
 .quick-toggle-has-menu .quick-toggle-menu-button {
     @include bms-button(0.14, 0.19, 0.34);
@@ -114,34 +136,34 @@ $bms_focus_ring_color: st-transparentize(st-mix(-st-accent-color, #ffffff, 60%),
 
     &:checked {
         color: st-transparentize(-st-accent-fg-color, 0);
-        background-color: st-mix(-st-accent-color, #ffffff, 85%);
+        background-color: $bms_menu_button_checked;
 
-        &:hover { background-color: st-lighten(st-mix(-st-accent-color, #ffffff, 85%), 4%); }
-        &:active { background-color: st-lighten(st-mix(-st-accent-color, #ffffff, 85%), 9%); }
+        &:hover { background-color: bms-accent-state($bms_menu_button_checked, 4%); }
+        &:active { background-color: bms-accent-state($bms_menu_button_checked, 9%); }
     }
 }
 
 .quick-toggle-has-menu:checked .quick-toggle-separator {
-    background-color: st-mix(-st-accent-fg-color, -st-accent-color, 30%);
+    background-color: st-mix(-st-accent-fg-color, -st-accent-color, bms-pick(30%, 20%));
 }
 
 // menu-items.css: the slider row's buttons are clear until pointed at.
 .quick-slider .icon-button,
 .quick-slider .button {
-    @include bms-button(0, 0.13, 0.19);
+    @include bms-button(0, bms-pick(0.13, 0.15), bms-pick(0.19, 0.3));
     @include bms-focus-ring;
 }
 
 .quick-slider .slider-bin:focus-within {
-    background-color: rgba(255, 255, 255, 0.1);
+    background-color: bms-ink(0.1);
 }
 
 .popup-menu-item {
     color: $bms_popup_fg_color;
 
-    &:hover, &:focus-visible { background-color: rgba(255, 255, 255, 0.13); }
-    &:active, &:checked { background-color: rgba(255, 255, 255, 0.19); }
-    &:disabled { color: rgba(255, 255, 255, 0.5); }
+    &:hover, &:focus-visible { background-color: bms-ink(0.13); }
+    &:active, &:checked { background-color: bms-ink(0.19); }
+    &:disabled { color: $bms_disabled_fg_color; }
 }
 
 // base.css: `.quick-toggle-menu { background: rgba(255,255,255,0.08);
@@ -158,7 +180,10 @@ $bms_focus_ring_color: st-transparentize(st-mix(-st-accent-color, #ffffff, 60%),
 // with w the white's alpha, b the brightness, a and T the menu tint, m the
 // menu's backdrop factor, d the dimming and B the blurred wallpaper. The
 // two agree for every B when 1 - s = (1 - w) * b.
-$bms_submenu_white: 0.08;
+//
+// On the light style the submenu has the popup's own white, which is much
+// more of it; the same sum holds.
+$bms_submenu_white: bms-pick(0.08, alpha($bms_popup_tint));
 
 @function bms-submenu-colour() {
     $a: alpha($bms_popup_tint);
@@ -193,11 +218,12 @@ $bms_submenu_white: 0.08;
 }
 
 // In the list a message is a sheet of white on the menu.
-$bms_card_color: rgba(255, 255, 255, 0.07);
-$bms_card_border_color: rgba(255, 255, 255, 0.05);
-$bms_card_hover_color: rgba(255, 255, 255, 0.12);
-$bms_card_active_color: rgba(255, 255, 255, 0.15);
-$bms_dim_fg_color: rgba(255, 255, 255, 0.68);
+$bms_card_color: rgba(255, 255, 255, bms-pick(0.07, 0.58));
+$bms_card_border_color: bms-pick(rgba(255, 255, 255, 0.05), rgba(0, 0, 0, 0.1));
+$bms_card_hover_color: rgba(255, 255, 255, bms-pick(0.12, 0.4));
+$bms_card_active_color: rgba(255, 255, 255, bms-pick(0.15, 0.7));
+$bms_second_in_stack_color: rgba(255, 255, 255, bms-pick(0.05, 0.54));
+$bms_lower_in_stack_color: rgba(255, 255, 255, bms-pick(0.02, 0.44));
 
 .message-list .message {
     color: $bms_popup_fg_color;
@@ -207,8 +233,8 @@ $bms_dim_fg_color: rgba(255, 255, 255, 0.68);
     &:hover { background-color: $bms_card_hover_color; }
     &:focus-visible, &:active { background-color: $bms_card_active_color; }
 
-    &.second-in-stack { background-color: rgba(255, 255, 255, 0.05); }
-    &.lower-in-stack { background-color: rgba(255, 255, 255, 0.02); }
+    &.second-in-stack { background-color: $bms_second_in_stack_color; }
+    &.lower-in-stack { background-color: $bms_lower_in_stack_color; }
 }
 
 .message {
@@ -236,18 +262,18 @@ $bms_dim_fg_color: rgba(255, 255, 255, 0.68);
 
 .notification-button:disabled,
 .message-list-controls .message-list-clear-button:disabled {
-    color: rgba(255, 255, 255, 0.35);
-    background-color: rgba(255, 255, 255, 0.05);
+    color: bms-ink(0.35);
+    background-color: bms-ink(0.05);
 }
 
 .message-media-control {
     color: $bms_popup_fg_color;
     background-color: transparent;
 
-    &:hover { background-color: rgba(255, 255, 255, 0.15); }
-    &:active { background-color: rgba(255, 255, 255, 0.3); }
-    &:focus-visible, &:checked { background-color: rgba(255, 255, 255, 0.1); }
-    &:disabled { color: rgba(255, 255, 255, 0.5); }
+    &:hover { background-color: bms-ink(0.15); }
+    &:active { background-color: bms-ink(0.3); }
+    &:focus-visible, &:checked { background-color: bms-ink(0.1); }
+    &:disabled { color: $bms_disabled_fg_color; }
 }
 
 // The date menu. dark.css.
@@ -270,16 +296,16 @@ $bms_dim_fg_color: rgba(255, 255, 255, 0.68);
 
     .calendar-day-heading { color: $bms_dim_fg_color; }
     .calendar-day.calendar-weekend { color: $bms_dim_fg_color; }
-    .calendar-day.calendar-other-month { color: rgba(255, 255, 255, 0.5); }
+    .calendar-day.calendar-other-month { color: bms-ink(bms-pick(0.5, 0.38)); }
 
     .calendar-day:hover,
     .calendar-month-header .pager-button:hover {
-        background-color: rgba(255, 255, 255, 0.13);
+        background-color: bms-ink(0.13);
     }
 
     .calendar-day:focus-visible,
     .calendar-month-header .pager-button:focus-visible {
-        background-color: rgba(255, 255, 255, 0.1);
+        background-color: bms-ink(0.1);
         box-shadow: inset 0 0 0 2px $bms_focus_ring_color;
     }
 
@@ -287,12 +313,12 @@ $bms_dim_fg_color: rgba(255, 255, 255, 0.68);
     .calendar-day:active,
     .calendar-month-header .pager-button:active {
         color: $bms_popup_fg_color;
-        background-color: rgba(255, 255, 255, 0.19);
+        background-color: bms-ink(0.19);
     }
 
     .calendar-day:selected:hover,
     .calendar-day:active:hover {
-        background-color: rgba(255, 255, 255, 0.13);
+        background-color: bms-ink(0.13);
     }
 
     .calendar-day.calendar-today,
@@ -300,16 +326,16 @@ $bms_dim_fg_color: rgba(255, 255, 255, 0.68);
         color: st-transparentize(-st-accent-fg-color, 0);
         background-color: st-transparentize(-st-accent-color, 0);
 
-        &:hover { background-color: st-lighten(-st-accent-color, 4%); }
-        &:active { background-color: st-lighten(-st-accent-color, 9%); }
+        &:hover { background-color: bms-accent-state(-st-accent-color, 4%); }
+        &:active { background-color: bms-accent-state(-st-accent-color, 9%); }
     }
 }
 
 .datemenu-today-button {
     background-color: transparent;
 
-    &:hover, &:focus-visible { background-color: rgba(255, 255, 255, 0.15); }
-    &:active { background-color: rgba(255, 255, 255, 0.3); }
+    &:hover, &:focus-visible { background-color: bms-ink(bms-pick(0.15, 0.07)); }
+    &:active { background-color: bms-ink(bms-pick(0.3, 0.09)); }
 
     .date-label { color: $bms_popup_fg_color; }
     .day-label { color: $bms_dim_fg_color; }
@@ -359,7 +385,7 @@ $bms_dim_fg_color: rgba(255, 255, 255, 0.68);
 $bms_dialog_backdrop: $bms_brightness * (1 - 0.03);
 // The extension's "dialog corner radius".
 $bms_dialog_radius: 18px;
-$bms_dialog_border_color: rgba(255, 255, 255, 0.1);
+$bms_dialog_border_color: bms-ink(0.1);
 
 .modal-dialog {
     color: $bms_popup_fg_color;
@@ -372,15 +398,15 @@ $bms_dialog_border_color: rgba(255, 255, 255, 0.1);
         @include bms-focus-ring;
 
         &:disabled {
-            color: rgba(255, 255, 255, 0.35);
-            background-color: rgba(255, 255, 255, 0.05);
+            color: bms-ink(0.35);
+            background-color: bms-ink(0.05);
         }
     }
 
     // `StEntry` and its states.
     .st-entry {
-        background-color: rgba(255, 255, 255, 0.1);
-        color: rgba(255, 255, 255, 0.7);
+        background-color: bms-ink(0.1);
+        color: bms-pick(rgba(255, 255, 255, 0.7), $bms_popup_fg_color);
 
         &:focus-within {
             color: $bms_popup_fg_color;
@@ -389,25 +415,25 @@ $bms_dialog_border_color: rgba(255, 255, 255, 0.1);
         }
 
         &:disabled {
-            background-color: rgba(255, 255, 255, 0.05);
-            color: rgba(255, 255, 255, 0.5);
+            background-color: bms-ink(0.05);
+            color: $bms_disabled_fg_color;
         }
 
-        > text > placeholder { color: rgba(255, 255, 255, 0.5); }
+        > text > placeholder { color: $bms_disabled_fg_color; }
     }
 
-    .user-icon { color: #ffffff; }
+    .user-icon { color: bms-pick(#ffffff, $bms_popup_fg_color); }
 }
 
 :root {
     --gniri-bms-dialog-color: #{bms-fold($bms_popup_tint, $bms_dialog_backdrop)};
     --gniri-bms-dialog-border-color: #{$bms_dialog_border_color};
     --gniri-bms-dialog-radius: #{$bms_dialog_radius};
-    --gniri-bms-dialog-button-color: #{rgba(255, 255, 255, 0.1)};
-    --gniri-bms-dialog-button-disabled-color: #{rgba(255, 255, 255, 0.05)};
-    --gniri-bms-dialog-button-disabled-fg-color: #{rgba(255, 255, 255, 0.35)};
-    --gniri-bms-entry-color: #{rgba(255, 255, 255, 0.1)};
-    --gniri-bms-entry-hint-color: #{rgba(255, 255, 255, 0.5)};
+    --gniri-bms-dialog-button-color: #{bms-ink(0.1)};
+    --gniri-bms-dialog-button-disabled-color: #{bms-ink(0.05)};
+    --gniri-bms-dialog-button-disabled-fg-color: #{bms-ink(0.35)};
+    --gniri-bms-entry-color: #{bms-ink(0.1)};
+    --gniri-bms-entry-hint-color: #{$bms_disabled_fg_color};
     --gniri-bms-lightbox-centre-color: #{lightbox-shade(0, $bms_brightness)};
     --gniri-bms-lightbox-corner-color: #{lightbox-shade(1, $bms_brightness)};
 }
@@ -418,13 +444,13 @@ $bms_dialog_border_color: rgba(255, 255, 255, 0.1);
     --gniri-bms-popup-tint: #{$bms_popup_tint};
     --gniri-bms-popup-border-color: #{$bms_popup_border_color};
     --gniri-bms-popup-fg-color: #{$bms_popup_fg_color};
-    --gniri-bms-popup-button-color: #{rgba(255, 255, 255, 0.1)};
+    --gniri-bms-popup-button-color: #{bms-ink(0.1)};
     --gniri-bms-submenu-white: #{rgba(255, 255, 255, $bms_submenu_white)};
     --gniri-bms-osd-radius: 48px;
     --gniri-bms-card-color: #{$bms_card_color};
     --gniri-bms-card-border-color: #{$bms_card_border_color};
-    --gniri-bms-second-in-stack-color: #{rgba(255, 255, 255, 0.05)};
-    --gniri-bms-lower-in-stack-color: #{rgba(255, 255, 255, 0.02)};
+    --gniri-bms-second-in-stack-color: #{$bms_second_in_stack_color};
+    --gniri-bms-lower-in-stack-color: #{$bms_lower_in_stack_color};
     --gniri-bms-dim-fg-color: #{$bms_dim_fg_color};
     --gniri-bms-banner-radius: #{$modal_radius + 2px};
 }

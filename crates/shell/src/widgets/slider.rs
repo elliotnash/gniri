@@ -59,18 +59,16 @@ impl Slider {
     }
 
     fn set_up_drawing(&self) {
-        let trough = token_colour("slider-trough-color");
-        let overdrive = token_colour("destructive-color");
         self.widget.set_draw_func({
             let inner = Rc::clone(&self.inner);
             move |area, cr, width, height| {
                 let (width, height) = (f64::from(width), f64::from(height));
                 let level = inner.level.get();
                 let colours = Colours {
-                    trough,
+                    trough: token_colour("slider-trough-color"),
                     // `-st-accent-color`, which follows the system setting.
                     active: adw::StyleManager::default().accent_color_rgba(),
-                    overdrive,
+                    overdrive: token_colour("destructive-color"),
                 };
                 // The handle is drawn in the widget's CSS `color`, which is
                 // how the theme brightens it on hover.

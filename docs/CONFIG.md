@@ -44,6 +44,16 @@ follows it to the file it pointed to when gniri started.
 
 ## The settings
 
+### `[appearance]`
+
+| Setting | Default | |
+|---|---|---|
+| `style` | `"prefer-dark"` | The style of the shell itself: `"dark"`, `"light"`, `"prefer-dark"` (GNOME's rule: dark, unless the desktop's colour scheme is "prefer light", which no switch sets) or `"prefer-light"` (light, and dark while the Dark Style switch is on). |
+
+The Dark Style switch in the quick settings is for the applications.
+GNOME Shell stays dark whatever it says, and so does gniri by default;
+`docs/FIDELITY.md` says what the light style is and is not.
+
 ### `[wallpaper]`
 
 | Key | Default | |

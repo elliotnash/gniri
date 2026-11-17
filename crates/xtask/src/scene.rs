@@ -134,6 +134,17 @@ impl Scene {
         Ok(path)
     }
 
+    /// Has the scene's desktop ask for the light style, which the shell
+    /// then has too. GNOME was only ever captured in its dark style: this
+    /// is for looking at.
+    pub fn in_light_style(mut self) -> Self {
+        self.fixture.insert(
+            "color_scheme".to_owned(),
+            toml::Value::String("prefer-light".to_owned()),
+        );
+        self
+    }
+
     /// Runs the scene in a fresh nested session and captures the result.
     ///
     /// `run` names the log files and the screenshot; `wallpaper` is an image

@@ -13,9 +13,11 @@ use std::rc::Rc;
 use gtk::prelude::*;
 use gtk::{cairo, gdk};
 
-/// A colour from the theme's token table (crates/theme/scss/_tokens.scss).
+/// A colour from the token table of the theme in use
+/// (crates/theme/scss/_tokens.scss). Looked up when something is drawn:
+/// the theme can change under a widget.
 pub fn token_colour(name: &str) -> gdk::RGBA {
-    gniri_theme::token(name)
+    crate::style::token(name)
         .and_then(|value| gdk::RGBA::parse(value).ok())
         .unwrap_or_else(|| {
             eprintln!("gniri: the theme has no colour token {name:?}");
@@ -152,7 +154,12 @@ pub struct LevelBar {
 }
 
 impl LevelBar {
-    pub fn new(bar_height: f64, separator_width: f64, colours: Colours) -> Self {
+    /// `colours` is asked each time the bar is drawn.
+    pub fn new(
+        bar_height: f64,
+        separator_width: f64,
+        colours: impl Fn() -> Colours + 'static,
+    ) -> Self {
         let level = Rc::new(Cell::new(Level {
             value: 0.0,
             maximum: 1.0,
@@ -169,7 +176,7 @@ impl LevelBar {
                     f64::from(width),
                     f64::from(height),
                     &level.get(),
-                    &colours,
+                    &colours(),
                     &area.color(),
                 );
             }

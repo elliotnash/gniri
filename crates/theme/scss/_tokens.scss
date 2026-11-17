@@ -36,6 +36,6 @@
     // .slider { -barlevel-background-color }
     --gniri-slider-trough-color: #{transparentize($fg_color, 0.9)};
     // blur-my-shell popup/base.css: `.osd-window .level`
-    --gniri-osd-level-trough-color: #{rgba(255, 255, 255, 0.14)};
-    --gniri-osd-level-active-color: #ffffff;
+    --gniri-osd-level-trough-color: #{if($variant == 'light', rgba(0, 0, 0, 0.12), rgba(255, 255, 255, 0.14))};
+    --gniri-osd-level-active-color: #{if($variant == 'light', #222226, #ffffff)};
 }

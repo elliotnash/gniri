@@ -68,15 +68,11 @@ pub fn build(app: &adw::Application, monitor: &gdk::Monitor) -> Osd {
 
     let icon = gtk::Image::new();
     let label = gtk::Label::builder().visible(false).build();
-    let level = LevelBar::new(
-        LEVEL_HEIGHT,
-        SEPARATOR_WIDTH,
-        Colours {
-            trough: token_colour("osd-level-trough-color"),
-            active: token_colour("osd-level-active-color"),
-            overdrive: token_colour("destructive-color"),
-        },
-    );
+    let level = LevelBar::new(LEVEL_HEIGHT, SEPARATOR_WIDTH, || Colours {
+        trough: token_colour("osd-level-trough-color"),
+        active: token_colour("osd-level-active-color"),
+        overdrive: token_colour("destructive-color"),
+    });
     let column = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
         .valign(gtk::Align::Center)

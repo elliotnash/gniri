@@ -1,7 +1,8 @@
 # Where gniri differs from GNOME Shell
 
-The goal is GNOME Shell 51 with blur-my-shell v78 at default settings, dark
-style. "Identical" means: theme values equal, layout within half a pixel, and
+The goal is GNOME Shell 51 with blur-my-shell v78 at default settings.
+GNOME Shell is dark unless told otherwise, and that is what was captured
+and is compared; see "Light style" for the other. "Identical" means: theme values equal, layout within half a pixel, and
 pixels within the thresholds in `tests/visual/thresholds.toml`. This file
 lists everything known to fall outside that, and why.
 
@@ -384,6 +385,31 @@ search results to it and takes none of niri's own away.
   manager) are not heard.
 - **Settings** are in gniri's config file (`[idle]`, `[lock]`), not in
   GNOME Settings.
+
+## Light style
+
+GNOME Shell has a light stylesheet, and shows it in one case only: the
+desktop's colour scheme is "prefer light", which no switch in GNOME sets
+(the Dark Style switch changes between "prefer dark" and no preference,
+and the shell is dark for both). gniri follows the same rule, and has a
+setting for the other three GNOME knows (`[appearance] style`): always
+dark, always light, or light unless the switch says dark, which is GNOME
+Classic's rule and the one that makes the shell follow the switch.
+
+- **Not compared.** GNOME was never captured in its light style. gniri's
+  is the same theme compiled for the other variant, as GNOME's own is,
+  and blur-my-shell's light styles ported from its source; the theme's
+  base colours are checked against GNOME's compiled light stylesheet.
+- **The blur is the dark style's.** blur-my-shell keeps its blur, dimmed
+  to 60%, and lays light tints on it; it has a brighter blur for the
+  light style which is off by default, and gniri does not have it. So the
+  overview's background is as dark as ever, and the extension's black
+  names under the app grid's icons are hard to read on it, there as here.
+- **The lock screen, the on-screen display's bar and the overview's own
+  texts** are dark in both, as in GNOME.
+- **A changed `style` setting** reaches the shell at once, and the lock
+  screen and the polkit agent when they next start; all three follow the
+  desktop's colour scheme as it changes.
 
 ## Language
 

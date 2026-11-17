@@ -2028,6 +2028,16 @@ fn config_reload() -> Result<(usize, usize)> {
     checker.expect("and the battery's number goes", |session| {
         Ok(tree::select(&panel(session)?, PERCENTAGE).is_err())
     });
+    write(&format!("{START}\n[appearance]\nstyle = \"light\""))?;
+    checker.expect("the light style is taken at once", |session| {
+        // The bar's light tint, folded as the dark one is: 75% of
+        // rgb(198,198,198) over the grey wallpaper.
+        Ok(near(pixel(session, BAR.0, BAR.1)?, [180, 180, 180]))
+    });
+    write(START)?;
+    checker.expect("and the dark one again", |session| {
+        Ok(near(pixel(session, BAR.0, BAR.1)?, [53, 53, 55]))
+    });
     write(&START.replace("#808080", "#3584e4"))?;
     checker.expect("another wallpaper colour is drawn", |session| {
         Ok(near(desktop(session)?, [53, 132, 228]))

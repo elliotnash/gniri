@@ -1,0 +1,11 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+// gniri light theme entry point. Mirrors gnome-shell-light.scss upstream.
+//
+// GNOME Shell is dark unless the desktop's colour scheme says "prefer
+// light" outright, which no switch in GNOME sets; see docs/FIDELITY.md.
+
+$variant: 'light';
+$contrast: 'normal';
+
+@import 'theme';
