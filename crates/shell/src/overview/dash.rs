@@ -30,6 +30,7 @@
 //! constraint; here the two share a `GtkOverlay` that is measured by the
 //! container.
 
+use gniri_core::tr;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::time::Duration;
@@ -423,7 +424,7 @@ pub fn build(services: &Rc<Services>) -> Dash {
     show_apps.image.add_css_class("show-apps-icon");
     show_apps
         .button
-        .update_property(&[gtk::accessible::Property::Label("Show Apps")]);
+        .update_property(&[gtk::accessible::Property::Label(&tr("Show Apps"))]);
     show_apps.button.connect_clicked({
         let services = Rc::clone(services);
         move |_| services.overview.update(|overview| overview.toggle_apps())
@@ -476,7 +477,11 @@ pub fn build(services: &Rc<Services>) -> Dash {
         label_showing: Cell::new(false),
         label_generation: Cell::new(0),
     });
-    inner.hook_label(&show_apps_container, &inner.show_apps.button, "Show Apps");
+    inner.hook_label(
+        &show_apps_container,
+        &inner.show_apps.button,
+        &tr("Show Apps"),
+    );
 
     // The row follows the installed applications and the open windows.
     let refresh = {

@@ -8,6 +8,7 @@
 //! applications that object. Here the shell asks, then tells logind (or,
 //! to log out, niri) itself.
 
+use gniri_core::{fill, tr, tr_in, tr_n};
 use std::cell::Cell;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
@@ -36,38 +37,58 @@ impl Kind {
     /// log-out dialog names when there is one.
     pub fn title(self, user: &str) -> String {
         match self {
-            Self::LogOut if !user.is_empty() => format!("Log Out {user}"),
-            Self::LogOut => "Log Out".to_owned(),
-            Self::Restart => "Restart".to_owned(),
-            Self::PowerOff => "Power Off".to_owned(),
+            Self::LogOut if !user.is_empty() => fill(&tr_in("title", "Log Out %s"), &[&user]),
+            Self::LogOut => tr_in("title", "Log Out"),
+            Self::Restart => tr_in("title", "Restart"),
+            Self::PowerOff => tr_in("title", "Power Off"),
         }
     }
 
     /// The sentence under it, with `seconds` left.
     pub fn description(self, user: &str, seconds: u32) -> String {
-        let unit = if seconds == 1 { "second" } else { "seconds" };
+        let count = u64::from(seconds);
         match self {
-            Self::LogOut if !user.is_empty() => {
-                format!("{user} will be logged out automatically in {seconds} {unit}")
-            }
-            Self::LogOut => {
-                format!("You will be logged out automatically in {seconds} {unit}")
-            }
-            Self::Restart => {
-                format!("The system will restart automatically in {seconds} {unit}")
-            }
-            Self::PowerOff => {
-                format!("The system will power off automatically in {seconds} {unit}")
-            }
+            Self::LogOut if !user.is_empty() => fill(
+                &tr_n(
+                    "%s will be logged out automatically in %d second",
+                    "%s will be logged out automatically in %d seconds",
+                    count,
+                ),
+                &[&user, &seconds],
+            ),
+            Self::LogOut => fill(
+                &tr_n(
+                    "You will be logged out automatically in %d second",
+                    "You will be logged out automatically in %d seconds",
+                    count,
+                ),
+                &[&seconds],
+            ),
+            Self::Restart => fill(
+                &tr_n(
+                    "The system will restart automatically in %d second",
+                    "The system will restart automatically in %d seconds",
+                    count,
+                ),
+                &[&seconds],
+            ),
+            Self::PowerOff => fill(
+                &tr_n(
+                    "The system will power off automatically in %d second",
+                    "The system will power off automatically in %d seconds",
+                    count,
+                ),
+                &[&seconds],
+            ),
         }
     }
 
     /// The label of the button that goes ahead.
-    pub fn confirm_label(self) -> &'static str {
+    pub fn confirm_label(self) -> String {
         match self {
-            Self::LogOut => "Log Out",
-            Self::Restart => "Restart",
-            Self::PowerOff => "Power Off",
+            Self::LogOut => tr_in("button", "Log Out"),
+            Self::Restart => tr_in("button", "Restart"),
+            Self::PowerOff => tr_in("button", "Power Off"),
         }
     }
 }
@@ -137,8 +158,8 @@ pub fn open(
     };
     // `_updateButtons`: Cancel first, which also makes it the button the
     // keyboard starts on.
-    let cancel_button = modal.add_button("Cancel", cancel.clone());
-    modal.add_button(kind.confirm_label(), {
+    let cancel_button = modal.add_button(&tr("Cancel"), cancel.clone());
+    modal.add_button(&kind.confirm_label(), {
         let services = Rc::clone(services);
         move || confirm(&services, kind)
     });

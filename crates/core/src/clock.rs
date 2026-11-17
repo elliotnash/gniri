@@ -8,6 +8,7 @@
 use std::fmt;
 
 use crate::calendar::days_in_month;
+use crate::i18n::{format_time, tr};
 
 /// A date and time of day in the user's time zone.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -154,71 +155,43 @@ pub struct ClockFormat {
     pub show_seconds: bool,
 }
 
-const MONTHS: [&str; 12] = [
-    "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-];
-
-fn weekday_abbreviation(weekday: Weekday) -> &'static str {
-    match weekday {
-        Weekday::Sunday => "Sun",
-        Weekday::Monday => "Mon",
-        Weekday::Tuesday => "Tue",
-        Weekday::Wednesday => "Wed",
-        Weekday::Thursday => "Thu",
-        Weekday::Friday => "Fri",
-        Weekday::Saturday => "Sat",
+/// The format GNOME's wall clock (gnome-desktop's `gnome-wall-clock.c`)
+/// writes the time in: one of sixteen, each of which has translations. The
+/// underscore divides the date from the time.
+fn wall_clock_format(format: &ClockFormat) -> &'static str {
+    match (
+        format.hour12,
+        format.show_date,
+        format.show_weekday,
+        format.show_seconds,
+    ) {
+        (false, true, true, true) => "%a %b %-e_%R:%S",
+        (false, true, true, false) => "%a %b %-e_%R",
+        (false, true, false, true) => "%b %-e_%R:%S",
+        (false, true, false, false) => "%b %-e_%R",
+        (false, false, true, true) => "%a %R:%S",
+        (false, false, true, false) => "%a %R",
+        (false, false, false, true) => "%R:%S",
+        (false, false, false, false) => "%R",
+        (true, true, true, true) => "%a %b %-e_%l:%M:%S %p",
+        (true, true, true, false) => "%a %b %-e_%l:%M %p",
+        (true, true, false, true) => "%b %-e_%l:%M:%S %p",
+        (true, true, false, false) => "%b %-e_%l:%M %p",
+        (true, false, true, true) => "%a %l:%M:%S %p",
+        (true, false, true, false) => "%a %l:%M %p",
+        (true, false, false, true) => "%l:%M:%S %p",
+        (true, false, false, false) => "%l:%M %p",
     }
 }
 
-/// The panel clock text, as GNOME's wall clock (gnome-desktop's
-/// `gnome-wall-clock.c`) writes it in English.
+/// The panel clock text, as GNOME's wall clock writes it.
 ///
-/// The formats are `[%a ][%b %-e]<en space>%l:%M[:%S] %p` and the same with
-/// `%R` for 24 hours. Two details matter for the width staying put: the date
-/// and the time are separated by an en space (U+2002), and a one-digit
-/// 12-hour hour is padded with a figure space (U+2007), which is as wide as a
-/// digit.
+/// Two details matter for the width staying put: the date and the time are
+/// separated by an en space (U+2002), and a one-digit 12-hour hour is
+/// padded with a figure space (U+2007), which is as wide as a digit.
 pub fn panel_clock_text(time: &LocalTime, format: &ClockFormat) -> String {
-    const EN_SPACE: char = '\u{2002}';
-    const FIGURE_SPACE: char = '\u{2007}';
-
-    let mut text = String::new();
-    if format.show_weekday {
-        text.push_str(weekday_abbreviation(time.weekday()));
-    }
-    if format.show_date {
-        if !text.is_empty() {
-            text.push(' ');
-        }
-        text.push_str(MONTHS[usize::from(time.month) - 1]);
-        text.push(' ');
-        text.push_str(&time.day.to_string());
-    }
-    if !text.is_empty() {
-        // With only the weekday GNOME uses a plain space.
-        text.push(if format.show_date { EN_SPACE } else { ' ' });
-    }
-
-    if format.hour12 {
-        let hour = match time.hour % 12 {
-            0 => 12,
-            hour => hour,
-        };
-        if hour < 10 {
-            text.push(FIGURE_SPACE);
-        }
-        text.push_str(&hour.to_string());
-    } else {
-        text.push_str(&format!("{:02}", time.hour));
-    }
-    text.push_str(&format!(":{:02}", time.minute));
-    if format.show_seconds {
-        text.push_str(&format!(":{:02}", time.second));
-    }
-    if format.hour12 {
-        text.push_str(if time.hour < 12 { " AM" } else { " PM" });
-    }
-    text
+    const EN_SPACE: &str = "\u{2002}";
+    format_time(&tr(wall_clock_format(format)), time).replace('_', EN_SPACE)
 }
 
 /// The time on the lock screen: the wall clock without the date, as
@@ -226,28 +199,23 @@ pub fn panel_clock_text(time: &LocalTime, format: &ClockFormat) -> String {
 /// divided by a ratio sign (U+2236), which sits at the height of the digits
 /// where a colon would hang low.
 pub fn lock_clock_time(time: &LocalTime, hour12: bool) -> String {
-    const RATIO: char = '\u{2236}';
-    if hour12 {
-        let hour = match time.hour % 12 {
-            0 => 12,
-            hour => hour,
-        };
-        let half = if time.hour < 12 { "AM" } else { "PM" };
-        format!("{hour}{RATIO}{:02} {half}", time.minute)
-    } else {
-        format!("{:02}{RATIO}{:02}", time.hour, time.minute)
-    }
+    const RATIO: &str = "\u{2236}";
+    let format = ClockFormat {
+        hour12,
+        show_date: false,
+        show_weekday: false,
+        show_seconds: false,
+    };
+    format_time(&tr(wall_clock_format(&format)), time)
+        .replace(':', RATIO)
+        // The padding of a one-digit hour: nothing stands in a column here.
+        .trim()
+        .to_owned()
 }
 
-/// The date under it: "Friday November 13" (format `%A %B %-d`).
+/// The date under it: "Friday November 13".
 pub fn lock_clock_date(time: &LocalTime) -> String {
-    let date = time.date();
-    format!(
-        "{} {} {}",
-        time.weekday().name(),
-        date.month_name(),
-        date.day
-    )
+    format_time(&tr("%A %B %-d"), time)
 }
 
 #[cfg(test)]

@@ -8,6 +8,7 @@
 //! signal stream is full, so the half that waits for replies must never be
 //! the one that empties the streams (docs/DECISIONS.md, M2).
 
+use gniri_core::tr;
 use std::collections::HashMap;
 
 use async_channel::{Receiver, Sender};
@@ -63,8 +64,8 @@ pub fn player(
         .get("xesam:artist")
         .and_then(|value| value.try_clone().ok())
         .and_then(|value| Vec::<String>::try_from(value).ok())
-        .unwrap_or_else(|| vec!["Unknown artist".to_owned()]);
-    let title = text(&metadata, "xesam:title").unwrap_or_else(|| "Unknown title".to_owned());
+        .unwrap_or_else(|| vec![tr("Unknown artist")]);
+    let title = text(&metadata, "xesam:title").unwrap_or_else(|| tr("Unknown title"));
     // Only a local file: gniri fetches nothing from the network.
     let cover = text(&metadata, "mpris:artUrl")
         .filter(|url| url.starts_with("file://"))

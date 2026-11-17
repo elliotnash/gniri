@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! Dates for the date menu: the month grid, stepping between months and the
-//! texts GNOME Shell writes dates and ages with, in English.
+//! texts GNOME Shell writes dates and ages with.
 //!
 //! Ports of the date arithmetic in gnome-shell's `js/ui/calendar.js`,
 //! `js/ui/dateMenu.js` and `js/misc/dateUtils.js`.
 
 use crate::clock::{LocalTime, Weekday};
+use crate::i18n::{fill, format_time, names, tr, tr_in, tr_n};
 
 /// A day in the proleptic Gregorian calendar.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -28,21 +29,6 @@ const WEEKDAYS: [Weekday; 7] = [
     Weekday::Saturday,
 ];
 
-const MONTHS: [&str; 12] = [
-    "January",
-    "February",
-    "March",
-    "April",
-    "May",
-    "June",
-    "July",
-    "August",
-    "September",
-    "October",
-    "November",
-    "December",
-];
-
 impl Weekday {
     /// 0 for Sunday to 6 for Saturday, as JavaScript's `getDay`.
     pub fn index(self) -> u8 {
@@ -58,22 +44,22 @@ impl Weekday {
     }
 
     /// "Saturday".
-    pub fn name(self) -> &'static str {
-        match self {
-            Self::Sunday => "Sunday",
-            Self::Monday => "Monday",
-            Self::Tuesday => "Tuesday",
-            Self::Wednesday => "Wednesday",
-            Self::Thursday => "Thursday",
-            Self::Friday => "Friday",
-            Self::Saturday => "Saturday",
-        }
+    pub fn name(self) -> String {
+        names().weekdays[usize::from(self.index())].clone()
     }
 
     /// The one-letter heading of a calendar column
     /// (`_getCalendarDayAbbreviation`).
-    pub fn grid_abbreviation(self) -> &'static str {
-        &self.name()[..1]
+    pub fn grid_abbreviation(self) -> String {
+        match self {
+            Self::Sunday => tr_in("grid sunday", "S"),
+            Self::Monday => tr_in("grid monday", "M"),
+            Self::Tuesday => tr_in("grid tuesday", "T"),
+            Self::Wednesday => tr_in("grid wednesday", "W"),
+            Self::Thursday => tr_in("grid thursday", "T"),
+            Self::Friday => tr_in("grid friday", "F"),
+            Self::Saturday => tr_in("grid saturday", "S"),
+        }
     }
 
     /// GNOME's `calendar-no-work` days in English: Saturday and Sunday.
@@ -152,35 +138,51 @@ impl Date {
         }
     }
 
-    pub fn month_name(self) -> &'static str {
-        MONTHS[usize::from(self.month) - 1]
+    /// The first moment of the day, for writing the date with a format.
+    pub fn midnight(self) -> LocalTime {
+        LocalTime {
+            year: self.year,
+            month: self.month,
+            day: self.day,
+            hour: 0,
+            minute: 0,
+            second: 0,
+        }
+    }
+
+    /// The date as `format` says, a `strftime` format in English: its
+    /// translation is used where there is one.
+    fn written(self, format: &str) -> String {
+        format_time(&tr(format), &self.midnight())
     }
 
     /// "November 14 2026": the date under the weekday at the top of the
-    /// date menu (`TodayButton.setDate`, format `%B %-d %Y`).
+    /// date menu (`TodayButton.setDate`).
     pub fn long_text(self) -> String {
-        format!("{} {} {}", self.month_name(), self.day, self.year)
+        self.written("%B %-d %Y")
     }
 
     /// The calendar's heading: the month, with the year unless it is this
     /// year (`Calendar._update`).
     pub fn month_heading(self, today: Date) -> String {
-        if self.year == today.year {
-            self.month_name().to_owned()
+        self.written(if self.year == today.year {
+            "%OB"
         } else {
-            format!("{} {}", self.month_name(), self.year)
-        }
+            "%OB %Y"
+        })
     }
 
     /// The title of the events card for this day
     /// (`EventsSection._updateTitle`).
     pub fn events_title(self, today: Date) -> String {
+        let format =
+            |format: &str| format_time(&tr_in("calendar heading", format), &self.midnight());
         match self.day_number() - today.day_number() {
-            0 => "Today".to_owned(),
-            -1 => "Yesterday".to_owned(),
-            1 => "Tomorrow".to_owned(),
-            _ if self.year == today.year => format!("{} {}", self.month_name(), self.day),
-            _ => self.long_text(),
+            0 => tr("Today"),
+            -1 => tr("Yesterday"),
+            1 => tr("Tomorrow"),
+            _ if self.year == today.year => format("%B %-d"),
+            _ => format("%B %-d %Y"),
         }
     }
 }
@@ -250,27 +252,26 @@ pub fn time_span_text(seconds_ago: i64) -> String {
     let years = weeks / 52.0;
 
     // `%d` of a fraction: the whole part.
-    let count = |value: f64, unit: &str| {
-        let value = value as i64;
-        let plural = if value == 1 { "" } else { "s" };
-        format!("{value} {unit}{plural} ago")
+    let count = |value: f64, singular: &str, plural: &str| {
+        let value = value as u64;
+        fill(&tr_n(singular, plural, value), &[&value])
     };
     if minutes < 5.0 {
-        "Just now".to_owned()
+        tr("Just now")
     } else if hours < 1.0 {
-        count(minutes, "minute")
+        count(minutes, "%d minute ago", "%d minutes ago")
     } else if days < 1.0 {
-        count(hours, "hour")
+        count(hours, "%d hour ago", "%d hours ago")
     } else if days < 2.0 {
-        "Yesterday".to_owned()
+        tr("Yesterday")
     } else if days < 15.0 {
-        count(days, "day")
+        count(days, "%d day ago", "%d days ago")
     } else if weeks < 8.0 {
-        count(weeks, "week")
+        count(weeks, "%d week ago", "%d weeks ago")
     } else if years < 1.0 {
-        count(months, "month")
+        count(months, "%d month ago", "%d months ago")
     } else {
-        count(years, "year")
+        count(years, "%d year ago", "%d years ago")
     }
 }
 
@@ -367,7 +368,7 @@ mod tests {
         assert_eq!(date(2026, 11, 15).events_title(today), "Tomorrow");
         assert_eq!(date(2026, 11, 20).events_title(today), "November 20");
         assert_eq!(date(2027, 2, 3).events_title(today), "February 3 2027");
-        let headings: Vec<&str> = (0..7)
+        let headings: Vec<String> = (0..7)
             .map(|day| Weekday::Sunday.plus(day).grid_abbreviation())
             .collect();
         assert_eq!(headings, ["S", "M", "T", "W", "T", "F", "S"]);

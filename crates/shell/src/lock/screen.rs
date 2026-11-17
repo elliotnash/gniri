@@ -4,6 +4,7 @@
 //! clock or the password prompt. Port of `UnlockDialog`, `UnlockDialogClock`
 //! and `UnlockDialogLayout` in `js/ui/unlockDialog.js`.
 
+use gniri_core::tr;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::time::Duration;
@@ -132,7 +133,7 @@ fn clock(lock: &Rc<Lock>, subscriptions: &mut Vec<Subscription>) -> (gtk::Box, g
         .halign(gtk::Align::Center)
         .build();
     let hint = gtk::Label::builder()
-        .label("Click or press a key")
+        .label(tr("Click or press a key"))
         .css_classes(["unlock-dialog-clock-hint"])
         .halign(gtk::Align::Center)
         .build();

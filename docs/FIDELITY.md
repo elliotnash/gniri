@@ -30,7 +30,6 @@ lists everything known to fall outside that, and why.
   removes it at once. Switching between workspaces is animated as in GNOME.
 - **Keyboard focus.** GNOME's panel can be reached with Ctrl+Alt+Tab. gniri's
   takes no keyboard focus yet.
-- **Clock language.** The clock is always written in English.
 - **Clock after resume.** After a suspend the clock can be stale until the
   next minute starts.
 - **Menus.** Clicking the keyboard-layout indicator switches to the next
@@ -138,11 +137,10 @@ BlueZ's agent all the time.
   hidden when their application is not installed, as in GNOME, and can be
   turned off in the config file. The calendar marks no days as having
   events and has no week numbers.
-- **First day of the week** comes from the config file (Sunday by default);
-  GNOME takes it from the locale.
+- **First day of the week** is the locale's, as in GNOME, unless the config
+  file names one.
 - **Opening.** As for quick settings: it fades and slides, and does not
   grow.
-- **Language.** Month and weekday names are English.
 
 ## Notifications
 
@@ -263,7 +261,6 @@ BlueZ's agent all the time.
   key".
 - **Not there:** "Switch User…", the on-screen keyboard, the
   screen-time-limit shield, media controls.
-- **Language.** The clock and the texts are English.
 - **Compared over the real wallpaper only.** GNOME's lock screen was
   captured once, by accident, so there are no flat-wallpaper pixels to
   compare with. The blurred background is the overview's (see "Blur").
@@ -306,8 +303,6 @@ search results to it and takes none of niri's own away.
 - **More than one output.** The entry and the dash are on every output
   that has a bar, and all show the same search. GNOME has them on the
   primary monitor only.
-- **Language.** "Type to search", "Show Apps", "No results" and the rest
-  are English.
 
 ## Dash
 
@@ -389,6 +384,30 @@ search results to it and takes none of niri's own away.
   manager) are not heard.
 - **Settings** are in gniri's config file (`[idle]`, `[lock]`), not in
   GNOME Settings.
+
+## Language
+
+gniri has no translations of its own. Its texts are GNOME's, word for
+word, and it looks them up in the catalogs GNOME installs: GNOME Shell's,
+gnome-desktop's (the clock), gnome-bluetooth's (the pairing dialog) and
+NetworkManager's (the names of the kinds of network). Where those are
+installed for the user's language, gniri is in that language.
+
+- **gniri's own texts stay English**: the few GNOME has no text for, such
+  as "Disconnecting…" beside a Bluetooth device (GNOME shows a spinner)
+  and what the lock screen says when PAM cannot be asked.
+- **Which language.** Texts and the formats dates are written in follow
+  `LC_MESSAGES` (and `LANGUAGE`); the names of months and weekdays follow
+  `LC_TIME`. GNOME translates a date's format in the language of
+  `LC_TIME`, so with two different languages set there a date can come
+  out in the one's order with the other's names.
+- **Applications' names** are in the user's language where their desktop
+  entries have them, and a search finds an application by its English
+  name too. Entries that leave their translation to a catalog of their
+  own (`X-GNOME-Gettext-Domain` and the like) show in English.
+- **Right-to-left languages** have their texts; the layout is not
+  mirrored.
+- **Not compared.** The reference was captured in English.
 
 ## Settings
 

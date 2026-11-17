@@ -35,8 +35,9 @@ Where it differs from GNOME Shell, and why, is written down:
 `docs/FIDELITY.md`.
 
 **Status.** Written for and used on one machine: Fedora 45, niri 26.04, a
-laptop at scale 1.25. Dark style only, and its texts are English. Expect
-rough edges elsewhere.
+laptop at scale 1.25. Dark style only. Its texts are in your language
+where GNOME Shell's translations are installed (gniri uses those, having
+none of its own). Expect rough edges elsewhere.
 
 ## Install
 

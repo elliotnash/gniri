@@ -549,7 +549,7 @@ fn panel_and_overview() -> Result<(usize, usize)> {
 type Part = fn() -> Result<(usize, usize)>;
 
 /// The parts, by the names `cargo xtask check <part>` takes.
-const PARTS: [(&str, Part); 11] = [
+const PARTS: [(&str, Part); 12] = [
     ("panel", panel_and_overview),
     ("overview", overview),
     ("quick-settings", quick_settings),
@@ -561,6 +561,7 @@ const PARTS: [(&str, Part); 11] = [
     ("agents", agent_dialogs),
     ("config", config_reload),
     ("outputs", outputs_coming_and_going),
+    ("language", another_language),
 ];
 
 /// Runs every part, or only the one called `only`.
@@ -582,6 +583,149 @@ pub fn run(only: Option<&str>) -> Result<bool> {
     }
     println!("{passed} of {} checks passed", passed + failed);
     Ok(failed == 0)
+}
+
+/// gniri in German: the texts are GNOME Shell's own translations, the
+/// dates are written as GNOME's German formats say, and a text put
+/// together from parts has them in the translation's order.
+///
+/// What a text should read is asked of gettext here, not written down: the
+/// check is that gniri finds GNOME's translations, whatever they say this
+/// year. It needs GNOME Shell's German catalog and the German locale, and
+/// is skipped without them.
+fn another_language() -> Result<(usize, usize)> {
+    const LOCALE: &str = "de_DE.UTF-8";
+    let german = |command: &mut Command| -> Option<String> {
+        let output = command
+            .env("LC_ALL", LOCALE)
+            .env("LANGUAGE", "de")
+            .output()
+            .ok()?;
+        Some(String::from_utf8_lossy(&output.stdout).into_owned())
+    };
+    let text = |original: &str| -> Option<String> {
+        german(Command::new("gettext").args(["-d", "gnome-shell", original]))
+            .filter(|text| text != original)
+    };
+    let installed = german(Command::new("locale").arg("-a")).is_some_and(|locales| {
+        locales
+            .lines()
+            .any(|locale| locale.eq_ignore_ascii_case("de_DE.utf8"))
+    });
+    let (Some(no_events), Some(no_notifications), Some(dark_style), Some(today)) = (
+        text("No Events"),
+        text("No Notifications"),
+        text("Dark Style"),
+        text("Today"),
+    ) else {
+        println!("language: skipped (GNOME Shell's German translation is not installed)");
+        return Ok((0, 0));
+    };
+    if !installed {
+        println!("language: skipped (the locale {LOCALE} is not installed)");
+        return Ok((0, 0));
+    }
+    let power_off = german(Command::new("ngettext").args([
+        "-d",
+        "gnome-shell",
+        "The system will power off automatically in %d second",
+        "The system will power off automatically in %d seconds",
+        "60",
+    ]))
+    .unwrap_or_default()
+    .replace("%d", "60");
+
+    let path = session::visual_dir()?
+        .join("logs")
+        .join("check-language.fixture.toml");
+    fs::write(
+        &path,
+        r#"
+        time = "2026-11-14T08:28:00"
+        session = { can_power_off = true }
+        dark_style = { available = true }
+        do_not_disturb = { available = true }
+        "#,
+    )?;
+    let session = Session::start_in(
+        &SessionOptions {
+            name: "check-language".to_owned(),
+            niri_config: None,
+            renderer: "vulkan".to_owned(),
+            gniri_args: scene::gniri_args(Some(&path), Some(WALLPAPER)),
+        },
+        session::Language {
+            locale: LOCALE.to_owned(),
+            languages: Some("de".to_owned()),
+        },
+    )?;
+    let mut checker = Checker {
+        session,
+        passed: 0,
+        failed: 0,
+    };
+    let stage_has = |session: &Session, wanted: &[&str]| -> Result<bool> {
+        let Some(stage) = surface(session, "gniri-stage")? else {
+            return Ok(false);
+        };
+        let texts = texts(&stage["tree"]);
+        Ok(wanted
+            .iter()
+            .all(|wanted| texts.iter().any(|text| text == wanted)))
+    };
+
+    println!("another language");
+    checker.expect("the clock writes the date as German does", |session| {
+        // "%-e. %b_%l:%M %p": the day first, with a full stop.
+        Ok(texts(&panel(session)?)
+            .iter()
+            .any(|text| text.starts_with("14. Nov")))
+    });
+    checker
+        .session
+        .gniri_msg(&["debug", "open-menu", "date-menu"])?;
+    checker.expect(
+        "the date menu's texts are GNOME's translations",
+        |session| stage_has(session, &[&no_events, &no_notifications, &today]),
+    );
+    checker.expect("its date is written out in German", |session| {
+        stage_has(session, &["Samstag", "14. November 2026"])
+    });
+    checker.expect("nothing of it is left in English", |session| {
+        let Some(stage) = surface(session, "gniri-stage")? else {
+            return Ok(false);
+        };
+        let texts = texts(&stage["tree"]);
+        Ok(!["No Events", "No Notifications", "Today", "Saturday"]
+            .iter()
+            .any(|english| texts.iter().any(|text| text == english)))
+    });
+    checker
+        .session
+        .gniri_msg(&["debug", "open-menu", "quick-settings"])?;
+    checker.expect("so are the quick settings' texts", |session| {
+        stage_has(session, &[&dark_style])
+    });
+    checker.session.gniri_msg(&["debug", "close-menu"])?;
+    checker.session.gniri_msg(&["power-off"])?;
+    checker.expect(
+        "a sentence with a number in it is the translation's, filled in",
+        |session| {
+            let Some(dialog) = surface(session, "gniri-dialog")? else {
+                return Ok(false);
+            };
+            Ok(texts(&dialog["tree"]).contains(&power_off))
+        },
+    );
+    checker.session.gniri_msg(&["debug", "close-dialog"])?;
+
+    let Checker {
+        session,
+        passed,
+        failed,
+    } = checker;
+    session.quit()?;
+    Ok((passed, failed))
 }
 
 /// The quick settings menu and the on-screen display, in a session of

@@ -4,6 +4,7 @@
 //! `js/gdm/authPrompt.js` and `UserWidget` in `js/ui/userWidget.js`, as the
 //! unlock dialog uses them: one user, one password entry.
 
+use gniri_core::tr;
 use std::rc::Rc;
 
 use gniri_core::Subscription;
@@ -47,7 +48,7 @@ pub fn build(lock: &Rc<Lock>) -> Prompt {
     let entry = PasswordEntry::new("login-dialog-prompt-entry");
     entry.widget.set_halign(gtk::Align::Fill);
     entry.widget.set_hexpand(true);
-    entry.set_hint("Password");
+    entry.set_hint(&tr("Password"));
 
     // `_defaultButtonWell`: the arrow that submits, inside the entry's
     // right end, and the spinner that takes its place while PAM works.

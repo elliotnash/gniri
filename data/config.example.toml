@@ -37,8 +37,8 @@
 # outputs = ["eDP-1"]
 
 [date_menu]
-# The day a week starts on in the calendar: "sunday" (default), "monday" or
-# "saturday".
+# The day a week starts on in the calendar: "sunday", "monday" or
+# "saturday". Unset, it is the day your locale starts a week on.
 # week_start = "monday"
 
 # The "Add World Clocks…" and "Select Weather Location…" cards under the

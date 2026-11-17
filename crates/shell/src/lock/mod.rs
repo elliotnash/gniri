@@ -18,6 +18,7 @@
 mod prompt;
 mod screen;
 
+use gniri_core::tr;
 use std::cell::{Cell, RefCell};
 use std::io::Write;
 use std::rc::Rc;
@@ -58,6 +59,8 @@ pub struct Notice {
 
 /// What a wrong password is answered with (`gdm/util.js`).
 const TRY_AGAIN: &str = "Sorry, that didn’t work. Please try again.";
+/// gniri's own, for when PAM cannot be asked at all.
+const CANNOT_CHECK: &str = "Passwords cannot be checked right now";
 
 /// What the worker threads tell the main loop.
 enum Report {
@@ -167,7 +170,7 @@ impl Lock {
                 // What a module said about it says more.
                 if !status.message.as_ref().is_some_and(|notice| notice.warning) {
                     status.message = Some(Notice {
-                        text: TRY_AGAIN.to_owned(),
+                        text: tr(TRY_AGAIN),
                         warning: true,
                     });
                 }
@@ -177,7 +180,7 @@ impl Lock {
                 self.status.update(|status| {
                     status.checking = false;
                     status.message = Some(Notice {
-                        text: "Passwords cannot be checked right now".to_owned(),
+                        text: tr(CANNOT_CHECK),
                         warning: true,
                     });
                 });

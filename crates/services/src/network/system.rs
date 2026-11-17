@@ -1064,7 +1064,7 @@ mod tests {
         assert_eq!(current.strength, 62);
         assert_eq!(wifi.active_strength, Some(45));
         assert_eq!(wifi.icon_name(), "network-wireless-signal-ok-symbolic");
-        assert_eq!(wifi.subtitle(), Some("home"));
+        assert_eq!(wifi.subtitle(), Some("home".to_owned()));
         assert!(!wifi.limited && !wifi.hotspot);
     }
 
@@ -1075,13 +1075,13 @@ mod tests {
         let mut system = neighbourhood();
         activate(&mut system, WLAN, "/active/1", "/profile/cafe", ACTIVATED);
         system.devices.get_mut(WLAN).unwrap().active_access_point = text("/ap/cafe");
-        assert_eq!(wifi(&system).subtitle(), Some("cafe"));
+        assert_eq!(wifi(&system).subtitle(), Some("cafe".to_owned()));
 
         // By profile alone: no access point chosen yet.
         let mut system = neighbourhood();
         activate(&mut system, WLAN, "/active/1", "/profile/home", ACTIVATING);
         let wifi = wifi(&system);
-        assert_eq!(wifi.subtitle(), Some("home"));
+        assert_eq!(wifi.subtitle(), Some("home".to_owned()));
         assert_eq!(wifi.current().unwrap().status, Status::Connecting);
         assert_eq!(wifi.active_strength, None);
         assert_eq!(wifi.icon_name(), "network-wireless-acquiring-symbolic");
@@ -1191,7 +1191,7 @@ mod tests {
         let wifi = state.wifi.as_ref().unwrap();
         assert!(wifi.hotspot);
         assert_eq!(wifi.icon_name(), "network-wireless-hotspot-symbolic");
-        assert_eq!(wifi.subtitle(), Some("Wi-Fi Hotspot"));
+        assert_eq!(wifi.subtitle(), Some("Wi-Fi Hotspot".to_owned()));
         assert_eq!(
             state.panel_icon_name(),
             Some("network-wireless-hotspot-symbolic")

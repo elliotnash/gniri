@@ -15,6 +15,7 @@
 
 pub mod backend;
 
+use gniri_core::{fill, tr};
 use std::collections::HashMap;
 
 use serde::Deserialize;
@@ -230,9 +231,11 @@ fn ssid(settings: &Settings) -> String {
     String::from_utf8_lossy(&bytes).into_owned()
 }
 
+/// A field that is only shown. `label` is GNOME's English, as for
+/// [`asked`]; the field carries it in the user's language.
 fn shown(label: &str, value: String) -> Field {
     Field {
-        label: label.to_owned(),
+        label: tr(label),
         key: None,
         value,
         password: false,
@@ -242,7 +245,7 @@ fn shown(label: &str, value: String) -> Field {
 
 fn asked(label: &str, key: &str, value: String, password: bool) -> Field {
     Field {
-        label: label.to_owned(),
+        label: tr(label),
         key: Some(key.to_owned()),
         value,
         password,
@@ -368,14 +371,21 @@ pub fn request(
             true,
         )]
     };
-    let needs_password = || Some(format!("A password is required to connect to “{id}”"));
+    let needs_password = || {
+        Some(fill(
+            &tr("A password is required to connect to “%s”"),
+            &[&id],
+        ))
+    };
 
     let (title, message, fields) = match kind.as_str() {
         "802-11-wireless" => (
             "Authentication required",
-            Some(format!(
-                "Passwords or encryption keys are required to access the wireless network “{}”",
-                ssid(settings)
+            Some(fill(
+                &tr(
+                    "Passwords or encryption keys are required to access the wireless network “%s”",
+                ),
+                &[&ssid(settings)],
             )),
             wireless_fields(settings, setting_name, hints)?,
         ),
@@ -410,7 +420,7 @@ pub fn request(
         ),
         "gsm" if hinted("pin") => (
             "PIN code required",
-            Some("PIN code is needed for the mobile broadband device".to_owned()),
+            Some(tr("PIN code is needed for the mobile broadband device")),
             vec![asked("PIN", "pin", text(settings, "gsm", "pin"), true)],
         ),
         "gsm" | "cdma" => (
@@ -439,7 +449,7 @@ pub fn request(
         return Err("there is nothing to ask for".to_owned());
     }
     Ok(Request {
-        title: title.to_owned(),
+        title: tr(title),
         message,
         fields,
         wps: flags & WPS_PBC_ACTIVE != 0,

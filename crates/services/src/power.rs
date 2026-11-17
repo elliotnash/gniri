@@ -7,6 +7,7 @@
 
 pub mod backend;
 
+use gniri_core::tr_in;
 use serde::Deserialize;
 
 use crate::model::Model;
@@ -172,11 +173,11 @@ impl Profile {
     }
 
     /// The name shown in the menu and as the toggle's subtitle.
-    pub fn label(self) -> &'static str {
+    pub fn label(self) -> String {
         match self {
-            Self::PowerSaver => "Power Saver",
-            Self::Balanced => "Balanced",
-            Self::Performance => "Performance",
+            Self::PowerSaver => tr_in("Power profile", "Power Saver"),
+            Self::Balanced => tr_in("Power profile", "Balanced"),
+            Self::Performance => tr_in("Power profile", "Performance"),
         }
     }
 

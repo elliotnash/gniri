@@ -12,6 +12,7 @@
 pub mod backend;
 pub mod markup;
 
+use gniri_core::tr;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -203,11 +204,11 @@ pub struct Source {
 
 impl Source {
     /// `MessageHeader`'s fallback for a source without a name.
-    pub fn display_title(&self) -> &str {
+    pub fn display_title(&self) -> String {
         if self.title.is_empty() {
-            "Unknown App"
+            tr("Unknown App")
         } else {
-            &self.title
+            self.title.clone()
         }
     }
 

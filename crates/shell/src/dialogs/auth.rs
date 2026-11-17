@@ -7,6 +7,7 @@
 //! user types back; whether that was right is for polkit's helper to say
 //! (crates/services/src/polkit.rs).
 
+use gniri_core::tr;
 use std::rc::Rc;
 
 use gniri_core::Subscription;
@@ -52,7 +53,7 @@ pub fn open(
     let modal = Modal::new(app, monitor, "prompt-dialog");
 
     let header = message_content();
-    header.title.set_label("Authentication Required");
+    header.title.set_label(&tr("Authentication Required"));
     header.description.set_label(&request.message);
     modal.content.append(&header.root);
 
@@ -63,9 +64,9 @@ pub fn open(
         .build();
     user_layout.append(&avatar::build(user));
     let (name, class) = if user.name == "root" {
-        ("Administrator", "polkit-dialog-user-root-label")
+        (tr("Administrator"), "polkit-dialog-user-root-label")
     } else {
-        (user.display_name(), "polkit-dialog-user-label")
+        (user.display_name().to_owned(), "polkit-dialog-user-label")
     };
     user_layout.append(
         &gtk::Label::builder()
@@ -108,7 +109,7 @@ pub fn open(
         let agent = Rc::clone(agent);
         move || agent.send(Command::Cancel)
     };
-    modal.add_button("Cancel", cancel.clone());
+    modal.add_button(&tr("Cancel"), cancel.clone());
     modal.on_escape(cancel);
 
     // `_onEntryActivate`
@@ -121,7 +122,7 @@ pub fn open(
             }
         }
     };
-    let authenticate = modal.add_button("Authenticate", respond.clone());
+    let authenticate = modal.add_button(&tr("Authenticate"), respond.clone());
     entry.text.connect_activate(move |_| respond());
 
     // Only something to send can be sent.
@@ -151,7 +152,7 @@ pub fn open(
             move |prompt: &Option<Prompt>| {
                 entry.widget.set_sensitive(prompt.is_some());
                 if let Some(prompt) = prompt {
-                    entry.set_hint(prompt.hint());
+                    entry.set_hint(&prompt.hint());
                     entry.set_shown(prompt.echo);
                     entry.clear();
                     entry.grab_focus();

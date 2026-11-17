@@ -23,6 +23,8 @@ pub struct App {
     /// Its desktop entry's name without ".desktop".
     pub id: String,
     pub name: String,
+    /// The name in English, where `name` is in another language.
+    pub english_name: Option<String>,
     /// An icon name, or the path of an image file.
     pub icon: Option<String>,
     /// The entry's `Exec` key as written.
@@ -30,6 +32,8 @@ pub struct App {
     pub generic_name: Option<String>,
     pub comment: Option<String>,
     pub keywords: Vec<String>,
+    /// The entry's `Categories`.
+    pub categories: Vec<String>,
     /// The application id of its windows, where that is not `id`.
     pub startup_wm_class: Option<String>,
     /// The command wants a terminal to run in.
@@ -41,11 +45,13 @@ impl From<DesktopEntry> for App {
         Self {
             id: entry.id,
             name: entry.name,
+            english_name: entry.english_name,
             icon: entry.icon,
             exec: entry.exec,
             generic_name: entry.generic_name,
             comment: entry.comment,
             keywords: entry.keywords,
+            categories: entry.categories,
             startup_wm_class: entry.startup_wm_class,
             terminal: entry.terminal,
         }
@@ -115,6 +121,9 @@ impl App {
         }
         let mut index = Vec::new();
         add(&mut index, Field::Name, &self.name);
+        if let Some(english_name) = &self.english_name {
+            add(&mut index, Field::Name, english_name);
+        }
         if let Some(program) = self.program() {
             // The program's name counts as one word, dashes and all.
             index.push((Field::Exec, program.to_lowercase()));

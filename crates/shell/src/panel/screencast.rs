@@ -4,6 +4,7 @@
 //! `js/ui/status/remoteAccess.js`: an orange button, shown while something
 //! is capturing the screen, that stops the capture when clicked.
 
+use gniri_core::tr;
 use std::rc::Rc;
 
 use gniri_core::Subscription;
@@ -19,7 +20,7 @@ pub fn build(services: &Rc<Services>, subscriptions: &mut Vec<Subscription>) -> 
 
     let button = button(&icons);
     button.add_css_class("screen-sharing-indicator");
-    button.update_property(&[gtk::accessible::Property::Label("Stop Screen Sharing")]);
+    button.update_property(&[gtk::accessible::Property::Label(&tr("Stop Screen Sharing"))]);
     button.connect_clicked({
         let services = Rc::clone(services);
         move |_| {

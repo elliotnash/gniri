@@ -13,6 +13,7 @@
 
 pub mod backend;
 
+use gniri_core::{fill, tr};
 use serde::Deserialize;
 
 use crate::model::Model;
@@ -58,36 +59,29 @@ impl Request {
     /// (`BluetoothPairingDialog`).
     pub fn title(&self) -> String {
         match self.kind {
-            Kind::EnterPin | Kind::EnterPasskey | Kind::Confirm(_) => {
-                "Confirm Bluetooth PIN".to_owned()
-            }
-            Kind::ShowPin(_) => format!("Pairing “{}”", self.device),
-            Kind::Pair => "Bluetooth Pairing Request".to_owned(),
-            Kind::Connect => "Confirm Bluetooth Connection".to_owned(),
+            Kind::EnterPin | Kind::EnterPasskey | Kind::Confirm(_) => tr("Confirm Bluetooth PIN"),
+            Kind::ShowPin(_) => fill(&tr("Pairing “%s”"), &[&self.device]),
+            Kind::Pair => tr("Bluetooth Pairing Request"),
+            Kind::Connect => tr("Confirm Bluetooth Connection"),
         }
     }
 
     pub fn description(&self) -> String {
-        let device = &self.device;
-        match self.kind {
+        let sentence = match self.kind {
             Kind::EnterPin | Kind::EnterPasskey => {
-                format!("Please confirm the PIN that was entered on “{device}”.")
+                "Please confirm the PIN that was entered on “%s”."
             }
-            Kind::ShowPin(_) if self.keyboard => format!(
-                "Please enter the following PIN on “{device}”. \
-                 Then press “Return” on the keyboard."
-            ),
-            Kind::ShowPin(_) => format!("Please enter the following PIN on “{device}”."),
-            Kind::Confirm(_) => format!(
-                "Please confirm that the following PIN matches the one displayed on “{device}”."
-            ),
-            Kind::Pair => {
-                format!("“{device}” wants to pair with this device. Do you want to allow pairing?")
+            Kind::ShowPin(_) if self.keyboard => {
+                "Please enter the following PIN on “%s”. Then press “Return” on the keyboard."
             }
-            Kind::Connect => {
-                format!("“{device}” wants to connect with this device. Do you want to allow it?")
+            Kind::ShowPin(_) => "Please enter the following PIN on “%s”.",
+            Kind::Confirm(_) => {
+                "Please confirm that the following PIN matches the one displayed on “%s”."
             }
-        }
+            Kind::Pair => "“%s” wants to pair with this device. Do you want to allow pairing?",
+            Kind::Connect => "“%s” wants to connect with this device. Do you want to allow it?",
+        };
+        fill(&tr(sentence), &[&self.device])
     }
 
     /// The PIN the dialog shows, large.
@@ -104,19 +98,19 @@ impl Request {
     }
 
     /// The button that turns the request down, which Escape presses too.
-    pub fn reject_label(&self) -> &'static str {
+    pub fn reject_label(&self) -> String {
         match self.kind {
-            Kind::Pair | Kind::Connect => "Dismiss",
-            _ => "Cancel",
+            Kind::Pair | Kind::Connect => tr("Dismiss"),
+            _ => tr("Cancel"),
         }
     }
 
     /// The button that goes ahead. A PIN that is only shown has none: the
     /// dialog goes when the device is paired.
-    pub fn accept_label(&self) -> Option<&'static str> {
+    pub fn accept_label(&self) -> Option<String> {
         match self.kind {
-            Kind::EnterPin | Kind::EnterPasskey | Kind::Confirm(_) => Some("Confirm"),
-            Kind::Pair | Kind::Connect => Some("Allow"),
+            Kind::EnterPin | Kind::EnterPasskey | Kind::Confirm(_) => Some(tr("Confirm")),
+            Kind::Pair | Kind::Connect => Some(tr("Allow")),
             Kind::ShowPin(_) => None,
         }
     }
@@ -234,7 +228,7 @@ mod tests {
         assert_eq!(confirm.pin(), Some("012345"));
         assert_eq!(
             (confirm.reject_label(), confirm.accept_label()),
-            ("Cancel", Some("Confirm"))
+            ("Cancel".to_owned(), Some("Confirm".to_owned()))
         );
 
         let enter = request(Kind::EnterPin);
@@ -256,7 +250,10 @@ mod tests {
             show.description(),
             "Please enter the following PIN on “Keys”. Then press “Return” on the keyboard."
         );
-        assert_eq!((show.reject_label(), show.accept_label()), ("Cancel", None));
+        assert_eq!(
+            (show.reject_label(), show.accept_label()),
+            ("Cancel".to_owned(), None)
+        );
 
         let pair = request(Kind::Pair);
         assert_eq!(pair.title(), "Bluetooth Pairing Request");
@@ -266,7 +263,7 @@ mod tests {
         );
         assert_eq!(
             (pair.reject_label(), pair.accept_label()),
-            ("Dismiss", Some("Allow"))
+            ("Dismiss".to_owned(), Some("Allow".to_owned()))
         );
 
         let connect = request(Kind::Connect);

@@ -16,7 +16,13 @@ also need ImageMagick (`magick`); `check` uses `wlrctl` for pointer input and
 
 Every run uses `tests/visual/scenes/config.toml`, never your own config, a
 private D-Bus session bus, and a fixture in place of the system: no click in
-a test turns your Wi-Fi off.
+a test turns your Wi-Fi off. It also runs in American English whatever your
+own language is, since that is what the reference was captured in.
+
+The session around it can be GNOME's or niri's own (with gniri as its
+shell or without). Under niri the harness takes the nested session's
+window out of the columns and sizes it itself, since niri would make it
+as wide as a column and as high as the screen.
 
 ## Backends
 
@@ -174,8 +180,17 @@ part's name after `check` runs that one alone.
 | `agents` | The Wi-Fi password and Bluetooth pairing dialogs |
 | `config` | The config file changing under a running shell |
 | `outputs` | Outputs going and coming back, and one changing its scale |
+| `language` | gniri in German: GNOME's translations, dates, sentences with numbers |
 
-Two of them need saying more about.
+`language` asks gettext what each text should read and compares, so it
+checks that GNOME's translations are found and not what they say; it is
+skipped where GNOME Shell's German catalog or the German locale is not
+installed. A unit test beside it (`cargo test -p xtask`) reads every text
+gniri asks a translation for out of the source and looks for it in GNOME's
+installed catalogs: a text that is a character off would never be
+translated, and nobody reading English would see why.
+
+Two of the others need saying more about.
 
 **`config`** writes a config file of its own and rewrites it step by
 step, moving each version into place as an editor does. With a fixture

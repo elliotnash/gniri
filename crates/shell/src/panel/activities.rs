@@ -3,6 +3,7 @@
 //! The activities button with its workspace dots. Port of `WorkspaceDot`,
 //! `WorkspaceIndicators` and `ActivitiesButton` in `js/ui/panel.js`.
 
+use gniri_core::tr;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::time::{Duration, Instant};
@@ -139,7 +140,7 @@ pub fn build(
     let button = button(&indicators);
     button.set_widget_name("panelActivities");
     button.set_tooltip_text(None);
-    button.update_property(&[gtk::accessible::Property::Label("Activities")]);
+    button.update_property(&[gtk::accessible::Property::Label(&tr("Activities"))]);
 
     button.connect_clicked({
         let services = Rc::clone(services);

@@ -9,6 +9,7 @@ mod slider;
 mod system;
 mod toggle;
 
+use gniri_core::{tr, tr_in};
 use std::rc::Rc;
 
 use gniri_core::Subscription;
@@ -132,7 +133,7 @@ pub fn build(services: &Rc<Services>) -> QuickSettings {
     power_toggle(services, &grid, &mut subscriptions);
 
     let night_light = simple_toggle(
-        "Night Light",
+        &tr("Night Light"),
         "night-light-symbolic",
         |services| &services.night_light,
         services,
@@ -140,7 +141,7 @@ pub fn build(services: &Rc<Services>) -> QuickSettings {
     );
     grid.add(&night_light.root, 1, None);
     let dark_style = simple_toggle(
-        "Dark Style",
+        &tr("Dark Style"),
         "dark-mode-symbolic",
         |services| &services.dark_style,
         services,
@@ -148,7 +149,7 @@ pub fn build(services: &Rc<Services>) -> QuickSettings {
     );
     grid.add(&dark_style.root, 1, None);
     let do_not_disturb = simple_toggle(
-        "Do Not Disturb",
+        &tr("Do Not Disturb"),
         "notifications-disabled-symbolic",
         |services| &services.do_not_disturb,
         services,
@@ -188,7 +189,7 @@ struct VolumeSlider {
     icon: &'static str,
     submenu: Submenu,
     menu_icon: &'static str,
-    menu_title: &'static str,
+    menu_title: String,
     /// The commands for the slider moving to a value.
     slide: fn(&audio::State, f64) -> Vec<audio::Command>,
     /// The commands for a click on the icon.
@@ -228,8 +229,8 @@ fn volume_slider(
     });
     row.connect_menu_clicked(open_submenu(services, slider.submenu));
 
-    let menu = ToggleMenu::new(slider.menu_icon, slider.menu_title);
-    add_settings_action(services, &menu, "Sound Settings", "sound");
+    let menu = ToggleMenu::new(slider.menu_icon, &slider.menu_title);
+    add_settings_action(services, &menu, &tr("Sound Settings"), "sound");
     follow_submenu(services, slider.submenu, &menu, subscriptions);
 
     subscriptions.push(services.audio.state.observe({
@@ -269,7 +270,7 @@ fn output_slider(services: &Rc<Services>, grid: &QuickGrid, subscriptions: &mut 
         icon: "audio-volume-muted-symbolic",
         submenu: Submenu::SoundOutput,
         menu_icon: "audio-headphones-symbolic",
-        menu_title: "Sound Output",
+        menu_title: tr("Sound Output"),
         slide: audio::State::slide_output,
         click_icon: audio::State::click_output_icon,
         select: audio::Command::SelectOutput,
@@ -288,7 +289,7 @@ fn input_slider(services: &Rc<Services>, grid: &QuickGrid, subscriptions: &mut V
         icon: "microphone-sensitivity-muted-symbolic",
         submenu: Submenu::SoundInput,
         menu_icon: "audio-input-microphone-symbolic",
-        menu_title: "Sound Input",
+        menu_title: tr("Sound Input"),
         slide: audio::State::slide_input,
         click_icon: audio::State::click_input_icon,
         select: audio::Command::SelectInput,
@@ -326,7 +327,7 @@ fn brightness_slider(
 
 /// `NMWiredToggle` in `status/network.js`.
 fn wired_toggle(services: &Rc<Services>, grid: &QuickGrid, subscriptions: &mut Vec<Subscription>) {
-    let toggle = Toggle::new("Wired", "network-wired-symbolic");
+    let toggle = Toggle::new(&tr("Wired"), "network-wired-symbolic");
     toggle.connect_clicked({
         let services = Rc::clone(services);
         move || {
@@ -380,14 +381,14 @@ fn network_entry(services: &Rc<Services>, network: &network::Network) -> Entry {
         entry.badge = Some("network-wireless-encrypted-symbolic");
     }
     if network.status == network::Status::Connecting {
-        entry.detail = Some("Connecting…".to_owned());
+        entry.detail = Some(tr("Connecting…"));
     }
     entry
 }
 
 /// `NMWirelessToggle` in `status/network.js`.
 fn wifi_toggle(services: &Rc<Services>, grid: &QuickGrid, subscriptions: &mut Vec<Subscription>) {
-    let toggle = Toggle::with_menu("Wi-Fi", "network-wireless-disabled-symbolic");
+    let toggle = Toggle::with_menu(&tr("Wi-Fi"), "network-wireless-disabled-symbolic");
     toggle.connect_clicked({
         let services = Rc::clone(services);
         move || {
@@ -411,8 +412,8 @@ fn wifi_toggle(services: &Rc<Services>, grid: &QuickGrid, subscriptions: &mut Ve
         }
     });
 
-    let menu = ToggleMenu::new("network-wireless-symbolic", "Wi-Fi");
-    add_settings_action(services, &menu, "All Networks", "wifi");
+    let menu = ToggleMenu::new("network-wireless-symbolic", &tr("Wi–Fi"));
+    add_settings_action(services, &menu, &tr("All Networks"), "wifi");
     follow_submenu(services, Submenu::Wifi, &menu, subscriptions);
 
     subscriptions.push(services.network.state.select(|state| state.wifi.clone(), {
@@ -421,7 +422,7 @@ fn wifi_toggle(services: &Rc<Services>, grid: &QuickGrid, subscriptions: &mut Ve
             toggle.set_visible(wifi.is_some());
             let Some(wifi) = wifi else { return };
             toggle.set_icon(wifi.icon_name());
-            toggle.set_subtitle(wifi.subtitle());
+            toggle.set_subtitle(wifi.subtitle().as_deref());
             toggle.set_checked(wifi.enabled);
             menu.set_active(wifi.enabled);
             let entries: Vec<Entry> = wifi
@@ -450,9 +451,9 @@ fn device_entry(services: &Rc<Services>, device: &bluetooth::Device) -> Entry {
     .icon(&device.icon_name());
     // GNOME shows a spinner while a request is under way.
     entry.detail = Some(match device.status {
-        bluetooth::Status::Connecting => "Connecting…".to_owned(),
-        bluetooth::Status::Disconnecting => "Disconnecting…".to_owned(),
-        _ => device.action_label().to_owned(),
+        bluetooth::Status::Connecting => tr("Connecting…"),
+        bluetooth::Status::Disconnecting => tr("Disconnecting…"),
+        _ => device.action_label(),
     });
     entry
 }
@@ -463,7 +464,7 @@ fn bluetooth_toggle(
     grid: &QuickGrid,
     subscriptions: &mut Vec<Subscription>,
 ) {
-    let toggle = Toggle::with_menu("Bluetooth", "bluetooth-disabled-symbolic");
+    let toggle = Toggle::with_menu(&tr("Bluetooth"), "bluetooth-disabled-symbolic");
     toggle.connect_clicked({
         let services = Rc::clone(services);
         move || {
@@ -473,8 +474,8 @@ fn bluetooth_toggle(
     });
     toggle.connect_menu_clicked(open_submenu(services, Submenu::Bluetooth));
 
-    let menu = ToggleMenu::new("bluetooth-active-symbolic", "Bluetooth");
-    add_settings_action(services, &menu, "Bluetooth Settings", "bluetooth");
+    let menu = ToggleMenu::new("bluetooth-active-symbolic", &tr("Bluetooth"));
+    add_settings_action(services, &menu, &tr("Bluetooth Settings"), "bluetooth");
     follow_submenu(services, Submenu::Bluetooth, &menu, subscriptions);
 
     // GNOME shows the toggle by the Bluetooth kill switch, not by the
@@ -506,7 +507,7 @@ fn bluetooth_toggle(
             toggle.set_subtitle(state.subtitle().as_deref());
             toggle.set_checked(state.powered());
             menu.set_active(state.powered());
-            menu.set_placeholder(state.placeholder().unwrap_or_default());
+            menu.set_placeholder(&state.placeholder().unwrap_or_default());
             let entries: Vec<Entry> = state
                 .menu_devices()
                 .map(|device| device_entry(&services, device))
@@ -519,7 +520,10 @@ fn bluetooth_toggle(
 
 /// `PowerProfilesToggle` in `status/powerProfiles.js`.
 fn power_toggle(services: &Rc<Services>, grid: &QuickGrid, subscriptions: &mut Vec<Subscription>) {
-    let toggle = Toggle::with_menu("Power Mode", "power-profile-balanced-symbolic");
+    let toggle = Toggle::with_menu(
+        &tr_in("Quick settings button title", "Power Mode"),
+        "power-profile-balanced-symbolic",
+    );
     toggle.connect_clicked({
         let services = Rc::clone(services);
         move || {
@@ -529,8 +533,11 @@ fn power_toggle(services: &Rc<Services>, grid: &QuickGrid, subscriptions: &mut V
     });
     toggle.connect_menu_clicked(open_submenu(services, Submenu::PowerMode));
 
-    let menu = ToggleMenu::new("power-profile-balanced-symbolic", "Power Mode");
-    add_settings_action(services, &menu, "Power Settings", "power");
+    let menu = ToggleMenu::new(
+        "power-profile-balanced-symbolic",
+        &tr_in("Quick settings menu header", "Power Mode"),
+    );
+    add_settings_action(services, &menu, &tr("Power Settings"), "power");
     follow_submenu(services, Submenu::PowerMode, &menu, subscriptions);
 
     subscriptions.push(services.power.state.select(
@@ -541,7 +548,7 @@ fn power_toggle(services: &Rc<Services>, grid: &QuickGrid, subscriptions: &mut V
                 toggle.set_visible(active.is_some());
                 let Some(active) = *active else { return };
                 toggle.set_icon(active.icon_name());
-                toggle.set_subtitle(Some(active.label()));
+                toggle.set_subtitle(Some(&active.label()));
                 toggle.set_checked(active != power::Profile::Balanced);
                 toggle.set_menu_enabled(profiles.len() > 2);
                 menu.set_active(active != power::Profile::Balanced);
@@ -550,7 +557,7 @@ fn power_toggle(services: &Rc<Services>, grid: &QuickGrid, subscriptions: &mut V
                     .iter()
                     .map(|&profile| {
                         let services = Rc::clone(&services);
-                        Entry::new(profile.label(), move || {
+                        Entry::new(&profile.label(), move || {
                             services.power.send(power::Command::SetProfile(profile));
                             close_submenu(&services);
                         })
@@ -571,7 +578,7 @@ fn airplane_toggle(
     grid: &QuickGrid,
     subscriptions: &mut Vec<Subscription>,
 ) {
-    let toggle = Toggle::new("Airplane Mode", "airplane-mode-symbolic");
+    let toggle = Toggle::new(&tr("Airplane Mode"), "airplane-mode-symbolic");
     toggle.connect_clicked({
         let services = Rc::clone(services);
         move || {

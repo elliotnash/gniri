@@ -7,6 +7,7 @@
 //! It shows one request of the secret agent's state and sends what the
 //! user types back (crates/services/src/network/agent.rs).
 
+use gniri_core::tr;
 use std::rc::Rc;
 
 use gniri_services::network::agent::{Command, Request};
@@ -69,7 +70,9 @@ pub fn open(
     }
     if request.wps {
         let note = wrapped_label("message-dialog-description");
-        note.set_label("Alternatively you can connect by pushing the “WPS” button on your router");
+        note.set_label(&tr(
+            "Alternatively you can connect by pushing the “WPS” button on your router",
+        ));
         content.root.append(&note);
     }
     modal.content.append(&content.root);
@@ -78,7 +81,7 @@ pub fn open(
         let services = Rc::clone(services);
         move || services.network_agent.send(Command::Cancel)
     };
-    modal.add_button("Cancel", cancel.clone());
+    modal.add_button(&tr("Cancel"), cancel.clone());
     modal.on_escape(cancel);
 
     let values = {
@@ -95,7 +98,7 @@ pub fn open(
             }
         }
     };
-    let connect_button = modal.add_button("Connect", connect.clone());
+    let connect_button = modal.add_button(&tr("Connect"), connect.clone());
 
     // `_updateOkButton`
     let update_button = {

@@ -165,7 +165,7 @@ fn bluez_comes_and_goes() {
     assert_eq!(bluetooth.state.icon_name(), "bluetooth-active-symbolic");
     assert_eq!(
         bluetooth.state.placeholder(),
-        Some("No available or connected devices")
+        Some("No available or connected devices".to_owned())
     );
 
     add_paired(&bus, PHONE, "Phone");
@@ -263,7 +263,7 @@ fn the_adapter_and_its_devices_follow_the_bus() {
     assert_eq!(bluetooth.state.icon_name(), "bluetooth-disabled-symbolic");
     assert_eq!(
         bluetooth.state.placeholder(),
-        Some("Turn on Bluetooth to connect to devices")
+        Some("Turn on Bluetooth to connect to devices".to_owned())
     );
     assert!(!bluetooth.state.shows_indicator());
 

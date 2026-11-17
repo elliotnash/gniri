@@ -6,6 +6,7 @@ mod app;
 mod date_menu;
 mod debug;
 mod dialogs;
+mod i18n;
 mod idle;
 mod ipc;
 mod keys;

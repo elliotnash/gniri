@@ -14,13 +14,16 @@
 pub mod backend;
 pub mod helper;
 
+use gniri_core::tr;
 use serde::Deserialize;
 
 use crate::model::Model;
 
 /// What `AuthenticationDialog._onSessionCompleted` says after a failed try,
 /// unless the helper said something more specific.
-pub const TRY_AGAIN: &str = "Sorry, that didn’t work. Please try again.";
+pub fn try_again() -> String {
+    tr("Sorry, that didn’t work. Please try again.")
+}
 
 /// What the helper wants answered.
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
@@ -37,10 +40,14 @@ impl Prompt {
     /// The entry's hint. Port of the "hack" in `_onSessionRequest`: PAM's
     /// "Password:" becomes the dialog's own word, anything else loses its
     /// colon.
-    pub fn hint(&self) -> &str {
+    pub fn hint(&self) -> String {
         match self.text.as_str() {
-            "Password:" | "Password: " => "Password",
-            other => other.trim_end_matches(' ').trim_end_matches(':').trim(),
+            "Password:" | "Password: " => tr("Password"),
+            other => other
+                .trim_end_matches(' ')
+                .trim_end_matches(':')
+                .trim()
+                .to_owned(),
         }
     }
 }
@@ -126,7 +133,7 @@ impl Model for State {
                 request.prompt = None;
                 // The helper's own words, if it had any, say more.
                 if !matches!(request.notice, Notice::Error(_)) {
-                    request.notice = Notice::Error(TRY_AGAIN.to_owned());
+                    request.notice = Notice::Error(try_again());
                 }
             }
             (_, None) => {}
@@ -222,7 +229,7 @@ mod tests {
         state.apply(Event::Denied);
         let request = state.request.as_ref().unwrap();
         assert_eq!(request.failures, 1);
-        assert_eq!(request.notice, Notice::Error(TRY_AGAIN.to_owned()));
+        assert_eq!(request.notice, Notice::Error(try_again()));
 
         // The next answer clears the message; a message of the helper's
         // own is kept over the stock one.

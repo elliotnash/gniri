@@ -10,6 +10,7 @@ pub mod backend;
 mod security;
 mod system;
 
+use gniri_core::{fill, tr};
 use std::cmp::Ordering;
 use std::time::Duration;
 
@@ -317,12 +318,12 @@ impl Wifi {
     /// The quick toggle's second line: the network's name. Port of
     /// `NMWirelessDeviceItem.name`; GNOME drops it when it would repeat the
     /// title, which is what is left without a network.
-    pub fn subtitle(&self) -> Option<&str> {
+    pub fn subtitle(&self) -> Option<String> {
         if self.hotspot {
-            // "%s Hotspot" with the adapter's name, which is the title.
-            return Some("Wi-Fi Hotspot");
+            // With the adapter's name, which is the title.
+            return Some(fill(&tr("%s Hotspot"), &[&tr("Wi-Fi")]));
         }
-        self.current().map(|network| network.ssid.as_str())
+        self.current().map(|network| network.ssid.clone())
     }
 
     /// Forgets the connection, as when it is dropped.
@@ -577,7 +578,7 @@ mod tests {
         );
         let wifi = scene.wifi.unwrap();
         assert!(wifi.hardware_enabled);
-        assert_eq!(wifi.subtitle(), Some("home"));
+        assert_eq!(wifi.subtitle(), Some("home".to_owned()));
         let scene = state("network = { primary = { kind = \"other\" } }");
         assert_eq!(scene.primary, Some(Connection::Other { limited: false }));
     }
@@ -588,7 +589,7 @@ mod tests {
             network("home", Status::Connected),
             network("cafe", Status::Idle),
         ]);
-        assert_eq!(wifi.subtitle(), Some("home"));
+        assert_eq!(wifi.subtitle(), Some("home".to_owned()));
         assert_eq!(wifi.icon_name(), "network-wireless-signal-good-symbolic");
 
         // The access point in use is not the strongest of its network.
@@ -613,7 +614,7 @@ mod tests {
         assert_eq!(wifi.subtitle(), None);
         assert_eq!(wifi.icon_name(), "network-wireless-signal-none-symbolic");
         wifi.hotspot = true;
-        assert_eq!(wifi.subtitle(), Some("Wi-Fi Hotspot"));
+        assert_eq!(wifi.subtitle(), Some("Wi-Fi Hotspot".to_owned()));
         assert_eq!(wifi.icon_name(), "network-wireless-hotspot-symbolic");
     }
 
@@ -761,7 +762,7 @@ mod tests {
         let mut state = connected_state();
         state.predict(&Command::ConnectWifi("cafe".to_owned()));
         let wifi = state.wifi.as_ref().unwrap();
-        assert_eq!(wifi.subtitle(), Some("cafe"));
+        assert_eq!(wifi.subtitle(), Some("cafe".to_owned()));
         assert_eq!(wifi.icon_name(), "network-wireless-acquiring-symbolic");
         assert_eq!(wifi.networks[0].status, Status::Idle);
         assert_eq!(
@@ -770,11 +771,17 @@ mod tests {
         );
 
         state.predict(&Command::ConnectWifi("open".to_owned()));
-        assert_eq!(state.wifi.as_ref().unwrap().subtitle(), Some("open"));
+        assert_eq!(
+            state.wifi.as_ref().unwrap().subtitle(),
+            Some("open".to_owned())
+        );
         // One that wants a password is joined too: the password is asked
         // for on the way.
         state.predict(&Command::ConnectWifi("locked".to_owned()));
-        assert_eq!(state.wifi.as_ref().unwrap().subtitle(), Some("locked"));
+        assert_eq!(
+            state.wifi.as_ref().unwrap().subtitle(),
+            Some("locked".to_owned())
+        );
     }
 
     #[test]

@@ -3,6 +3,7 @@
 //! An entry for a password, with the eye that shows what was typed. Port of
 //! `St.PasswordEntry` and of `CapsLockWarning` in `js/ui/shellEntry.js`.
 
+use gniri_core::tr;
 use std::cell::Cell;
 use std::rc::Rc;
 
@@ -147,7 +148,7 @@ pub fn wiggle(widget: &impl IsA<gtk::Widget>) {
 /// The line that says Caps Lock is on, shown only while it is.
 pub fn caps_lock_warning() -> gtk::Label {
     let label = gtk::Label::builder()
-        .label("Caps lock is on")
+        .label(tr("Caps lock is on"))
         .css_classes(["caps-lock-warning-label"])
         .visible(false)
         .build();

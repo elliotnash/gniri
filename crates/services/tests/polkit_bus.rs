@@ -14,7 +14,7 @@ use common::{Follower, MockBus, TIMEOUT};
 use futures_lite::future::block_on;
 use gniri_services::polkit::backend::{self, Options, PATH};
 use gniri_services::polkit::helper::Helper;
-use gniri_services::polkit::{self, Command, Notice, TRY_AGAIN};
+use gniri_services::polkit::{self, Command, Notice, try_again};
 use gniri_services::user::User;
 use zbus::Variant;
 
@@ -236,7 +236,7 @@ fn a_wrong_answer_asks_again_and_the_right_one_ends_the_call() {
     });
     assert_eq!(
         setup.agent.state.request.as_ref().unwrap().notice,
-        Notice::Error(TRY_AGAIN.to_owned())
+        Notice::Error(try_again())
     );
     assert!(!call.is_finished(), "polkit is still waiting");
 

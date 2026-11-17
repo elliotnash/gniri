@@ -320,7 +320,7 @@ fn a_known_network_is_joined_and_left_by_command() {
         ]
     );
     let wifi = network.state.wifi.as_ref().unwrap();
-    assert_eq!(wifi.subtitle(), Some("home"));
+    assert_eq!(wifi.subtitle(), Some("home".to_owned()));
     assert_eq!(wifi.icon_name(), "network-wireless-signal-good-symbolic");
     // Nothing carries the default route yet as far as the mock says.
     assert_eq!(network.state.primary, None);
@@ -472,7 +472,7 @@ fn the_panel_follows_the_primary_connection() {
     });
     let toggle = network.state.wifi.as_ref().unwrap();
     assert_eq!(toggle.icon_name(), "network-wireless-acquiring-symbolic");
-    assert_eq!(toggle.subtitle(), Some("home"));
+    assert_eq!(toggle.subtitle(), Some("home".to_owned()));
     assert!(toggle.networks[0].is_active());
 
     bus.set_property(NM, &wifi_active, ACTIVE, "State", ACTIVATED);

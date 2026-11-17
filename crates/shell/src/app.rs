@@ -118,6 +118,8 @@ fn application(role: ipc::Role) -> adw::Application {
         .flags(gio::ApplicationFlags::NON_UNIQUE)
         .build();
     app.connect_startup(|_| {
+        // GTK has set the locale by now; nothing has been written yet.
+        crate::i18n::init();
         // GNOME Shell's own chrome is dark whatever the app colour scheme is.
         adw::StyleManager::default().set_color_scheme(adw::ColorScheme::ForceDark);
         style::load();

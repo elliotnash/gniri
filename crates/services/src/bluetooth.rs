@@ -10,6 +10,7 @@
 pub mod agent;
 pub mod backend;
 
+use gniri_core::{fill, tr, tr_n};
 use std::cmp::Ordering;
 
 use serde::Deserialize;
@@ -117,20 +118,20 @@ impl Device {
 
     /// The row's second label: what a click does. Port of the `connected`
     /// binding in `BluetoothDeviceItem`.
-    pub fn action_label(&self) -> &'static str {
+    pub fn action_label(&self) -> String {
         if self.connected() {
-            "Disconnect"
+            tr("Disconnect")
         } else {
-            "Connect"
+            tr("Connect")
         }
     }
 
     /// Port of `BluetoothDeviceItem._updateAccessibleName`.
     pub fn accessible_name(&self) -> String {
         if self.connected() {
-            format!("Disconnect {}", self.name)
+            fill(&tr("Disconnect %s"), &[&self.name])
         } else {
-            format!("Connect to {}", self.name)
+            fill(&tr("Connect to %s"), &[&self.name])
         }
     }
 
@@ -190,13 +191,13 @@ impl State {
 
     /// The text the menu shows instead of an empty list. Port of
     /// `BluetoothToggle._updatePlaceholder`.
-    pub fn placeholder(&self) -> Option<&'static str> {
+    pub fn placeholder(&self) -> Option<String> {
         if self.menu_devices().next().is_some() {
             None
         } else if self.powered() {
-            Some("No available or connected devices")
+            Some(tr("No available or connected devices"))
         } else {
-            Some("Turn on Bluetooth to connect to devices")
+            Some(tr("Turn on Bluetooth to connect to devices"))
         }
     }
 
@@ -217,7 +218,13 @@ impl State {
         let first = connected.next()?;
         match connected.count() {
             0 => Some(first.name.clone()),
-            others => Some(format!("{} Connected", others + 1)),
+            others => {
+                let count = others as u64 + 1;
+                Some(fill(
+                    &tr_n("%d Connected", "%d Connected", count),
+                    &[&count],
+                ))
+            }
         }
     }
 
@@ -355,13 +362,13 @@ mod tests {
         let mut state = State::default();
         assert_eq!(
             state.placeholder(),
-            Some("Turn on Bluetooth to connect to devices")
+            Some("Turn on Bluetooth to connect to devices".to_owned())
         );
 
         state = on(Vec::new());
         assert_eq!(
             state.placeholder(),
-            Some("No available or connected devices")
+            Some("No available or connected devices".to_owned())
         );
 
         // A paired device with nothing to connect to: hidden, but counted.
@@ -372,7 +379,7 @@ mod tests {
         assert_eq!(state.menu_devices().count(), 0);
         assert_eq!(
             state.placeholder(),
-            Some("No available or connected devices")
+            Some("No available or connected devices".to_owned())
         );
         assert_eq!(state.subtitle().as_deref(), Some("Tracker"));
         assert!(state.shows_indicator());
@@ -397,7 +404,7 @@ mod tests {
         assert!(!state.shows_indicator());
         assert_eq!(
             state.placeholder(),
-            Some("Turn on Bluetooth to connect to devices")
+            Some("Turn on Bluetooth to connect to devices".to_owned())
         );
     }
 

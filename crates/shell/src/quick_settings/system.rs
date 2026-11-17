@@ -4,6 +4,7 @@
 //! lock and the power-off menu. Port of `SystemItem` in
 //! `js/ui/status/system.js`.
 
+use gniri_core::{tr, tr_in};
 use std::rc::Rc;
 
 use gniri_core::Subscription;
@@ -133,8 +134,8 @@ pub fn build(services: &Rc<Services>, subscriptions: &mut Vec<Subscription>) -> 
 
     // `ShutdownItem`'s menu. The entries with an ellipsis ask first
     // (crates/shell/src/dialogs/end_session.rs).
-    let menu = ToggleMenu::new("system-shutdown-symbolic", "Power Off");
-    let suspend = menu.add_action("Suspend", {
+    let menu = ToggleMenu::new("system-shutdown-symbolic", &tr_in("title", "Power Off"));
+    let suspend = menu.add_action(&tr("Suspend"), {
         let services = Rc::clone(services);
         move || {
             services.menus.update(|menus| menus.close());
@@ -152,18 +153,18 @@ pub fn build(services: &Rc<Services>, subscriptions: &mut Vec<Subscription>) -> 
             services.end_session.update(|open| *open = Some(kind));
         }
     };
-    let restart = menu.add_action("Restart…", ask(end_session::Kind::Restart));
+    let restart = menu.add_action(&tr("Restart…"), ask(end_session::Kind::Restart));
     subscriptions.push(services.session.state.select(
         |state| state.can_restart,
         move |can| restart.set_visible(*can),
     ));
-    let power_off = menu.add_action("Power Off…", ask(end_session::Kind::PowerOff));
+    let power_off = menu.add_action(&tr("Power Off…"), ask(end_session::Kind::PowerOff));
     subscriptions.push(services.session.state.select(
         |state| state.can_power_off,
         move |can| power_off.set_visible(*can),
     ));
     menu.add_separator();
-    menu.add_action("Log Out…", ask(end_session::Kind::LogOut));
+    menu.add_action(&tr("Log Out…"), ask(end_session::Kind::LogOut));
 
     let root = gtk::Box::builder()
         .css_classes(["quick-settings-system-item"])

@@ -68,7 +68,7 @@ pub fn show_notification(
     notification: &Notification,
     now: &LocalTime,
 ) {
-    message.set_source(source.display_title(), source.icon.as_ref());
+    message.set_source(&source.display_title(), source.icon.as_ref());
     message.set_time(Some(&age(notification, now)));
     message.set_title(&notification.title);
     message.set_body(&notification.body);

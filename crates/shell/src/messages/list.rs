@@ -4,6 +4,7 @@
 //! application with notifications. Port of `MessageView` in
 //! `js/ui/messageList.js` and `CalendarMessageList` in `js/ui/calendar.js`.
 
+use gniri_core::tr;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::{Rc, Weak};
@@ -239,7 +240,7 @@ impl Inner {
                 let group = groups
                     .entry(source.key.clone())
                     .or_insert_with(|| self.build_group(&source.key));
-                group.title.set_label(source.display_title());
+                group.title.set_label(&source.display_title());
                 group.messages.retain(|id, _| {
                     source
                         .notifications
@@ -319,7 +320,7 @@ fn placeholder() -> gtk::Box {
         .can_target(false)
         .build();
     placeholder.append(&gtk::Image::from_icon_name("no-notifications-symbolic"));
-    placeholder.append(&gtk::Label::new(Some("No Notifications")));
+    placeholder.append(&gtk::Label::new(Some(&tr("No Notifications"))));
     placeholder
 }
 
@@ -338,7 +339,7 @@ impl MessageList {
         let clear = gtk::Button::builder()
             .css_classes(["message-list-clear-button", "button"])
             .halign(gtk::Align::Start)
-            .child(&gtk::Label::new(Some("Clear")))
+            .child(&gtk::Label::new(Some(&tr("Clear"))))
             .build();
         clear.connect_clicked({
             let services = Rc::clone(services);

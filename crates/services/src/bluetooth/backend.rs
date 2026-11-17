@@ -1102,7 +1102,7 @@ mod tests {
         assert_eq!(off.icon_name(), "bluetooth-disabled-symbolic");
         assert_eq!(
             off.placeholder(),
-            Some("Turn on Bluetooth to connect to devices")
+            Some("Turn on Bluetooth to connect to devices".to_owned())
         );
 
         objects.change(HCI0, ADAPTER, &adapter(true));

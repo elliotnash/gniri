@@ -230,6 +230,170 @@ mod tests {
         );
     }
 
+    /// The originals of a compiled gettext catalog (a `.mo` file), each
+    /// with its context, if it has one, before a `\u{4}`; of a text with a
+    /// plural, the singular.
+    fn originals(catalog: &[u8]) -> Vec<String> {
+        let word = |at: usize| -> usize {
+            let bytes: [u8; 4] = catalog[at..at + 4].try_into().expect("four bytes");
+            // Written in the byte order of the machine that compiled it.
+            if catalog[..4] == [0xde, 0x12, 0x04, 0x95] {
+                u32::from_le_bytes(bytes) as usize
+            } else {
+                u32::from_be_bytes(bytes) as usize
+            }
+        };
+        let (count, table) = (word(8), word(12));
+        (0..count)
+            .map(|index| {
+                let (length, at) = (word(table + 8 * index), word(table + 8 * index + 4));
+                let original = &catalog[at..at + length];
+                let singular = original.split(|byte| *byte == 0).next().unwrap_or_default();
+                String::from_utf8_lossy(singular).into_owned()
+            })
+            .collect()
+    }
+
+    /// Every text gniri asks a translation for is one GNOME has: written
+    /// as GNOME writes it, to the ellipsis and the kind of dash, and asked
+    /// for with GNOME's context. A text that is a little off is simply
+    /// never translated, which nobody reading English would notice.
+    ///
+    /// The catalogs of a few languages are read, since each only has the
+    /// texts its translators got to. Skipped where GNOME Shell's are not
+    /// installed.
+    #[test]
+    fn every_translated_text_is_one_of_gnomes() {
+        const DOMAINS: [&str; 4] = [
+            "gnome-shell",
+            "gnome-desktop-3.0",
+            "gnome-bluetooth-3.0",
+            "NetworkManager",
+        ];
+        /// gniri's own, which stay English.
+        const OWN: [&str; 1] = ["Disconnecting…"];
+
+        let mut known = std::collections::HashSet::new();
+        for language in ["de", "fr", "es", "sv", "it"] {
+            for domain in DOMAINS {
+                let path = format!("/usr/share/locale/{language}/LC_MESSAGES/{domain}.mo");
+                if let Ok(catalog) = std::fs::read(path) {
+                    known.extend(originals(&catalog));
+                }
+            }
+        }
+        if !known.contains("Type to search") {
+            eprintln!("skipped: GNOME Shell's translations are not installed");
+            return;
+        }
+
+        /// The string literals `call(` is given at the start of its
+        /// arguments, wherever it is called in `source`.
+        fn literals(source: &str, call: &str, wanted: usize) -> Vec<Vec<String>> {
+            let mut found = Vec::new();
+            let mut rest = source;
+            while let Some(at) = rest.find(call) {
+                let before = rest[..at].chars().next_back();
+                rest = &rest[at + call.len()..];
+                if before.is_some_and(|before| before.is_alphanumeric() || before == '_') {
+                    continue;
+                }
+                let mut arguments = Vec::new();
+                let mut cursor = rest;
+                while arguments.len() < wanted {
+                    cursor = cursor.trim_start().trim_start_matches('&').trim_start();
+                    let Some(literal) = cursor.strip_prefix('"') else {
+                        break;
+                    };
+                    let mut text = String::new();
+                    let mut characters = literal.char_indices();
+                    let mut end = None;
+                    while let Some((index, character)) = characters.next() {
+                        match character {
+                            '"' => {
+                                end = Some(index);
+                                break;
+                            }
+                            '\\' => match characters.next() {
+                                Some((_, 'u')) => {
+                                    let code: String = characters
+                                        .by_ref()
+                                        .map(|(_, digit)| digit)
+                                        .skip(1)
+                                        .take_while(|digit| *digit != '}')
+                                        .collect();
+                                    let code = u32::from_str_radix(&code, 16).expect("hex");
+                                    text.push(char::from_u32(code).expect("a character"));
+                                }
+                                Some((_, other)) => text.push(other),
+                                None => {}
+                            },
+                            other => text.push(other),
+                        }
+                    }
+                    let Some(end) = end else {
+                        break;
+                    };
+                    arguments.push(text);
+                    cursor = literal[end + 1..].trim_start().trim_start_matches(',');
+                }
+                if arguments.len() == wanted {
+                    found.push(arguments);
+                }
+            }
+            found
+        }
+
+        fn visit(directory: &Path, sources: &mut Vec<std::path::PathBuf>) {
+            for entry in std::fs::read_dir(directory).expect("the directory can be read") {
+                let path = entry.expect("its entries too").path();
+                if path.is_dir() {
+                    visit(&path, sources);
+                } else if path.extension().is_some_and(|extension| extension == "rs") {
+                    sources.push(path);
+                }
+            }
+        }
+
+        let root = crate::session::workspace_root();
+        let mut sources = Vec::new();
+        for member in ["core", "services", "shell"] {
+            visit(&root.join("crates").join(member).join("src"), &mut sources);
+        }
+        let mut unknown = Vec::new();
+        let mut checked = 0;
+        for path in sources {
+            let source = std::fs::read_to_string(&path).expect("a source file is text");
+            let mut asked: Vec<String> = Vec::new();
+            asked.extend(
+                literals(&source, "tr(", 1)
+                    .into_iter()
+                    .map(|a| a[0].clone()),
+            );
+            asked.extend(
+                literals(&source, "tr_in(", 2)
+                    .into_iter()
+                    .map(|a| format!("{}\u{4}{}", a[0], a[1])),
+            );
+            asked.extend(
+                literals(&source, "tr_n(", 1)
+                    .into_iter()
+                    .map(|a| a[0].clone()),
+            );
+            for text in asked {
+                checked += 1;
+                if !known.contains(&text) && !OWN.contains(&text.as_str()) {
+                    unknown.push(format!("{}: {text:?}", path.display()));
+                }
+            }
+        }
+        assert!(checked > 100, "only {checked} texts were found to check");
+        assert!(
+            unknown.is_empty(),
+            "GNOME has no such text (a \\u{{4}} follows a context): {unknown:#?}"
+        );
+    }
+
     /// gniri's own code runs on the GLib main loop and a few plain
     /// threads; zbus is used with its default runtime. A crate that pulls
     /// tokio in would start a second runtime beside them.

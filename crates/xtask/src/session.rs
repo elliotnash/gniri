@@ -49,6 +49,36 @@ pub struct Session {
     helpers: RefCell<Vec<String>>,
     pub niri_socket: PathBuf,
     pub wayland_display: String,
+    /// The language the session's processes run in.
+    language: Language,
+}
+
+/// The language of a session: its locale, and the list gettext goes by
+/// before it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Language {
+    pub locale: String,
+    pub languages: Option<String>,
+}
+
+impl Language {
+    /// What every comparison with the reference runs in, whatever the
+    /// language of the session around it: the reference was captured in
+    /// American English.
+    pub fn english() -> Self {
+        Self {
+            locale: "en_US.UTF-8".to_owned(),
+            languages: None,
+        }
+    }
+
+    fn apply(&self, command: &mut Command) {
+        command.env("LC_ALL", &self.locale);
+        match &self.languages {
+            Some(languages) => command.env("LANGUAGE", languages),
+            None => command.env_remove("LANGUAGE"),
+        };
+    }
 }
 
 /// The workspace root: two levels above this crate.
@@ -72,8 +102,12 @@ pub fn visual_dir() -> Result<PathBuf> {
 /// Nested niri only draws while the host compositor shows its window. Behind
 /// a lock screen it stops completely, IPC included, so a run would hang until
 /// the timeout (docs/DECISIONS.md, S8). Hosts without the GNOME screensaver
-/// interface are not checked.
+/// interface are not checked, nor asked: a call to a name nobody has waits
+/// for the bus to give up on starting its owner.
 fn check_host_is_showing() -> Result<()> {
+    if !session_bus_has("org.gnome.ScreenSaver") {
+        return Ok(());
+    }
     let output = Command::new("gdbus")
         .args(["call", "--session", "--dest", "org.gnome.ScreenSaver"])
         .args(["--object-path", "/org/gnome/ScreenSaver"])
@@ -86,6 +120,101 @@ fn check_host_is_showing() -> Result<()> {
         ),
         _ => Ok(()),
     }
+}
+
+/// Whether the host session is GNOME's, whose session manager
+/// `gnome-session-inhibit` asks. Where it is installed but the session is
+/// another (niri with gniri, say), it fails without running anything.
+fn gnome_session_manager_runs() -> bool {
+    on_path("gnome-session-inhibit") && session_bus_has("org.gnome.SessionManager")
+}
+
+/// Whether some program has `name` on the session bus.
+fn session_bus_has(name: &str) -> bool {
+    Command::new("gdbus")
+        .args(["call", "--session", "--dest", "org.freedesktop.DBus"])
+        .args(["--object-path", "/org/freedesktop/DBus"])
+        .args(["--method", "org.freedesktop.DBus.NameHasOwner"])
+        .arg(name)
+        .output()
+        .is_ok_and(|output| output.stdout.starts_with(b"(true"))
+}
+
+/// The size every comparison with the reference assumes of the nested
+/// output, in the host's logical pixels: the size nested niri asks for its
+/// window, which GNOME gives it.
+const NESTED_SIZE: (i32, i32) = (1280, 800);
+
+/// The socket of the niri this process runs in, if it runs in one.
+fn host_niri_socket() -> Option<PathBuf> {
+    std::env::var_os("NIRI_SOCKET")
+        .filter(|socket| !socket.is_empty())
+        .map(PathBuf::from)
+}
+
+/// The process whose child `pid` is.
+fn parent_of(pid: i32) -> Option<u32> {
+    let stat = fs::read_to_string(format!("/proc/{pid}/stat")).ok()?;
+    // After the name, which is in parentheses and may hold anything: the
+    // state, then the parent.
+    stat.rsplit_once(')')?
+        .1
+        .split_whitespace()
+        .nth(1)?
+        .parse()
+        .ok()
+}
+
+/// Under a host that is niri itself, a new window is laid out as a column:
+/// as wide as a column is there and as high as the screen. The nested
+/// session's window is taken out of the columns and given the size it
+/// asked for. Returns the window's id on the host once it is there and
+/// has been sized.
+fn size_nested_window(session: u32) -> Option<u64> {
+    let Some(Response::Windows(windows)) = ask_host(Request::Windows) else {
+        return None;
+    };
+    // `dbus-run-session` is the session's process, niri its child.
+    let window = windows
+        .iter()
+        .find(|window| window.pid.and_then(parent_of) == Some(session))?;
+    let id = Some(window.id);
+    for action in [
+        Action::MoveWindowToFloating { id },
+        Action::SetWindowWidth {
+            id,
+            change: niri_ipc::SizeChange::SetFixed(NESTED_SIZE.0),
+        },
+        Action::SetWindowHeight {
+            id,
+            change: niri_ipc::SizeChange::SetFixed(NESTED_SIZE.1),
+        },
+    ] {
+        ask_host(Request::Action(action))?;
+    }
+    id
+}
+
+/// Makes the nested session's window on the host larger by `by`.
+fn grow_host_window(window: u64, by: (i32, i32)) {
+    let id = Some(window);
+    let _ = ask_host(Request::Action(Action::SetWindowWidth {
+        id,
+        change: niri_ipc::SizeChange::AdjustFixed(by.0),
+    }));
+    let _ = ask_host(Request::Action(Action::SetWindowHeight {
+        id,
+        change: niri_ipc::SizeChange::AdjustFixed(by.1),
+    }));
+}
+
+/// Asks the niri this process runs in.
+fn ask_host(request: Request) -> Option<Response> {
+    Socket::connect_to(host_niri_socket()?)
+        .ok()?
+        .send(request)
+        .ok()?
+        .ok()
 }
 
 /// True if `program` is on PATH.
@@ -108,6 +237,11 @@ fn build_gniri(root: &Path) -> Result<PathBuf> {
 
 impl Session {
     pub fn start(options: &SessionOptions) -> Result<Self> {
+        Self::start_in(options, Language::english())
+    }
+
+    /// Starts a session whose processes run in `language`.
+    pub fn start_in(options: &SessionOptions, language: Language) -> Result<Self> {
         if std::env::var_os("WAYLAND_DISPLAY").is_none() {
             bail!("WAYLAND_DISPLAY is not set: nested niri needs a running Wayland session");
         }
@@ -135,7 +269,7 @@ impl Session {
         // While the session runs, hold off the host's idle blanking: a long
         // test run with nobody at the keyboard would otherwise lock the
         // screen and stall niri halfway through.
-        let mut command = if on_path("gnome-session-inhibit") {
+        let mut command = if gnome_session_manager_runs() {
             let mut command = Command::new("gnome-session-inhibit");
             command
                 .args(["--inhibit", "idle", "--reason", "gniri nested test session"])
@@ -174,11 +308,16 @@ impl Session {
             // Its own process group, so the wrappers, niri and gniri can all
             // be stopped together and none is left behind.
             .process_group(0);
+        language.apply(&mut command);
 
         let mut process = command.spawn().context("starting dbus-run-session niri")?;
 
         let started = Instant::now();
+        let mut host_window = None;
         let ready = loop {
+            if host_window.is_none() {
+                host_window = size_nested_window(process.id());
+            }
             if let Ok(contents) = fs::read_to_string(&ready_file) {
                 break contents;
             }
@@ -212,7 +351,7 @@ impl Session {
                 .ok_or_else(|| anyhow!("ready file has no {key}: {ready:?}"))
         };
 
-        Ok(Self {
+        let session = Self {
             process,
             gniri_pid: field("pid")?.parse().context("pid in ready file")?,
             gniri,
@@ -222,7 +361,48 @@ impl Session {
             helpers: RefCell::new(Vec::new()),
             niri_socket: PathBuf::from(field("niri_socket")?),
             wayland_display: field("wayland_display")?,
-        })
+            language,
+        };
+        if let Some(window) = host_window {
+            // The window was resized after it was mapped; nothing is to be
+            // looked at before the nested output has its size. The host
+            // may also have taken its border, or a title bar, out of what
+            // was asked for: then the window is made larger by as much.
+            let mut tries = 0;
+            let settled = wait_until_within(
+                "the nested output to have its size",
+                Duration::from_secs(5),
+                || {
+                    let Response::Outputs(outputs) = session.request(Request::Outputs)? else {
+                        return Ok(false);
+                    };
+                    let Some(logical) = outputs.values().find_map(|output| output.logical) else {
+                        return Ok(false);
+                    };
+                    let short = (
+                        NESTED_SIZE.0 - logical.width as i32,
+                        NESTED_SIZE.1 - logical.height as i32,
+                    );
+                    if short == (0, 0) {
+                        return Ok(true);
+                    }
+                    tries += 1;
+                    // Every few looks: the output follows the window a
+                    // moment late.
+                    if tries % 8 == 0 {
+                        grow_host_window(window, short);
+                    }
+                    Ok(false)
+                },
+            );
+            if settled.is_err() {
+                eprintln!(
+                    "xtask: the nested output is not {}x{}; comparisons that assume it will fail",
+                    NESTED_SIZE.0, NESTED_SIZE.1
+                );
+            }
+        }
+        Ok(session)
     }
 
     /// PID of the gniri process inside the session.
@@ -372,7 +552,8 @@ impl Session {
         let socket = self.helper_socket(subcommand);
         let _ = fs::remove_file(&socket);
         let output = File::create(&log)?;
-        let child = Command::new(&self.gniri)
+        let mut command = Command::new(&self.gniri);
+        command
             .args(&self.gniri_args)
             .arg(subcommand)
             .env("WAYLAND_DISPLAY", &self.wayland_display)
@@ -383,7 +564,9 @@ impl Session {
             .env("GSETTINGS_BACKEND", "memory")
             .stdin(Stdio::null())
             .stdout(output.try_clone()?)
-            .stderr(output)
+            .stderr(output);
+        self.language.apply(&mut command);
+        let child = command
             .spawn()
             .with_context(|| format!("starting gniri {subcommand}"))?;
         wait_until(&format!("gniri {subcommand} to start"), || {

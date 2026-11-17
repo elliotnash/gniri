@@ -20,6 +20,7 @@
 //! inside it all along, so the focused look is a style class that goes by
 //! whether anything is typed.
 
+use gniri_core::tr;
 use std::cell::Cell;
 use std::rc::Rc;
 
@@ -52,7 +53,7 @@ fn icon(name: &str) -> gtk::Image {
 
 pub fn build(services: &Rc<Services>) -> SearchEntry {
     let text = gtk::Text::builder()
-        .placeholder_text("Type to search")
+        .placeholder_text(tr("Type to search"))
         .input_hints(gtk::InputHints::NO_EMOJI | gtk::InputHints::NO_SPELLCHECK)
         .enable_emoji_completion(false)
         .hexpand(true)

@@ -64,7 +64,7 @@ pub fn open(
         let services = Rc::clone(services);
         move || services.bluetooth_agent.send(Command::Reject)
     };
-    let reject_button = modal.add_button(request.reject_label(), reject.clone());
+    let reject_button = modal.add_button(&request.reject_label(), reject.clone());
     modal.on_escape(reject);
 
     if let Some(label) = request.accept_label() {
@@ -81,7 +81,7 @@ pub fn open(
                 None => services.bluetooth_agent.send(Command::Accept),
             }
         };
-        let accept_button = modal.add_button(label, accept.clone());
+        let accept_button = modal.add_button(&label, accept.clone());
         if let Some(entry) = &entry {
             let update_button = {
                 let (entry, request) = (entry.clone(), request.clone());

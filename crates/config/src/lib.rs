@@ -111,8 +111,8 @@ pub struct DateMenu {
     /// the card only starts GNOME Weather.
     pub weather: bool,
     /// The day a week starts on in the calendar: "sunday", "monday" or
-    /// "saturday".
-    pub week_start: WeekStart,
+    /// "saturday". Unset, it is the day the user's locale starts a week on.
+    pub week_start: Option<WeekStart>,
 }
 
 impl Default for DateMenu {
@@ -120,7 +120,7 @@ impl Default for DateMenu {
         Self {
             world_clocks: true,
             weather: true,
-            week_start: WeekStart::Sunday,
+            week_start: None,
         }
     }
 }
@@ -412,6 +412,8 @@ mod tests {
         assert!(config.clock.format().show_date);
         assert!(config.panel.shows_on("eDP-1"));
         assert_eq!(config.wallpaper.image, None);
+        // The locale's.
+        assert_eq!(config.date_menu.week_start, None);
         assert_eq!(config.commands.settings, "gnome-control-center");
         // GNOME's defaults: blank and lock after five minutes.
         assert_eq!(config.idle.blank_after, 300);
@@ -528,12 +530,12 @@ mod tests {
             DateMenu {
                 world_clocks: false,
                 weather: false,
-                week_start: WeekStart::Monday,
+                week_start: Some(WeekStart::Monday),
             }
         );
         assert_eq!(
-            config.date_menu.week_start.weekday(),
-            gniri_core::Weekday::Monday
+            config.date_menu.week_start.map(WeekStart::weekday),
+            Some(gniri_core::Weekday::Monday)
         );
     }
 

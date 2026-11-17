@@ -5,6 +5,7 @@
 
 mod calendar;
 
+use gniri_core::tr;
 use std::rc::Rc;
 
 use gniri_core::{Date, Subscription};
@@ -68,7 +69,14 @@ pub fn build(services: &Rc<Services>) -> DateMenu {
     // The menu is built anew when these settings change
     // (crates/shell/src/outputs.rs).
     let settings = services.config.with(|config| config.date_menu.clone());
-    let calendar = Calendar::new(today, settings.week_start.weekday());
+    // The config file's day, else the locale's, else GNOME's own
+    // fallback.
+    let week_start = settings
+        .week_start
+        .map(gniri_config::WeekStart::weekday)
+        .or_else(crate::i18n::week_start)
+        .unwrap_or(gniri_core::Weekday::Sunday);
+    let calendar = Calendar::new(today, week_start);
 
     // `TodayButton`: the date in words. It takes the calendar back to
     // today, so it only reacts while another day is selected.
@@ -98,12 +106,12 @@ pub fn build(services: &Rc<Services>) -> DateMenu {
 
     // `EventsSection`, as GNOME shows it with no events. Without a
     // calendar application to open it is only a label.
-    let events_title = header_label(&["events-title"], "Today");
+    let events_title = header_label(&["events-title"], &tr("Today"));
     let events_list = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
         .css_classes(["events-list"])
         .build();
-    events_list.append(&header_label(&["event-placeholder"], "No Events"));
+    events_list.append(&header_label(&["event-placeholder"], &tr("No Events")));
     let events_box = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
         .css_classes(["events-box"])
@@ -128,7 +136,7 @@ pub fn build(services: &Rc<Services>) -> DateMenu {
     if settings.world_clocks && services.has_app(CLOCKS_APP) {
         let header = header_label(
             &["world-clocks-header", "no-world-clocks"],
-            "Add World Clocks…",
+            &tr("Add World Clocks…"),
         );
         displays.append(&card(
             services,
@@ -140,7 +148,7 @@ pub fn build(services: &Rc<Services>) -> DateMenu {
     if settings.weather && services.has_app(WEATHER_APP) {
         let header = header_label(
             &["weather-header", "no-location"],
-            "Select Weather Location…",
+            &tr("Select Weather Location…"),
         );
         displays.append(&card(
             services,
@@ -190,7 +198,7 @@ pub fn build(services: &Rc<Services>) -> DateMenu {
     subscriptions.push(services.time.select(|time| time.date(), {
         let calendar = calendar.clone();
         move |today: &Date| {
-            day_label.set_label(today.weekday().name());
+            day_label.set_label(&today.weekday().name());
             date_label.set_label(&today.long_text());
             calendar.set_today(*today);
         }

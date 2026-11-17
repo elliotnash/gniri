@@ -37,6 +37,7 @@
 //! The applications are found by the shell itself; everything else by the
 //! applications that answer searches over D-Bus.
 
+use gniri_core::tr;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -359,8 +360,11 @@ impl Inner {
         self.status.set_visible(!have_results);
         if !have_results {
             let searching = self.services.search.state.with(search::State::searching);
-            self.status_text
-                .set_label(if searching { "Searching" } else { "No results" });
+            self.status_text.set_label(&if searching {
+                tr("Searching")
+            } else {
+                tr("No results")
+            });
         }
         self.shown.replace(shown);
         self.select();
