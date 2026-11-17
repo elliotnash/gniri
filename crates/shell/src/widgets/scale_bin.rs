@@ -26,6 +26,11 @@ mod imp {
         pub(super) scale: Cell<f64>,
         /// How far right the child is drawn, in pixels.
         pub(super) shift: Cell<f64>,
+        /// How far down.
+        pub(super) shift_y: Cell<f64>,
+        /// Whether the scale changes what this takes up (`ScaleLayout`),
+        /// or only how it looks (an actor's scale).
+        pub(super) resizes: Cell<bool>,
     }
 
     impl Default for ScaleBin {
@@ -34,6 +39,8 @@ mod imp {
                 child: std::cell::RefCell::new(None),
                 scale: Cell::new(1.0),
                 shift: Cell::new(0.0),
+                shift_y: Cell::new(0.0),
+                resizes: Cell::new(true),
             }
         }
     }
@@ -64,7 +71,7 @@ mod imp {
             };
             let (min, natural, _, _) = child.measure(orientation, for_size);
             let scale = self.scale.get();
-            if scale >= 1.0 {
+            if scale >= 1.0 || !self.resizes.get() {
                 return (min, natural, -1, -1);
             }
             // "Math.floor(min * container.scale_y)"
@@ -80,9 +87,9 @@ mod imp {
             let Some(child) = &*self.child.borrow() else {
                 return;
             };
-            let (scale, shift) = (self.scale.get(), self.shift.get());
+            let (scale, shift, shift_y) = (self.scale.get(), self.shift.get(), self.shift_y.get());
             child.set_child_visible(scale > SMALLEST);
-            if scale >= 1.0 && shift == 0.0 {
+            if scale >= 1.0 && shift == 0.0 && shift_y == 0.0 {
                 child.size_allocate(&gtk::Allocation::new(0, 0, width, height), -1);
                 return;
             }
@@ -95,7 +102,7 @@ mod imp {
             let (_, natural, _, _) = child.measure(gtk::Orientation::Vertical, child_width);
             let (w, h) = (f64::from(child_width), f64::from(natural));
             let x = (f64::from(width) - w * scale) / 2.0 + shift;
-            let y = (f64::from(height) - h * scale) / 2.0;
+            let y = (f64::from(height) - h * scale) / 2.0 + shift_y;
             let transform = gsk::Transform::new()
                 .translate(&graphene::Point::new(x as f32, y as f32))
                 .scale(scale as f32, scale as f32);
@@ -132,6 +139,18 @@ impl ScaleBin {
     pub fn set_scale(&self, scale: f64) {
         if self.imp().scale.replace(scale) != scale {
             self.queue_resize();
+        }
+    }
+
+    /// Scales only how the child looks, not what this takes up.
+    pub fn keep_size(&self) {
+        self.imp().resizes.set(false);
+        self.queue_resize();
+    }
+
+    pub fn set_shift_y(&self, shift: f64) {
+        if self.imp().shift_y.replace(shift) != shift {
+            self.queue_allocate();
         }
     }
 

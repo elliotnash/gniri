@@ -281,9 +281,11 @@ BlueZ's agent all the time.
   read. The list does not grow in or shrink away; it changes at once. A
   player's controls work there, and a click on its card does nothing, as in
   GNOME.
-- **Changing between clock and prompt.** They cross-fade. GNOME also
-  shrinks one away upwards as the other grows in from below, follows a
-  swipe on a touch screen, and reacts to scrolling.
+- **Changing between clock and prompt.** As in GNOME, the clock rises,
+  shrinks and fades as the prompt comes up from below and grows, and the
+  room they take changes from the one's height to the other's, so the
+  notifications have room under the clock and give way to the prompt.
+  GNOME also follows a swipe on a touch screen, and reacts to scrolling.
 - **Locking and unlocking** happen at once. GNOME fades the screen out
   before an idle lock and slides the shield away after unlocking.
 - **Every output asks.** Each output has the clock and, after a key press

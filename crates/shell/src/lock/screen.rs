@@ -19,6 +19,8 @@ use super::Lock;
 use super::prompt::{self, Prompt};
 use crate::surfaces::layer::{self, Anchor, Zone};
 use crate::surfaces::wallpaper;
+use crate::widgets::motion::Eased;
+use crate::widgets::scale_bin::ScaleBin;
 
 /// unlockDialog.js `CROSSFADE_TIME`: the clock and the prompt change
 /// places this fast.
@@ -33,12 +35,114 @@ const IDLE_TIMEOUT: Duration = Duration::from_secs(2 * 60);
 /// this far below the middle of the screen.
 const AUTH_PROMPT_VERTICAL_CENTER_OFFSET: i32 = 50;
 
-const CLOCK_PAGE: &str = "clock";
-const PROMPT_PAGE: &str = "prompt";
+/// unlockDialog.js `FADE_OUT_TRANSLATION` and `FADE_OUT_SCALE`: the clock
+/// rises and shrinks away as the prompt comes up from below and grows.
+const FADE_OUT_TRANSLATION: f64 = 200.0;
+const FADE_OUT_SCALE: f64 = 0.3;
+
+mod imp {
+    use std::cell::Cell;
+
+    use gtk::glib;
+    use gtk::prelude::*;
+    use gtk::subclass::prelude::*;
+
+    /// `UnlockStack`: the clock and the prompt over each other, as tall
+    /// as the one that shows, and between the two while they change.
+    #[derive(Default)]
+    pub struct UnlockStack {
+        pub(super) progress: Cell<f64>,
+    }
+
+    #[glib::object_subclass]
+    impl ObjectSubclass for UnlockStack {
+        const NAME: &'static str = "GniriUnlockStack";
+        type Type = super::UnlockStack;
+        type ParentType = gtk::Widget;
+    }
+
+    impl ObjectImpl for UnlockStack {
+        fn dispose(&self) {
+            while let Some(child) = self.obj().first_child() {
+                child.unparent();
+            }
+        }
+    }
+
+    impl WidgetImpl for UnlockStack {
+        fn request_mode(&self) -> gtk::SizeRequestMode {
+            gtk::SizeRequestMode::HeightForWidth
+        }
+
+        fn measure(&self, orientation: gtk::Orientation, for_size: i32) -> (i32, i32, i32, i32) {
+            let obj = self.obj();
+            let (Some(clock), Some(prompt)) = (obj.first_child(), obj.last_child()) else {
+                return (0, 0, -1, -1);
+            };
+            let (clock_min, clock_natural, _, _) = clock.measure(orientation, for_size);
+            let (prompt_min, prompt_natural, _, _) = prompt.measure(orientation, for_size);
+            if orientation == gtk::Orientation::Horizontal {
+                return (
+                    clock_min.max(prompt_min),
+                    clock_natural.max(prompt_natural),
+                    -1,
+                    -1,
+                );
+            }
+            let progress = self.progress.get();
+            let between = |clock: i32, prompt: i32| {
+                (f64::from(clock) + f64::from(prompt - clock) * progress) as i32
+            };
+            (
+                between(clock_min, prompt_min),
+                between(clock_natural, prompt_natural),
+                -1,
+                -1,
+            )
+        }
+
+        fn size_allocate(&self, width: i32, height: i32, _baseline: i32) {
+            // Each over the whole stack, centred where it needs more.
+            let mut child = self.obj().first_child();
+            while let Some(widget) = child {
+                child = widget.next_sibling();
+                let (min, _, _, _) = widget.measure(gtk::Orientation::Vertical, width);
+                let tall = min.max(height);
+                widget.size_allocate(
+                    &gtk::Allocation::new(0, (height - tall) / 2, width, tall),
+                    -1,
+                );
+            }
+        }
+    }
+}
+
+glib::wrapper! {
+    pub struct UnlockStack(ObjectSubclass<imp::UnlockStack>)
+        @extends gtk::Widget,
+        @implements gtk::Accessible, gtk::Buildable, gtk::ConstraintTarget;
+}
+
+impl UnlockStack {
+    fn new(clock: &impl IsA<gtk::Widget>, prompt: &impl IsA<gtk::Widget>) -> Self {
+        let stack: Self = glib::Object::new();
+        clock.set_parent(&stack);
+        prompt.set_parent(&stack);
+        stack
+    }
+
+    fn set_progress(&self, progress: f64) {
+        use gtk::subclass::prelude::ObjectSubclassIsExt;
+        if self.imp().progress.replace(progress) != progress {
+            self.queue_resize();
+        }
+    }
+}
 
 struct Inner {
     lock: std::rc::Weak<Lock>,
-    stack: gtk::Stack,
+    /// 0 on the clock, 1 on the prompt (`_adjustment`).
+    progress: Eased,
     hint: gtk::Label,
     prompt: Prompt,
     /// Shows the hint after a while on the clock.
@@ -48,6 +152,8 @@ struct Inner {
     /// True under a fixture: no timers.
     still: bool,
     on_prompt: Cell<bool>,
+    /// What `progress` shows the prompt for.
+    wants_prompt: Rc<Cell<bool>>,
 }
 
 pub struct Screen {
@@ -72,7 +178,9 @@ impl Inner {
     /// `_showClock`
     fn show_clock(self: &Rc<Self>) {
         self.on_prompt.set(false);
-        self.stack.set_visible_child_name(CLOCK_PAGE);
+        self.wants_prompt.set(false);
+        self.progress
+            .ease(0.0, CROSSFADE_TIME, adw::Easing::EaseOutQuad, || {});
         self.prompt.entry.clear();
         cancel(&self.idle_timer);
         if let Some(lock) = self.lock.upgrade() {
@@ -98,7 +206,11 @@ impl Inner {
     /// `_showPrompt`
     fn show_prompt(self: &Rc<Self>) {
         self.on_prompt.set(true);
-        self.stack.set_visible_child_name(PROMPT_PAGE);
+        self.wants_prompt.set(true);
+        // There to take the keyboard from the start.
+        self.progress.jump(self.progress.value());
+        self.progress
+            .ease(1.0, CROSSFADE_TIME, adw::Easing::EaseOutQuad, || {});
         self.prompt.entry.grab_focus();
         cancel(&self.hint_timer);
         self.touch();
@@ -201,13 +313,41 @@ pub fn build(lock: &Rc<Lock>, monitor: &gdk::Monitor) -> Screen {
     prompt.root.set_hexpand(true);
     column.append(&prompt.root);
 
-    let stack = gtk::Stack::builder()
-        .css_classes(["unlock-dialog"])
-        .transition_type(gtk::StackTransitionType::Crossfade)
-        .transition_duration(CROSSFADE_TIME)
-        .build();
-    stack.add_named(&clock, Some(CLOCK_PAGE));
-    stack.add_named(&column, Some(PROMPT_PAGE));
+    // Each scaled about its middle, without changing what it takes up
+    // (`set_pivot_point(0.5, 0.5)`).
+    let clock_page = ScaleBin::new(&clock);
+    clock_page.keep_size();
+    let prompt_page = ScaleBin::new(&column);
+    prompt_page.keep_size();
+    let stack = UnlockStack::new(&clock_page, &prompt_page);
+    stack.add_css_class("unlock-dialog");
+    // Whether the prompt is wanted: it shows, and has the keyboard, from
+    // the start of its coming up to the end of its going.
+    let wants_prompt = Rc::new(Cell::new(false));
+    let progress = Eased::new(&stack, 0.0, {
+        let (clock_page, prompt_page) = (clock_page.downgrade(), prompt_page.downgrade());
+        let stack = stack.downgrade();
+        let wants_prompt = Rc::clone(&wants_prompt);
+        // `_setTransitionProgress`
+        move |progress| {
+            let (Some(clock), Some(prompt), Some(stack)) =
+                (clock_page.upgrade(), prompt_page.upgrade(), stack.upgrade())
+            else {
+                return;
+            };
+            stack.set_progress(progress);
+            let wanted = wants_prompt.get();
+            prompt.set_child_visible(progress > 0.0 || wanted);
+            clock.set_child_visible(progress < 1.0 || !wanted);
+            prompt.set_opacity(progress);
+            prompt.set_scale(FADE_OUT_SCALE + (1.0 - FADE_OUT_SCALE) * progress);
+            prompt.set_shift_y(FADE_OUT_TRANSLATION * (1.0 - progress));
+            clock.set_opacity(1.0 - progress);
+            clock.set_scale(FADE_OUT_SCALE + (1.0 - FADE_OUT_SCALE) * (1.0 - progress));
+            clock.set_shift_y(-FADE_OUT_TRANSLATION * progress);
+        }
+    });
+    progress.jump(0.0);
 
     // `NotificationsBox`, at the foot of the screen; the clock moves up
     // rather than be covered by it (`UnlockDialogLayout`).
@@ -282,7 +422,8 @@ pub fn build(lock: &Rc<Lock>, monitor: &gdk::Monitor) -> Screen {
 
     let inner = Rc::new(Inner {
         lock: Rc::downgrade(lock),
-        stack,
+        progress,
+        wants_prompt,
         hint,
         prompt,
         hint_timer: RefCell::new(None),
