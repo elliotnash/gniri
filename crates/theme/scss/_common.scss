@@ -32,6 +32,8 @@ $large_scalable_icon_size: $scalable_icon_size * 2;
 
 // animation definition
 $ease_out_quad: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+// Clutter's EASE_IN_QUAD, as Penner's curve is usually written in CSS.
+$ease_in_quad: cubic-bezier(0.55, 0.085, 0.68, 0.53);
 
 // St cross-fades between two styles with an ease-in-out-quad timeline when a
 // rule sets `transition-duration` (st-theme-node-transition.c). This is the

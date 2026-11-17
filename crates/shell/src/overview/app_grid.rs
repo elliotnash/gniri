@@ -604,7 +604,8 @@ impl Inner {
                     .collect(),
                 View::Folder => match &folder {
                     Some(id) => folder_items(items, id).into_iter().map(app).collect(),
-                    None => Vec::new(),
+                    // What the dialog showed, as it shrinks away.
+                    None => self.shown.borrow().clone(),
                 },
             }
         })
@@ -653,8 +654,10 @@ impl Inner {
         let shown = self.shown.borrow();
         for (tile, item) in self.grid.imp().tiles.borrow().iter().zip(shown.iter()) {
             if let Shown::Folder { id, .. } = item {
+                // Faded out as the dialog opens, and back in as it
+                // closes (the theme's transitions).
                 let hidden = open.as_deref() == Some(id.as_str());
-                tile.button.set_opacity(if hidden { 0.0 } else { 1.0 });
+                super::icon::set_class(&tile.button, "folder-open", hidden);
             }
         }
     }
@@ -838,6 +841,15 @@ impl AppView {
     /// The tile at `index`.
     pub fn tile(&self, index: usize) -> Option<Tile> {
         self.inner.grid.imp().tiles.borrow().get(index).cloned()
+    }
+
+    /// The button of the folder `id`'s icon, if it shows.
+    pub fn folder_icon(&self, id: &str) -> Option<gtk::Widget> {
+        let index =
+            self.inner.shown.borrow().iter().position(
+                |shown| matches!(shown, Shown::Folder { id: other, .. } if other == id),
+            )?;
+        self.tile(index).map(|tile| tile.button.upcast())
     }
 
     /// The index of the tile whose button `widget` is or is inside.

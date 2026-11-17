@@ -8,6 +8,7 @@
 //!
 //! ```text
 //! box.app-folder-dialog-container       AppFolderDialog, and its shade
+//!   GniriZoom                           what grows out of the folder's icon
 //!   GniriBlurBehind                     blur-my-shell's blur of the dialog
 //!     box.app-folder-dialog             _viewBox
 //!       box.folder-name-container         _entryBox
@@ -27,7 +28,6 @@
 
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
-use std::time::Duration;
 
 use gniri_core::{Subscription, tr};
 use gniri_services::apps::GridItem;
@@ -40,7 +40,7 @@ use crate::services::Services;
 
 /// appDisplay.js `FOLDER_DIALOG_ANIMATION_TIME`; the theme's transitions
 /// last as long.
-const ANIMATION_TIME: Duration = Duration::from_millis(200);
+const ANIMATION_TIME_MS: u32 = 200;
 /// blur-my-shell's default blur as a GSK blur radius (twice the Gaussian
 /// sigma of 7.5: docs/DECISIONS.md, S14), and its brightness.
 const BLUR_RADIUS: f32 = 15.0;
@@ -56,6 +56,68 @@ const DIALOG_RADIUS: f32 = 64.0;
 
 mod imp {
     use super::*;
+
+    /// The dialog, drawn at the folder's icon and growing to its place.
+    #[derive(Default)]
+    pub struct Zoom {
+        /// Where the icon is, in this widget's own coordinates.
+        pub(super) from: Cell<Option<graphene::Rect>>,
+        /// 0 at the icon, 1 in place.
+        pub(super) progress: Cell<f64>,
+    }
+
+    #[glib::object_subclass]
+    impl ObjectSubclass for Zoom {
+        const NAME: &'static str = "GniriZoom";
+        type Type = super::Zoom;
+        type ParentType = gtk::Widget;
+    }
+
+    impl ObjectImpl for Zoom {
+        fn dispose(&self) {
+            while let Some(child) = self.obj().first_child() {
+                child.unparent();
+            }
+        }
+    }
+
+    impl WidgetImpl for Zoom {
+        fn measure(&self, orientation: gtk::Orientation, for_size: i32) -> (i32, i32, i32, i32) {
+            match self.obj().first_child() {
+                Some(child) => child.measure(orientation, for_size),
+                None => (0, 0, -1, -1),
+            }
+        }
+
+        fn size_allocate(&self, width: i32, height: i32, _baseline: i32) {
+            let Some(child) = self.obj().first_child() else {
+                return;
+            };
+            let progress = self.progress.get();
+            let Some(from) = self
+                .from
+                .get()
+                .filter(|_| progress < 1.0 && width > 0 && height > 0)
+            else {
+                child.allocate(width, height, -1, None);
+                return;
+            };
+            // `_zoomAndFadeIn`: the translation and the scale that put the
+            // dialog on the icon, eased away (pivot at its top left).
+            let lerp = |from: f32, to: f32| from + (to - from) * progress as f32;
+            let (scale_x, scale_y) = (
+                lerp(from.width() / width as f32, 1.0).max(0.001),
+                lerp(from.height() / height as f32, 1.0).max(0.001),
+            );
+            let transform = gsk::Transform::new()
+                .translate(&graphene::Point::new(
+                    lerp(from.x(), 0.0),
+                    lerp(from.y(), 0.0),
+                ))
+                .scale(scale_x, scale_y);
+            child.allocate(width, height, -1, Some(transform));
+        }
+    }
 
     #[derive(Default)]
     pub struct BlurBehind {
@@ -98,17 +160,38 @@ mod imp {
                     if !widget.is_drawable() {
                         continue;
                     }
-                    let Some(origin) = widget.compute_point(&*obj, &graphene::Point::new(0.0, 0.0))
-                    else {
+                    // Where it is on screen, in this widget's coordinates:
+                    // while the dialog zooms, what is behind it stays put.
+                    let full = graphene::Rect::new(
+                        0.0,
+                        0.0,
+                        widget.width() as f32,
+                        widget.height() as f32,
+                    );
+                    let placed = (|| {
+                        let origin =
+                            widget.compute_point(&*obj, &graphene::Point::new(0.0, 0.0))?;
+                        let corner = widget.compute_point(
+                            &*obj,
+                            &graphene::Point::new(full.width(), full.height()),
+                        )?;
+                        Some(graphene::Rect::new(
+                            origin.x(),
+                            origin.y(),
+                            corner.x() - origin.x(),
+                            corner.y() - origin.y(),
+                        ))
+                    })();
+                    let Some(placed) = placed else {
                         continue;
                     };
                     let paintable = gtk::WidgetPaintable::new(Some(widget));
                     snapshot.save();
-                    snapshot.translate(&origin);
+                    snapshot.translate(&graphene::Point::new(placed.x(), placed.y()));
                     paintable.snapshot(
                         snapshot,
-                        f64::from(widget.width()),
-                        f64::from(widget.height()),
+                        f64::from(placed.width()),
+                        f64::from(placed.height()),
                     );
                     snapshot.restore();
                 }
@@ -134,6 +217,27 @@ glib::wrapper! {
         @implements gtk::Accessible, gtk::Buildable, gtk::ConstraintTarget;
 }
 
+glib::wrapper! {
+    pub struct Zoom(ObjectSubclass<imp::Zoom>)
+        @extends gtk::Widget,
+        @implements gtk::Accessible, gtk::Buildable, gtk::ConstraintTarget;
+}
+
+impl Zoom {
+    fn new(child: &impl IsA<gtk::Widget>) -> Self {
+        let widget: Self = glib::Object::new();
+        child.set_parent(&widget);
+        widget.imp().progress.set(1.0);
+        widget
+    }
+
+    fn set_progress(&self, progress: f64) {
+        if self.imp().progress.replace(progress) != progress {
+            self.queue_allocate();
+        }
+    }
+}
+
 impl BlurBehind {
     fn new(child: &impl IsA<gtk::Widget>) -> Self {
         let widget: Self = glib::Object::new();
@@ -145,6 +249,14 @@ impl BlurBehind {
 struct Inner {
     services: Rc<Services>,
     container: gtk::Box,
+    zoom: Zoom,
+    /// The zoom's progress (ease-out-expo) and the dialog's opacity.
+    zooming: crate::widgets::motion::Eased,
+    fading: crate::widgets::motion::Eased,
+    /// The icon of the folder with this id, to grow out of.
+    source: RefCell<Option<Box<dyn Fn(&str) -> Option<gtk::Widget>>>>,
+    /// The folder last opened: what to shrink back into once it is closed.
+    opened: RefCell<Option<String>>,
     blur: BlurBehind,
     dialog: gtk::Box,
     label: gtk::Label,
@@ -185,6 +297,29 @@ impl Inner {
         Some((id, name))
     }
 
+    /// Where the icon of the open folder is, in the zoom's coordinates,
+    /// once both are laid out.
+    fn source_rect(&self) -> Option<graphene::Rect> {
+        let id = self.opened.borrow().clone()?;
+        let source = (self.source.borrow().as_ref()?)(&id)?;
+        if !source.is_drawable() || self.zoom.width() <= 0 {
+            return None;
+        }
+        // Without the zoom's own transform: from its parent's point of
+        // view, both are where they are laid out.
+        let parent = self.zoom.parent()?;
+        let origin = source.compute_point(&parent, &graphene::Point::new(0.0, 0.0))?;
+        let zoom = self
+            .zoom
+            .compute_point(&parent, &graphene::Point::new(0.0, 0.0))?;
+        Some(graphene::Rect::new(
+            origin.x() - zoom.x(),
+            origin.y() - zoom.y(),
+            source.width() as f32,
+            source.height() as f32,
+        ))
+    }
+
     fn open(self: &Rc<Self>) {
         let generation = self.generation.get() + 1;
         self.generation.set(generation);
@@ -194,13 +329,33 @@ impl Inner {
         // `popup` focuses the edit button: the keyboard is the dialog's,
         // and typing starts no search under it.
         self.edit.grab_focus();
-        // On screen in its closed look first, then the transition.
-        glib::idle_add_local_once({
+        self.opened.replace(
+            self.services
+                .overview
+                .with(|overview| overview.folder.clone()),
+        );
+        self.zooming.jump(0.0);
+        self.fading.jump(0.0);
+        // Laid out first, so that where the icon is can be known; then
+        // `_zoomAndFadeIn`.
+        self.zoom.add_tick_callback({
             let inner = Rc::clone(self);
-            move || {
-                if inner.generation.get() == generation {
-                    inner.container.add_css_class("open");
+            move |zoom, _| {
+                if inner.generation.get() != generation {
+                    return glib::ControlFlow::Break;
                 }
+                if zoom.width() <= 0 {
+                    return glib::ControlFlow::Continue;
+                }
+                inner.container.add_css_class("open");
+                inner.zoom.imp().from.set(inner.source_rect());
+                inner
+                    .zooming
+                    .ease(1.0, ANIMATION_TIME_MS, adw::Easing::EaseOutExpo, || {});
+                inner
+                    .fading
+                    .ease(1.0, ANIMATION_TIME_MS, adw::Easing::EaseOutExpo, || {});
+                glib::ControlFlow::Break
             }
         });
     }
@@ -218,21 +373,21 @@ impl Inner {
         if let Some(give_back) = self.give_back_focus.borrow().as_ref() {
             give_back();
         }
-        let hide = {
-            let inner = Rc::clone(self);
+        // `_zoomAndFadeOut`: back into the icon, if it is still there.
+        self.zoom.imp().from.set(self.source_rect());
+        self.fading
+            .ease(0.0, ANIMATION_TIME_MS, adw::Easing::EaseOutQuad, || {});
+        let inner = Rc::clone(self);
+        self.zooming.ease(
+            0.0,
+            ANIMATION_TIME_MS,
+            adw::Easing::EaseOutExpo,
             move || {
                 if inner.generation.get() == generation {
                     inner.container.set_visible(false);
                 }
-            }
-        };
-        let animated =
-            gtk::Settings::default().is_some_and(|settings| settings.is_gtk_enable_animations());
-        if animated {
-            glib::timeout_add_local_once(ANIMATION_TIME, hide);
-        } else {
-            hide();
-        }
+            },
+        );
     }
 
     fn sync_name(&self) {
@@ -335,6 +490,12 @@ impl FolderDialog {
         self.inner.blur.imp().backdrop.replace(widgets);
     }
 
+    /// Gives the icon of a folder, by its id, for the dialog to grow out
+    /// of.
+    pub fn on_source(&self, source: impl Fn(&str) -> Option<gtk::Widget> + 'static) {
+        self.inner.source.replace(Some(Box::new(source)));
+    }
+
     /// Run when the dialog gives the keyboard back.
     pub fn on_focus_back(&self, give_back: impl Fn() + 'static) {
         self.inner
@@ -399,22 +560,44 @@ pub fn build(services: &Rc<Services>) -> FolderDialog {
     dialog.append(&name_row);
     dialog.append(&view.widget);
     let blur = BlurBehind::new(&dialog);
-    blur.set_halign(gtk::Align::Center);
-    blur.set_valign(gtk::Align::Center);
     blur.set_size_request(DIALOG_SIZE, DIALOG_SIZE);
     blur.set_overflow(gtk::Overflow::Hidden);
+    let zoom = Zoom::new(&blur);
+    zoom.set_halign(gtk::Align::Center);
+    zoom.set_valign(gtk::Align::Center);
+    zoom.set_hexpand(true);
+    zoom.set_vexpand(true);
 
     let container = gtk::Box::builder()
         .css_classes(["app-folder-dialog-container"])
         .visible(false)
         .build();
-    container.append(&blur);
-    blur.set_hexpand(true);
-    blur.set_vexpand(true);
+    container.append(&zoom);
 
+    let zooming = crate::widgets::motion::Eased::new(&zoom, 1.0, {
+        let zoom = zoom.downgrade();
+        move |progress| {
+            if let Some(zoom) = zoom.upgrade() {
+                zoom.set_progress(progress);
+            }
+        }
+    });
+    let fading = crate::widgets::motion::Eased::new(&zoom, 1.0, {
+        let zoom = zoom.downgrade();
+        move |opacity| {
+            if let Some(zoom) = zoom.upgrade() {
+                zoom.set_opacity(opacity);
+            }
+        }
+    });
     let inner = Rc::new(Inner {
         services: Rc::clone(services),
         container: container.clone(),
+        zoom,
+        zooming,
+        fading,
+        source: RefCell::new(None),
+        opened: RefCell::new(None),
         blur,
         dialog: dialog.clone(),
         label,

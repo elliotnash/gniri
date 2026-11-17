@@ -73,12 +73,25 @@ $app_folder_radius: $modal_radius * 4;
 // appDisplay.js FOLDER_DIALOG_ANIMATION_TIME
 $app_folder_animation_time: 200ms;
 
-.app-folder-dialog-container {
+// The open folder's own icon fades out as its dialog opens, and back in
+// for the second half of its closing (`FolderIcon`'s handler of
+// 'open-state-changed').
+.app-display .overview-tile.folder-open {
     opacity: 0;
-    transition: opacity $app_folder_animation_time $ease_out_quad,
-                background-color $app_folder_animation_time $ease_out_quad;
+    transition: background-color $tile_transition $st_transition_easing,
+                opacity ($app_folder_animation_time * 0.5) $ease_out_quad;
+}
 
-    &.open { opacity: 1; }
+.app-display .overview-tile:not(.folder-open) {
+    transition: background-color $tile_transition $st_transition_easing,
+                opacity ($app_folder_animation_time * 0.5) $ease_in_quad
+                        ($app_folder_animation_time * 0.5);
+}
+
+// Its shade fades in and out (`_zoomAndFadeIn` eases the background
+// colour); the dialog itself zooms, in the code.
+.app-folder-dialog-container {
+    transition: background-color $app_folder_animation_time $ease_out_quad;
 }
 
 .app-folder-dialog {

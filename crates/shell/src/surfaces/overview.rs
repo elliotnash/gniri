@@ -353,6 +353,10 @@ pub fn build(
         dash.widget.clone().upcast(),
     ]);
     folder.on_focus_back(entry.focuser());
+    folder.on_source({
+        let view = Rc::clone(&app_display);
+        move |id| view.folder_icon(id)
+    });
     let controls = Controls::new(
         Parts {
             cover: cover.clone(),

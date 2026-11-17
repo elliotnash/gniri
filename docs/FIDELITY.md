@@ -379,8 +379,9 @@ search results to it and takes none of niri's own away.
 - **Pages are always full.** GNOME keeps an icon on the page it was put
   on, and a page can end before it is full; here the icons flow from one
   page to the next.
-- **A folder's dialog** fades in and out; GNOME's also grows out of the
-  folder's icon and back. The blur behind it is gniri's own: the
+- **A folder's dialog** grows out of the folder's icon and back into it,
+  as GNOME's, while the icon fades out and in. The blur behind it is
+  drawn with the dialog, so it shrinks with it. The blur is gniri's own: the
   compositor cannot blur what is on gniri's surface under another part of
   it, so the dialog draws the overview again behind itself, blurred and
   dimmed as blur-my-shell's blur would have it.
