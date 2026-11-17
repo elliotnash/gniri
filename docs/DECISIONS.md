@@ -655,6 +655,13 @@ was unlocked by `loginctl unlock-session`.
   output's size and moved up by the panel's height, so that its pixels
   land on the backdrop's. It is the same `GdkTexture`, not a second
   copy. Without a wallpaper of gniri's it is a flat colour.
+- **The panel draws the cover's top.** The overview's surface starts
+  under the panel, and making it reach behind the bar would mean a
+  surface of the same layer stacked under the panel, which nothing
+  promises (above). So the panel's surface has a second picture of the
+  same texture under the bar, laid out at the output's size and cut to
+  the bar, and the overview fades it with its own cover. It shows only
+  while the overview's surface is mapped.
 - **The keyboard is the overview's while it is open** (S9), and the text
   field inside has the focus all along: typing needs no key forwarding.
   What GNOME does with focus (the entry lighting up when typing starts,

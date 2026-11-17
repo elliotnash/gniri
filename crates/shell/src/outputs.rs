@@ -283,17 +283,27 @@ impl Outputs {
     }
 
     /// The dash and the search belong with the panel: an output without
-    /// one shows niri's overview as it is.
+    /// one shows niri's overview as it is. With one, the overview's cover
+    /// goes on behind the panel too, which gets a cover from each overview
+    /// built for it.
     fn build_overview(
         &self,
         monitor: &gdk::Monitor,
         wallpaper: Option<&Wallpaper>,
-        has_panel: bool,
+        panel: Option<&Panel>,
     ) -> Option<Overview> {
-        has_panel.then(|| {
-            let cover = wallpaper.map_or_else(wallpaper::cover_without_wallpaper, Wallpaper::cover);
-            overview::build(&self.app, monitor, &self.services, cover)
-        })
+        let panel = panel?;
+        let cover = || wallpaper.map_or_else(wallpaper::cover_without_wallpaper, Wallpaper::cover);
+        let panel_cover = cover();
+        let overview = overview::build(
+            &self.app,
+            monitor,
+            &self.services,
+            cover(),
+            panel_cover.clone(),
+        );
+        panel.set_cover(&panel_cover);
+        Some(overview)
     }
 
     fn build(&self, monitor: gdk::Monitor) -> Output {
@@ -304,7 +314,7 @@ impl Outputs {
         let stage = self.build_stage(&monitor, panel.as_ref());
         let osd = osd::build(&self.app, &monitor);
         let banner = banner::build(&self.app, &monitor);
-        let overview = self.build_overview(&monitor, wallpaper.as_ref(), panel.is_some());
+        let overview = self.build_overview(&monitor, wallpaper.as_ref(), panel.as_ref());
         Output {
             monitor,
             panel,
@@ -356,7 +366,7 @@ impl Outputs {
             }
             if changes.overview || new_wallpaper || had_panel != wants_panel {
                 let overview =
-                    self.build_overview(&monitor, output.wallpaper.as_ref(), wants_panel);
+                    self.build_overview(&monitor, output.wallpaper.as_ref(), output.panel.as_ref());
                 output.set_overview(overview);
             }
         }

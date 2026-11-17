@@ -24,6 +24,9 @@ const WINDOW: &str = "#f6f5f4";
 /// well clear of the workspace niri shows behind the bar and of its
 /// shadow.
 const BAR: (u32, u32) = (200, 20);
+/// A pixel of the bar with nothing of the bar's on it, where in the
+/// overview the workspace above the active one shows behind the bar.
+const BAR_OVER_WORKSPACE: (u32, u32) = (400, 20);
 
 struct Checker {
     session: Session,
@@ -480,8 +483,26 @@ fn panel_and_overview() -> Result<(usize, usize)> {
         "and clears the bar, showing the dimmed backdrop",
         |session| Ok(near(pixel(session, BAR.0, BAR.1)?, [77, 77, 77])),
     );
+    let over_workspace =
+        |session: &Session| pixel(session, BAR_OVER_WORKSPACE.0, BAR_OVER_WORKSPACE.1);
+    checker.expect("where the workspace above passes behind it", |session| {
+        Ok(!near(over_workspace(session)?, [77, 77, 77]))
+    });
+    checker.session.gniri_msg(&["debug", "show-apps"])?;
+    checker.expect(
+        "the app grid's cover reaches behind the bar, over that workspace",
+        |session| Ok(near(over_workspace(session)?, [77, 77, 77])),
+    );
+    checker
+        .session
+        .gniri_msg(&["debug", "show-apps", "--off"])?;
+    checker.expect("and goes from there with the grid", |session| {
+        Ok(!near(over_workspace(session)?, [77, 77, 77]))
+    });
+    // Closed from the grid, with the cover behind the bar.
+    checker.session.gniri_msg(&["debug", "show-apps"])?;
     checker.session.action(Action::CloseOverview {})?;
-    checker.expect("closing it restores the bar", |session| {
+    checker.expect("closing it from the app grid restores the bar", |session| {
         Ok(!panel_shows_overview(session)? && near(pixel(session, BAR.0, BAR.1)?, [53, 53, 55]))
     });
 

@@ -9,6 +9,10 @@
 //! with its windows to click and drag. With the app grid or the search
 //! results in front, it takes the pointer everywhere.
 //!
+//! What covers niri's workspaces behind the grid and the results goes on
+//! behind the panel too: the part of it that is above this surface is
+//! drawn on the panel's (surfaces/panel.rs), faded with the rest.
+//!
 //! It holds the keyboard for as long as it is mapped, so that typing
 //! starts a search (docs/DECISIONS.md, S9). niri's own keys for the
 //! overview therefore arrive here: Escape, Enter and the arrows are
@@ -58,6 +62,8 @@ struct Inner {
     dragging: drag::Dragging,
     search_results: search_results::SearchResults,
     cover: gtk::Widget,
+    /// The cover's part behind the panel, on the panel's surface.
+    panel_cover: gtk::Widget,
     /// Counts opens and closes, so a close that was overtaken by a new
     /// open does not unmap the surface.
     generation: Cell<u64>,
@@ -121,6 +127,14 @@ impl Inner {
         surface.set_input_region(Some(&region));
     }
 
+    /// Shows or hides the cover. Its part behind the panel shows only
+    /// while this surface is mapped: the panel's always is.
+    fn set_cover_visible(&self, visible: bool) {
+        self.cover.set_visible(visible);
+        self.panel_cover
+            .set_visible(visible && self.window.is_visible());
+    }
+
     /// Shows what the state says: the windows, the app grid or the search
     /// results. The grid rises from below and goes back down
     /// (`_onShowAppsButtonToggled`), the results and the grid cross-fade
@@ -132,13 +146,13 @@ impl Inner {
             .overview
             .with(|overview| (overview.apps, overview.searching()));
         let time = CONTROLS_ANIMATION.as_millis() as u32;
-        let hidden_after = |widget: gtk::Widget, shown: fn(&Self) -> bool| {
+        let hidden_after = |hide: fn(&Self), shown: fn(&Self) -> bool| {
             let inner = Rc::downgrade(self);
             move || {
                 if let Some(inner) = inner.upgrade()
                     && !shown(&inner)
                 {
-                    widget.set_visible(false);
+                    hide(&inner);
                     inner.update_input_region();
                 }
             }
@@ -160,7 +174,7 @@ impl Inner {
         }
 
         if apps || searching {
-            self.cover.set_visible(true);
+            self.set_cover_visible(true);
         }
         // The entry and the dash change their tint as the cover fades in
         // behind them or out (_bms-overview.scss).
@@ -169,7 +183,7 @@ impl Inner {
             if apps || searching { 1.0 } else { 0.0 },
             time,
             adw::Easing::EaseOutQuad,
-            hidden_after(self.cover.clone(), wants_cover),
+            hidden_after(|inner| inner.set_cover_visible(false), wants_cover),
         );
         let grid = apps && !searching;
         if grid {
@@ -182,14 +196,20 @@ impl Inner {
                 if apps { 1.0 } else { 0.0 },
                 time,
                 adw::Easing::EaseOutSine,
-                hidden_after(self.app_display.widget.clone().upcast(), wants_grid),
+                hidden_after(
+                    |inner| inner.app_display.widget.set_visible(false),
+                    wants_grid,
+                ),
             );
         }
         self.grid_fade.ease(
             if searching { 0.0 } else { 1.0 },
             time,
             adw::Easing::EaseOutQuad,
-            hidden_after(self.app_display.widget.clone().upcast(), wants_grid),
+            hidden_after(
+                |inner| inner.app_display.widget.set_visible(false),
+                wants_grid,
+            ),
         );
         if searching {
             self.search_results.widget.set_visible(true);
@@ -198,7 +218,10 @@ impl Inner {
             if searching { 1.0 } else { 0.0 },
             time,
             adw::Easing::EaseOutQuad,
-            hidden_after(self.search_results.widget.clone().upcast(), wants_results),
+            hidden_after(
+                |inner| inner.search_results.widget.set_visible(false),
+                wants_results,
+            ),
         );
         self.update_input_region();
     }
@@ -234,6 +257,9 @@ impl Inner {
             move || {
                 if inner.generation.get() == generation {
                     inner.window.set_visible(false);
+                    // Whatever the state says, nothing of the overview
+                    // stays on the panel.
+                    inner.panel_cover.set_visible(false);
                 }
             }
         };
@@ -421,12 +447,15 @@ fn neighbours(niri: &gniri_services::niri::State, output: Option<&str>) -> (bool
 
 /// Builds the overview surface for `monitor`, unmapped. `cover` is the
 /// blurred wallpaper to put in front of niri's workspaces while the app
-/// grid or the search results show.
+/// grid or the search results show, and `panel_cover` another of it, for
+/// the caller to put behind the panel (`Panel::set_cover`). The overview
+/// shows and hides both.
 pub fn build(
     app: &adw::Application,
     monitor: &gdk::Monitor,
     services: &Rc<Services>,
     cover: gtk::Widget,
+    panel_cover: gtk::Widget,
 ) -> Overview {
     let window = layer::window(
         app,
@@ -442,6 +471,7 @@ pub fn build(
     cover.set_visible(false);
     // Nothing of the cover is to be pointed at.
     cover.set_can_target(false);
+    panel_cover.set_visible(false);
 
     let entry = search_entry::build(services);
     let dash = Rc::new(dash::build(services));
@@ -520,7 +550,16 @@ pub fn build(
             }
         }
     });
-    let covering = opacity_of(&cover);
+    // One opacity for the cover and its part behind the panel, so that
+    // the two fade as one.
+    let covering = Eased::new(&cover, 1.0, {
+        let covers = [cover.downgrade(), panel_cover.downgrade()];
+        move |opacity| {
+            for cover in covers.iter().filter_map(glib::WeakRef::upgrade) {
+                cover.set_opacity(opacity);
+            }
+        }
+    });
     let grid_fade = opacity_of(&app_display.widget);
     let search_fade = opacity_of(&search_results.widget);
     let inner = Rc::new(Inner {
@@ -539,6 +578,7 @@ pub fn build(
         grid_fade,
         search_fade,
         cover,
+        panel_cover,
         generation: Cell::new(0),
     });
 

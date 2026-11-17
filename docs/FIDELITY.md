@@ -326,8 +326,8 @@ search results to it and takes none of niri's own away.
   and the strip's place stays empty.
 - **Behind the app grid and a search** GNOME has shrunk or hidden the
   workspaces. niri's stay, so gniri draws the overview's background once
-  more in front of them. The bar is not covered: a workspace that
-  reaches behind it still shows there.
+  more in front of them, behind the bar too, where a workspace would
+  otherwise still show.
 - **Behind the search entry and the dash** a neighbouring workspace can
   pass: the one above behind the entry, the one below behind the dash.
   They blur it, windows and all, and while one is there their tint is
