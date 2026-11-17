@@ -21,6 +21,8 @@ niri-ipc.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 async-channel.workspace = true
+glib-unix.workspace = true
+libc.workspace = true
 
 [build-dependencies]
 glib-build-tools = "0.22"

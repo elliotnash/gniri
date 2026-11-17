@@ -65,8 +65,33 @@ fn focused_output() -> Option<String> {
     client.focused_output()
 }
 
-pub fn run(cli: Cli) -> glib::ExitCode {
-    app::run_helper(cli, Role::Polkit, |app, _config, fixture| {
+/// Quits once standard input closes. The shell gives its agent a pipe
+/// there and never writes to it (`PolkitAgent` in app.rs).
+fn end_with_shell(app: &adw::Application) {
+    let (closed, on_close) = async_channel::bounded::<()>(1);
+    let watch = std::thread::Builder::new()
+        .name("shell".to_owned())
+        .spawn(move || {
+            // Returns once the pipe is closed, or cannot be read.
+            let _ = std::io::copy(&mut std::io::stdin().lock(), &mut std::io::sink());
+            let _ = closed.send_blocking(());
+        });
+    if let Err(error) = watch {
+        eprintln!("gniri: polkit: cannot watch for the shell to end: {error}");
+        return;
+    }
+    let app = app.clone();
+    glib::spawn_future_local(async move {
+        let _ = on_close.recv().await;
+        app.quit();
+    });
+}
+
+pub fn run(cli: Cli, with_shell: bool) -> glib::ExitCode {
+    app::run_helper(cli, Role::Polkit, move |app, _config, fixture| {
+        if with_shell {
+            end_with_shell(app);
+        }
         let scheduler = services::scheduler();
         let log = CommandLog::default();
         let link = match fixture {

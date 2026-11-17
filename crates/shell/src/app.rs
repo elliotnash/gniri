@@ -43,12 +43,22 @@ fn application_id(role: ipc::Role) -> String {
 }
 
 /// The polkit agent, a process the shell starts and stops with itself.
+///
+/// An agent left behind keeps polkit's registration, and polkit then
+/// refuses the next shell's. So the shell stops it as it quits, and the
+/// agent also ends once its standard input closes: that is a pipe whose
+/// other end the shell holds, which the kernel closes however the shell
+/// ends, a crash included.
 struct PolkitAgent(std::process::Child);
 
 impl PolkitAgent {
     fn start() -> Option<Self> {
         let program = std::env::current_exe().ok()?;
-        match std::process::Command::new(program).arg("polkit").spawn() {
+        match std::process::Command::new(program)
+            .args(["polkit", "--with-shell"])
+            .stdin(std::process::Stdio::piped())
+            .spawn()
+        {
             Ok(child) => Some(Self(child)),
             Err(error) => {
                 eprintln!("gniri: cannot start the polkit agent: {error}");
@@ -90,6 +100,18 @@ pub fn run(cli: Cli) -> glib::ExitCode {
     };
 
     let app = application(ipc::Role::Shell);
+    // systemd stops gniri with SIGTERM, sent to the shell alone
+    // (`KillMode=process` keeps the lock screen). Quitting, rather than
+    // dying of it, stops the polkit agent with the shell.
+    for signal in [libc::SIGTERM, libc::SIGINT] {
+        glib_unix::unix_signal_add_local(signal, {
+            let app = app.clone();
+            move || {
+                app.quit();
+                glib::ControlFlow::Continue
+            }
+        });
+    }
     let running: Rc<RefCell<Option<Running>>> = Rc::default();
     let setup = RefCell::new(Some((config, fixture)));
     app.connect_activate({

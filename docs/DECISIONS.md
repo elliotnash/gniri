@@ -523,7 +523,13 @@ was unlocked by `loginctl unlock-session`.
   signal, releases its sleep inhibitor on `locked`, and starts a new one if
   it dies, since a session whose locker died stays locked with nothing
   shown. For the same reason the systemd unit has `KillMode=process`:
-  restarting gniri must not take the lock screen with it.
+  restarting gniri must not take the lock screen with it. It must take
+  the polkit agent: one left behind keeps polkit's registration, and
+  polkit refuses the next shell's agent, so an installed update went on
+  answering with the old one. The shell therefore quits on SIGTERM
+  (stopping the agent) where it used to die of it, and the agent ends
+  when its standard input, a pipe from the shell, closes, which a crash
+  closes too.
 - **Leaving the lock.** The only ways out are PAM saying yes, and logind's
   `Unlock` signal. After `unlock` the locker waits for the compositor to
   have heard it (`gdk_display_sync`) before it exits: a locker that

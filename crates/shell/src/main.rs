@@ -87,7 +87,12 @@ enum Command {
     /// when the session is to be locked; `gniri msg lock` asks it to.
     Lock,
     /// Run the polkit authentication agent. The shell starts this itself.
-    Polkit,
+    Polkit {
+        /// End once standard input closes: the shell gives its agent a
+        /// pipe there, so that the agent ends with it.
+        #[arg(long, hide = true)]
+        with_shell: bool,
+    },
     /// Open a plain flat-coloured window (for tests).
     DebugWindow {
         #[arg(long, default_value = "#f6f5f4")]
@@ -248,7 +253,10 @@ fn main() -> glib::ExitCode {
     match &cli.command {
         None => app::run(cli),
         Some(Command::Lock) => lock::run(cli),
-        Some(Command::Polkit) => polkit::run(cli),
+        Some(Command::Polkit { with_shell }) => {
+            let with_shell = *with_shell;
+            polkit::run(cli, with_shell)
+        }
         Some(Command::DebugWindow { color, app_id }) => {
             debug::window::run(color, app_id.as_deref())
         }

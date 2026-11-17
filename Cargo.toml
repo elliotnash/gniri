@@ -47,6 +47,10 @@ libpulse-binding = "2.30"
 nonstick = "0.1"
 # Follows niri releases and is not semver-stable: pin to the installed niri.
 niri-ipc = "=26.4.0"
+# For the shell to quit on SIGTERM: GLib's signal source, and the signal
+# numbers (no calls into libc: `unsafe` is forbidden).
+glib-unix = "0.22"
+libc = "0.2"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
