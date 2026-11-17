@@ -121,8 +121,9 @@ mod imp {
 
     #[derive(Default)]
     pub struct BlurBehind {
-        /// What is behind the dialog, drawn again under it.
-        pub(super) backdrop: RefCell<Vec<gtk::Widget>>,
+        /// What is behind the dialog, drawn again under it, each with a
+        /// paintable that says when it has changed.
+        pub(super) backdrop: RefCell<Vec<(gtk::Widget, gtk::WidgetPaintable)>>,
         /// The shade over those is the lighter one.
         pub(super) lighter: Cell<bool>,
     }
@@ -156,7 +157,7 @@ mod imp {
                 let rounded = gsk::RoundedRect::new(bounds, corner, corner, corner, corner);
                 snapshot.push_rounded_clip(&rounded);
                 snapshot.push_blur(f64::from(BLUR_RADIUS));
-                for widget in self.backdrop.borrow().iter() {
+                for (widget, paintable) in self.backdrop.borrow().iter() {
                     if !widget.is_drawable() {
                         continue;
                     }
@@ -185,7 +186,6 @@ mod imp {
                     let Some(placed) = placed else {
                         continue;
                     };
-                    let paintable = gtk::WidgetPaintable::new(Some(widget));
                     snapshot.save();
                     snapshot.translate(&graphene::Point::new(placed.x(), placed.y()));
                     paintable.snapshot(
@@ -234,6 +234,12 @@ impl Zoom {
     fn set_progress(&self, progress: f64) {
         if self.imp().progress.replace(progress) != progress {
             self.queue_allocate();
+            // GTK keeps a child's drawing when only its transform changes,
+            // but the blur draws what is behind it on screen, which moves
+            // under it as it zooms.
+            if let Some(child) = self.first_child() {
+                child.queue_draw();
+            }
         }
     }
 }
@@ -243,6 +249,28 @@ impl BlurBehind {
         let widget: Self = glib::Object::new();
         child.set_parent(&widget);
         widget
+    }
+
+    /// Draws `widgets` behind the dialog, again whenever one of them is
+    /// drawn anew: GTK would otherwise keep the blur as it first drew it.
+    fn set_backdrop(&self, widgets: Vec<gtk::Widget>) {
+        let backdrop = widgets
+            .into_iter()
+            .map(|widget| {
+                let paintable = gtk::WidgetPaintable::new(Some(&widget));
+                paintable.connect_invalidate_contents({
+                    let blur = self.downgrade();
+                    move |_| {
+                        if let Some(blur) = blur.upgrade() {
+                            blur.queue_draw();
+                        }
+                    }
+                });
+                (widget, paintable)
+            })
+            .collect();
+        self.imp().backdrop.replace(backdrop);
+        self.queue_draw();
     }
 }
 
@@ -490,7 +518,7 @@ impl FolderDialog {
     /// What is drawn behind the dialog, blurred: the overview's parts, in
     /// the order they are drawn.
     pub fn set_backdrop(&self, widgets: Vec<gtk::Widget>) {
-        self.inner.blur.imp().backdrop.replace(widgets);
+        self.inner.blur.set_backdrop(widgets);
     }
 
     /// Gives the icon of a folder, by its id, for the dialog to grow out

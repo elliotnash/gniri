@@ -889,6 +889,12 @@ was unlocked by `loginctl unlock-session`.
 - **The folder dialog draws its own blur, so it carries it while it
   zooms**: what it draws behind itself is placed by its bounds on screen,
   not in its own coordinates, and stays put while the dialog is scaled.
+  It has to be drawn again for that: GTK keeps a widget's drawing when
+  only its transform changes, and kept the blur of the first frame, the
+  patch behind the folder's icon, scaled up with the dialog. So the zoom
+  redraws it at each step, and so does any change to the overview's parts
+  behind it (each has a `GtkWidgetPaintable` that says when it was drawn
+  anew).
 - **A headless mutter is a host that always draws.** A nested niri draws
   only when its host shows its window; behind the host's lock screen
   every animation stands still. mutter's `--headless --virtual-monitor`
