@@ -349,7 +349,8 @@ search results to it and takes none of niri's own away.
 - **Dragging** works as in GNOME: to the dash to pin, within it, onto the
   apps button to unpin ("Unpin"). Applications cannot be dragged from
   the search results, nor onto a workspace to open there. The room made
-  for a dragged item opens at once, where GNOME's grows.
+  for a dragged item opens at once, and an item that changes places jumps
+  there; GNOME's grow and shrink.
 - **A click** on an application that runs goes to the window of its that
   was used last. GNOME shows all its windows when there are several, and
   starts a new one on a middle click or with Ctrl held.
