@@ -121,7 +121,11 @@ impl Osd {
             .set_label(content.label.as_deref().unwrap_or_default());
         inner.level.widget.set_visible(content.level.is_some());
         if let Some((value, maximum)) = content.level {
-            inner.level.set(value, maximum);
+            if inner.window.is_visible() {
+                inner.level.glide(value, maximum);
+            } else {
+                inner.level.set(value, maximum);
+            }
         }
 
         if !inner.window.is_visible() {

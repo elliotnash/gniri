@@ -146,11 +146,15 @@ pub fn draw(
     }
 }
 
+/// osdWindow.js `LEVEL_ANIMATION_TIME`
+const LEVEL_ANIMATION_TIME: u32 = 100;
+
 /// A level bar that only shows a value: the OSD's `.level`.
 #[derive(Clone)]
 pub struct LevelBar {
     pub widget: gtk::DrawingArea,
     level: Rc<Cell<Level>>,
+    value: Rc<super::motion::Eased>,
 }
 
 impl LevelBar {
@@ -181,16 +185,43 @@ impl LevelBar {
                 );
             }
         });
-        Self { widget, level }
+        let value = Rc::new(super::motion::Eased::new(&widget, 0.0, {
+            let (level, widget) = (Rc::clone(&level), widget.downgrade());
+            move |value| {
+                let mut now = level.get();
+                now.value = value;
+                level.set(now);
+                if let Some(widget) = widget.upgrade() {
+                    widget.queue_draw();
+                }
+            }
+        }));
+        Self {
+            widget,
+            level,
+            value,
+        }
     }
 
-    /// Shows `value` out of `maximum`; anything above 1.0 is overdrive.
-    pub fn set(&self, value: f64, maximum: f64) {
+    fn set_maximum(&self, maximum: f64) {
         let mut level = self.level.get();
-        level.value = value;
         level.maximum = maximum;
         level.overdrive_start = maximum.min(1.0);
         self.level.set(level);
-        self.widget.queue_draw();
+    }
+
+    /// Shows `value` out of `maximum` at once; anything above 1.0 is
+    /// overdrive.
+    pub fn set(&self, value: f64, maximum: f64) {
+        self.set_maximum(maximum);
+        self.value.jump(value);
+    }
+
+    /// The same, the bar gliding there (`OsdWindow.setLevel` while it
+    /// shows).
+    pub fn glide(&self, value: f64, maximum: f64) {
+        self.set_maximum(maximum);
+        self.value
+            .ease(value, LEVEL_ANIMATION_TIME, adw::Easing::EaseOutQuad, || {});
     }
 }

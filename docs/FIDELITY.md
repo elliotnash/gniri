@@ -26,9 +26,8 @@ lists everything known to fall outside that, and why.
   antialiases them where they fall. At scale 1.25 an edge that falls between
   two pixels is a soft line in gniri and a hard one in GNOME. This holds for
   every surface, and the pixel comparison allows for it.
-- **Workspace dots appearing and disappearing.** GNOME scales a dot in or out
-  over half a second when a workspace is added or removed. gniri adds and
-  removes it at once. Switching between workspaces is animated as in GNOME.
+- **Workspace dots appearing and disappearing** grow in and shrink away
+  over half a second, as in GNOME, and so does switching between them.
 - **Keyboard focus.** GNOME's panel can be reached with Ctrl+Alt+Tab. gniri's
   takes no keyboard focus yet.
 - **Clock after resume.** After a suspend the clock can be stale until the
@@ -52,7 +51,9 @@ lists everything known to fall outside that, and why.
 - **Opening.** GNOME's menus grow from 96% while they fade in. A blurred
   widget cannot be scaled (the compositor would blur the wrong region), so
   gniri's only fade and slide.
-- **Submenus** open and close at once; GNOME's unfold over 200 ms.
+- **Submenus** unfold and then fade in, and fade out and then fold, as in
+  GNOME (200 ms each). The unfolding eases out a little more steeply
+  (GTK's revealer, cubic where Clutter's default is quadratic).
 - **Power button.** "Log Out…" ends the session by asking niri to quit.
   "Switch User…" is not there. See "Dialogs" for the dialog that asks first.
 - **Settings.** Entries such as "Power Settings" start GNOME Settings
@@ -218,7 +219,8 @@ BlueZ's agent all the time.
 
 ## On-screen display
 
-- The level bar jumps to a new value; GNOME's glides for 100 ms.
+- The level bar glides to a new value over 100 ms while the display
+  shows, as in GNOME, and starts at it when the display appears.
 - Only the volume and brightness keys show it. GNOME also uses it for
   things gniri does not have yet (display switching, tablets).
 

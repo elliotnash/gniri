@@ -44,10 +44,10 @@ fn follow_submenu(
     menu: &ToggleMenu,
     subscriptions: &mut Vec<Subscription>,
 ) {
-    let root = menu.root.clone();
+    let menu = menu.clone();
     subscriptions.push(services.menus.select(
         move |menus| menus.submenu() == Some(submenu),
-        move |open| root.set_visible(*open),
+        move |open| menu.set_open(*open),
     ));
 }
 

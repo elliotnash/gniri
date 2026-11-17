@@ -4,6 +4,7 @@
 
 pub mod avatar;
 pub mod level;
+pub mod motion;
 pub mod password_entry;
 pub mod picture;
 pub mod slider;

@@ -6,7 +6,9 @@
 
 use std::rc::Rc;
 
-use gtk::prelude::*;
+use adw::prelude::*;
+
+use crate::widgets::motion::Eased;
 
 /// One row of a menu's list.
 #[derive(Clone)]
@@ -46,10 +48,18 @@ impl Entry {
     }
 }
 
+/// quickSettings.js `POPUP_ANIMATION_TIME / 2`: a submenu unfolds for this
+/// long, then its contents fade in for as long (and the other way round).
+const UNFOLD_TIME: u32 = 200;
+
 #[derive(Clone)]
 pub struct ToggleMenu {
     /// `.quick-toggle-menu-container`: what the grid places under the row.
     pub root: gtk::Box,
+    /// Its height, unfolding.
+    revealer: gtk::Revealer,
+    /// `.quick-toggle-menu`, whose opacity follows the unfolding.
+    opacity: Rc<Eased>,
     header_icon: gtk::Image,
     /// The list of entries, rebuilt by [`ToggleMenu::set_entries`].
     section: gtk::Box,
@@ -175,13 +185,75 @@ impl ToggleMenu {
             .visible(false)
             .build();
         menu.set_hexpand(true);
-        root.append(&menu);
+        let revealer = gtk::Revealer::builder()
+            .transition_type(gtk::RevealerTransitionType::SlideDown)
+            .transition_duration(UNFOLD_TIME)
+            .hexpand(true)
+            .child(&menu)
+            .build();
+        root.append(&revealer);
+        let opacity = Rc::new(Eased::new(&menu, 1.0, {
+            let menu = menu.downgrade();
+            move |opacity| {
+                if let Some(menu) = menu.upgrade() {
+                    menu.set_opacity(opacity);
+                }
+            }
+        }));
+        // `open`'s and `close`'s second halves.
+        revealer.connect_child_revealed_notify({
+            let (root, opacity) = (root.downgrade(), Rc::clone(&opacity));
+            move |revealer| {
+                if revealer.is_child_revealed() {
+                    if revealer.reveals_child() {
+                        opacity.ease(1.0, UNFOLD_TIME, adw::Easing::EaseOutQuad, || {});
+                    }
+                } else if !revealer.reveals_child()
+                    && let Some(root) = root.upgrade()
+                {
+                    root.set_visible(false);
+                }
+            }
+        });
         Self {
             root,
+            revealer,
+            opacity,
             header_icon,
             section,
             placeholder,
             footer,
+        }
+    }
+
+    /// Unfolds and then shows its contents, or hides them and then folds
+    /// (`QuickToggleMenu.open` and `close`).
+    pub fn set_open(&self, open: bool) {
+        if open {
+            if self.revealer.reveals_child() && self.root.is_visible() {
+                return;
+            }
+            self.root.set_visible(true);
+            self.opacity.jump(0.0);
+            self.revealer.set_reveal_child(true);
+            // Already unfolded (it was closing): only the fade is left.
+            if self.revealer.is_child_revealed() {
+                self.opacity
+                    .ease(1.0, UNFOLD_TIME, adw::Easing::EaseOutQuad, || {});
+            }
+        } else {
+            if !self.revealer.reveals_child() {
+                return;
+            }
+            let revealer = self.revealer.downgrade();
+            // "duration * (opacity / 255)"
+            let duration = (f64::from(UNFOLD_TIME) * self.opacity.value()).round() as u32;
+            self.opacity
+                .ease(0.0, duration, adw::Easing::EaseOutQuad, move || {
+                    if let Some(revealer) = revealer.upgrade() {
+                        revealer.set_reveal_child(false);
+                    }
+                });
         }
     }
 

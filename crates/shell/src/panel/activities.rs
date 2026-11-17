@@ -13,6 +13,7 @@ use gniri_core::Subscription;
 
 use super::{button, set_checked};
 use crate::services::Services;
+use crate::widgets::motion::Eased;
 
 /// `.workspace-dot` min-width and min-height (`$scalable_icon_size * 0.5`).
 const DOT_SIZE: f64 = 8.0;
@@ -25,6 +26,9 @@ const INACTIVE_OPACITY: f64 = 0.5;
 const SWITCH_DURATION_MS: u32 = 250;
 /// windowManager.js `SCROLL_TIMEOUT_TIME`: at most one switch per this long.
 const SCROLL_INTERVAL: Duration = Duration::from_millis(150);
+/// `WorkspaceDot.scaleIn` and `scaleOutAndDestroy`: a dot grows in and
+/// shrinks away this fast.
+const SCALE_DURATION_MS: u32 = 500;
 
 /// How much wider than a dot the active workspace's pill is
 /// (`WorkspaceIndicators._updateExpansion`).
@@ -51,22 +55,56 @@ struct Dot {
     expansion: Cell<f64>,
     multiplier: Cell<f64>,
     animation: RefCell<Option<adw::TimedAnimation>>,
+    /// The whole dot's scale, 1 but while it grows in or shrinks away. Its
+    /// slot keeps its size, as an actor's allocation does under a scale.
+    scale: Eased,
 }
 
 impl Dot {
-    fn new(workspace: u64, active: bool, multiplier: f64) -> Rc<Self> {
-        let dot = Rc::new(Self {
+    /// A dot for `workspace`, grown in if `grow` (`scaleIn`).
+    fn new(workspace: u64, active: bool, multiplier: f64, grow: bool) -> Rc<Self> {
+        let widget = gtk::Box::builder()
+            .css_classes(["workspace-dot"])
+            .valign(gtk::Align::Center)
+            .build();
+        let dot = Rc::new_cyclic(|dot: &std::rc::Weak<Self>| Self {
             workspace,
-            widget: gtk::Box::builder()
-                .css_classes(["workspace-dot"])
-                .valign(gtk::Align::Center)
-                .build(),
             expansion: Cell::new(if active { 1.0 } else { 0.0 }),
             multiplier: Cell::new(multiplier),
             animation: RefCell::new(None),
+            scale: Eased::new(&widget, if grow { 0.0 } else { 1.0 }, {
+                let dot = dot.clone();
+                move |_| {
+                    if let Some(dot) = dot.upgrade() {
+                        dot.apply();
+                    }
+                }
+            }),
+            widget,
         });
         dot.apply();
+        if grow {
+            dot.scale
+                .ease(1.0, SCALE_DURATION_MS, adw::Easing::EaseOutCubic, || {});
+        }
         dot
+    }
+
+    /// `scaleOutAndDestroy`
+    fn leave(self: &Rc<Self>, indicators: &gtk::Box) {
+        let (widget, indicators) = (self.widget.clone(), indicators.downgrade());
+        self.scale.ease(
+            0.0,
+            SCALE_DURATION_MS,
+            adw::Easing::EaseOutCubic,
+            move || {
+                if let Some(indicators) = indicators.upgrade()
+                    && widget.parent().as_ref() == Some(indicators.upcast_ref())
+                {
+                    indicators.remove(&widget);
+                }
+            },
+        );
     }
 
     /// Sizes the dot and its slot for the current expansion
@@ -74,7 +112,7 @@ impl Dot {
     fn apply(&self) {
         let expansion = self.expansion.get();
         let slot = (DOT_SIZE * lerp(1.0, self.multiplier.get(), expansion)).round() as i32;
-        let scale = lerp(INACTIVE_SCALE, 1.0, expansion);
+        let scale = lerp(INACTIVE_SCALE, 1.0, expansion) * self.scale.value();
         let width = (f64::from(slot) * scale).round() as i32;
         let height = (DOT_SIZE * scale).round() as i32;
         let before = (slot - width) / 2;
@@ -222,9 +260,12 @@ fn workspaces_on(niri: &gniri_services::niri::State, output: Option<&str>) -> Ve
 }
 
 /// Makes the row of dots match `workspaces`, reusing the dot of a workspace
-/// that is still there so its animation carries on.
+/// that is still there so its animation carries on. A new workspace's dot
+/// grows in and a gone one's shrinks away where it was
+/// (`_recalculateDots`), except for the first row of all.
 fn sync_dots(indicators: &gtk::Box, dots: &mut Vec<Rc<Dot>>, workspaces: &[(u64, bool)]) {
     let multiplier = width_multiplier(workspaces.len());
+    let first = indicators.first_child().is_none();
     let unchanged_order = dots.len() == workspaces.len()
         && dots
             .iter()
@@ -232,17 +273,40 @@ fn sync_dots(indicators: &gtk::Box, dots: &mut Vec<Rc<Dot>>, workspaces: &[(u64,
             .all(|(dot, (id, _))| dot.workspace == *id);
 
     if !unchanged_order {
-        let mut old: Vec<Rc<Dot>> = std::mem::take(dots);
-        for dot in &old {
-            indicators.remove(&dot.widget);
+        // Every dot as it is in the row now, those leaving included.
+        let mut children = Vec::new();
+        let mut child = indicators.first_child();
+        while let Some(widget) = child {
+            child = widget.next_sibling();
+            children.push(widget);
         }
+        let mut old: Vec<Rc<Dot>> = std::mem::take(dots);
+        let mut row: Vec<gtk::Widget> = Vec::new();
         for (id, active) in workspaces {
             let dot = match old.iter().position(|dot| dot.workspace == *id) {
                 Some(index) => old.swap_remove(index),
-                None => Dot::new(*id, *active, multiplier),
+                None => Dot::new(*id, *active, multiplier, !first),
             };
-            indicators.append(&dot.widget);
+            row.push(dot.widget.clone().upcast());
             dots.push(dot);
+        }
+        for (index, widget) in children.iter().enumerate() {
+            if !row.contains(widget) {
+                row.insert(index.min(row.len()), widget.clone());
+            }
+        }
+        let mut previous: Option<gtk::Widget> = None;
+        for widget in &row {
+            if widget.parent().is_none() {
+                indicators.insert_child_after(widget, previous.as_ref());
+            } else {
+                indicators.reorder_child_after(widget, previous.as_ref());
+            }
+            previous = Some(widget.clone());
+        }
+        // What is gone shrinks away where it was.
+        for dot in old {
+            dot.leave(indicators);
         }
     }
 
