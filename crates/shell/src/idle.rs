@@ -15,8 +15,9 @@ use gniri_services::{brightness, notifications, session};
 use gtk::glib;
 
 use crate::services::Services;
+use crate::surfaces::fade::Fade;
 
-pub fn start(services: &Rc<Services>) -> Vec<Subscription> {
+pub fn start(services: &Rc<Services>, app: &adw::Application) -> Vec<Subscription> {
     // The brightness to go back to while the screen is dimmed.
     let undimmed: Rc<Cell<Option<f64>>> = Rc::default();
     let dim = services
@@ -48,6 +49,11 @@ pub fn start(services: &Rc<Services>) -> Vec<Subscription> {
             idle.has_passed(Timer::Blank) || (locked && idle.has_passed(Timer::BlankLocked))
         })
     };
+    // `ScreenShield._onStatusChanged`: going idle unlocked, the screens
+    // first fade to black, and turn off once they are. Input before then
+    // takes the black away (`_onUserBecameActive`). Locked, they turn off
+    // at once.
+    let fade = Fade::new(app);
     let blank_when_idle = services.idle.state.select(
         {
             let services = Rc::downgrade(services);
@@ -55,10 +61,26 @@ pub fn start(services: &Rc<Services>) -> Vec<Subscription> {
         },
         {
             let services = Rc::downgrade(services);
-            move |blank| {
-                if *blank && let Some(services) = services.upgrade() {
-                    services.power_off_monitors();
+            move |blank_now| {
+                let Some(services) = services.upgrade() else {
+                    return;
+                };
+                if !*blank_now {
+                    fade.stop();
+                    return;
                 }
+                if services.session.state.with(|session| session.locked) {
+                    services.power_off_monitors();
+                    return;
+                }
+                let services = Rc::downgrade(&services);
+                fade.start(move || {
+                    if let Some(services) = services.upgrade()
+                        && blank(&services)
+                    {
+                        services.power_off_monitors();
+                    }
+                });
             }
         },
     );

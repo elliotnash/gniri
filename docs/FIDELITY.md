@@ -286,8 +286,12 @@ BlueZ's agent all the time.
   room they take changes from the one's height to the other's, so the
   notifications have room under the clock and give way to the prompt.
   GNOME also follows a swipe on a touch screen, and reacts to scrolling.
-- **Locking and unlocking** happen at once. GNOME fades the screen out
-  before an idle lock and slides the shield away after unlocking.
+- **Going idle**, the screens fade to black over ten seconds and then
+  turn off, as in GNOME; the session locks no sooner than the end of the
+  fade, and input before then brings everything back.
+- **Unlocking** happens at once. GNOME slides the shield away; under the
+  compositor's session lock nothing but the lock screen is drawn until it
+  is gone, so there is nothing to slide it away from.
 - **Every output asks.** Each output has the clock and, after a key press
   or click there, its own prompt. GNOME has the prompt on one monitor.
 - **Fingerprint.** A finger is waited for while a prompt shows, through

@@ -3,6 +3,7 @@
 //! Layer-shell surfaces. Each submodule builds one kind of surface.
 
 pub mod banner;
+pub mod fade;
 pub mod layer;
 pub mod osd;
 pub mod overview;

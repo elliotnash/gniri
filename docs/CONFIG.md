@@ -112,7 +112,7 @@ the compositor to stay awake holds all of it off.
 
 | Key | Default | |
 |---|---|---|
-| `blank_after` | `300` | Seconds without input after which the screens turn off (GNOME's "Blank Screen Delay"). `0` for never. |
+| `blank_after` | `300` | Seconds without input after which the screens fade to black and turn off, ten seconds later (GNOME's "Blank Screen Delay"). Input while they fade brings everything back. `0` for never. |
 | `dim` | `true` | Dim the screen for the last fifth of that time. |
 
 ### `[lock]`
@@ -120,7 +120,7 @@ the compositor to stay awake holds all of it off.
 | Key | Default | |
 |---|---|---|
 | `automatic` | `true` | Lock when the screens turn off for idleness. |
-| `delay` | `0` | Seconds between the screens turning off and the lock. |
+| `delay` | `0` | Seconds between the screens starting to fade and the lock; never less than the ten seconds of the fade, as in GNOME. |
 | `on_suspend` | `true` | Lock before the machine sleeps. |
 
 `gniri msg lock`, the lock button in the quick settings and

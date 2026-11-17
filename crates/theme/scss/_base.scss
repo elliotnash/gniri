@@ -22,3 +22,9 @@ window.gniri-layer {
 window.gniri-layer {
     -gtk-icon-palette: success #4e9a06, warning #f5793e, error #cc0000;
 }
+
+// The screens fading to black as the session goes idle (surfaces/fade.rs):
+// GNOME's lightbox, black whatever the style.
+.gniri-fade {
+    background-color: black;
+}

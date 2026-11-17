@@ -508,7 +508,7 @@ fn activate(
         search,
         restyle,
     ];
-    subscriptions.extend(idle::start(&services));
+    subscriptions.extend(idle::start(&services, app));
 
     Some(Running {
         _outputs: outputs,

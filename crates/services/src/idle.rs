@@ -119,6 +119,10 @@ const DIM_SHARE: (u32, u32) = (4, 5);
 /// gsd-power.c `MINIMUM_IDLE_DIM_DELAY`: with a shorter delay the screen
 /// is not dimmed first.
 const MINIMUM_DIM_DELAY: Duration = Duration::from_secs(10);
+/// screenShield.js `STANDARD_FADE_TIME`: when the session goes idle the
+/// screens fade to black for this long before they turn off, and the
+/// session locks no sooner.
+pub const FADE_TIME: Duration = Duration::from_secs(10);
 /// The `idle-brightness` setting's default: the share of full brightness
 /// a dimmed screen has. A screen that is darker already is left alone.
 pub const DIM_BRIGHTNESS: f64 = 0.3;
@@ -136,7 +140,11 @@ pub fn timers(settings: &Settings) -> Vec<(Timer, Duration)> {
     }
     timers.push((Timer::Blank, blank_after));
     if settings.lock {
-        timers.push((Timer::Lock, blank_after + settings.lock_delay));
+        // `_onStatusChanged`: "Math.max(STANDARD_FADE_TIME, lock-delay)".
+        timers.push((
+            Timer::Lock,
+            blank_after + settings.lock_delay.max(FADE_TIME),
+        ));
     }
     timers.sort_by_key(|(timer, after)| (*after, *timer));
     timers
@@ -163,14 +171,14 @@ mod tests {
     }
 
     #[test]
-    fn gnome_defaults_dim_at_four_minutes_and_blank_and_lock_at_five() {
+    fn gnome_defaults_dim_at_four_minutes_and_fade_out_and_lock_after_five() {
         assert_eq!(
             seconds(&timers(&settings(300))),
             [
                 (Timer::BlankLocked, 15),
                 (Timer::Dim, 240),
                 (Timer::Blank, 300),
-                (Timer::Lock, 300),
+                (Timer::Lock, 310),
             ]
         );
     }
@@ -196,8 +204,8 @@ mod tests {
             seconds(&timers(&settings(10))),
             [
                 (Timer::Blank, 10),
-                (Timer::Lock, 10),
                 (Timer::BlankLocked, 15),
+                (Timer::Lock, 20),
             ]
         );
 
