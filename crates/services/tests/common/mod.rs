@@ -22,6 +22,8 @@ pub const TIMEOUT: Duration = Duration::from_secs(10);
 pub struct MockBus {
     daemon: Child,
     mocks: Vec<Child>,
+    /// Directories made for the mocks, taken away with the bus.
+    scratch: Vec<std::path::PathBuf>,
     address: String,
     /// For driving the mocks.
     pub control: zbus::Connection,
@@ -64,6 +66,7 @@ impl MockBus {
         Some(Self {
             daemon,
             mocks: Vec::new(),
+            scratch: Vec::new(),
             address,
             control,
         })
@@ -210,6 +213,54 @@ impl MockBus {
     }
 }
 
+impl MockBus {
+    /// Starts a gnome-keyring of its own on this bus, with a login keyring
+    /// in a new directory, unlocked: nothing of the user's is touched, and
+    /// nothing asks. `None` if gnome-keyring is not installed.
+    #[allow(dead_code)]
+    pub fn start_keyring(&mut self) -> Option<()> {
+        use std::io::Write;
+        let home = std::env::temp_dir().join(format!(
+            "gniri-keyring-{}-{}",
+            std::process::id(),
+            self.mocks.len()
+        ));
+        let _ = std::fs::remove_dir_all(&home);
+        let runtime = home.join("run");
+        std::fs::create_dir_all(&runtime).ok()?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&runtime, std::fs::Permissions::from_mode(0o700)).ok()?;
+        }
+        let daemon = Command::new("gnome-keyring-daemon")
+            .args(["--foreground", "--components=secrets", "--unlock"])
+            .env("DBUS_SESSION_BUS_ADDRESS", &self.address)
+            .env("HOME", &home)
+            .env("XDG_DATA_HOME", home.join("data"))
+            .env("XDG_RUNTIME_DIR", &runtime)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn();
+        let mut daemon = match daemon {
+            Ok(daemon) => daemon,
+            Err(error) => {
+                eprintln!("skipped: cannot run gnome-keyring-daemon: {error}");
+                return None;
+            }
+        };
+        // The login keyring's password, then the end of it.
+        let mut stdin = daemon.stdin.take().expect("stdin is piped");
+        stdin.write_all(b"test password").ok()?;
+        drop(stdin);
+        self.mocks.push(daemon);
+        self.scratch.push(home);
+        self.wait_for_name("org.freedesktop.secrets");
+        Some(())
+    }
+}
+
 impl Drop for MockBus {
     fn drop(&mut self) {
         for mock in &mut self.mocks {
@@ -218,6 +269,9 @@ impl Drop for MockBus {
         }
         let _ = self.daemon.kill();
         let _ = self.daemon.wait();
+        for directory in &self.scratch {
+            let _ = std::fs::remove_dir_all(directory);
+        }
     }
 }
 

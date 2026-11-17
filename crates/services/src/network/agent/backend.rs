@@ -7,16 +7,21 @@
 //! the secrets, or with an error that says the user gave up or that this
 //! agent has none (it then asks the next agent, if there is one). Requests
 //! are answered one at a time, in the order they came.
+//!
+//! The secrets NetworkManager leaves to the agent are kept in the keyring
+//! ([`keyring`]): looked up before the user is asked, and kept once they
+//! have answered or NetworkManager hands them over.
 
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 
 use async_channel::{Receiver, Sender};
 use futures_lite::StreamExt;
 use zbus::fdo::DBusProxy;
 use zbus::message::Header;
 use zbus::names::BusName;
-use zbus::{OwnedObjectPath, proxy::CacheProperties};
+use zbus::{OwnedObjectPath, OwnedVariant, Variant, proxy::CacheProperties};
 
+use super::keyring::{self, Keyring};
 use super::{ALLOW_INTERACTION, Command, Event, REQUEST_NEW, Request, Settings, request, secrets};
 use crate::bus::{Wakes, merge};
 
@@ -50,6 +55,8 @@ enum AgentError {
     NoSecrets(String),
     /// Someone other than NetworkManager asked.
     PermissionDenied(String),
+    /// The keyring would not do what was asked.
+    Failed(String),
 }
 
 /// One `GetSecrets` call.
@@ -68,6 +75,18 @@ struct Get {
 
 enum Call {
     Get(Box<Get>),
+    /// Keep the secrets of these settings that are left to the agent.
+    Save {
+        sender: Option<String>,
+        settings: Settings,
+        reply: Sender<Result<(), AgentError>>,
+    },
+    /// Forget what is kept for the connection with these settings.
+    Delete {
+        sender: Option<String>,
+        settings: Settings,
+        reply: Sender<Result<(), AgentError>>,
+    },
     /// NetworkManager withdrew the request for this connection and setting.
     Cancel {
         sender: Option<String>,
@@ -128,16 +147,57 @@ impl Agent {
         let _ = self.calls.send(cancel).await;
     }
 
-    /// NetworkManager asks this for the secrets it is told to leave to the
-    /// agent. GNOME's agent puts them in the keyring; this one keeps
-    /// nothing, and asks again the next time.
-    async fn save_secrets(&self, _connection: Settings, _connection_path: OwnedObjectPath) {}
+    /// NetworkManager hands over the secrets it is told to leave to the
+    /// agent, when a connection is saved with them.
+    async fn save_secrets(
+        &self,
+        #[zbus(header)] header: Header<'_>,
+        connection: Settings,
+        _connection_path: OwnedObjectPath,
+    ) -> Result<(), AgentError> {
+        let (reply, result) = async_channel::bounded(1);
+        let save = Call::Save {
+            sender: sender(&header),
+            settings: connection,
+            reply,
+        };
+        self.pass(save, result).await
+    }
 
-    async fn delete_secrets(&self, _connection: Settings, _connection_path: OwnedObjectPath) {}
+    /// The connection was deleted: so is what was kept for it.
+    async fn delete_secrets(
+        &self,
+        #[zbus(header)] header: Header<'_>,
+        connection: Settings,
+        _connection_path: OwnedObjectPath,
+    ) -> Result<(), AgentError> {
+        let (reply, result) = async_channel::bounded(1);
+        let delete = Call::Delete {
+            sender: sender(&header),
+            settings: connection,
+            reply,
+        };
+        self.pass(delete, result).await
+    }
+}
+
+impl Agent {
+    /// Passes `call` on and waits for its answer.
+    async fn pass(
+        &self,
+        call: Call,
+        result: Receiver<Result<(), AgentError>>,
+    ) -> Result<(), AgentError> {
+        let gone = || AgentError::AgentCanceled("the agent is shutting down".to_owned());
+        self.calls.send(call).await.map_err(|_| gone())?;
+        result.recv().await.map_err(|_| gone())?
+    }
 }
 
 enum Wake {
     Call(Call),
+    /// What the keyring had for the lookup with this number.
+    Found(u64, HashMap<String, String>),
     Command(Command),
     /// NetworkManager came, went or was replaced; its new unique name.
     Owner(Option<String>),
@@ -162,6 +222,12 @@ struct Runner {
     owner: Option<String>,
     active: Option<Asking>,
     waiting: VecDeque<Asking>,
+    /// None without a session bus.
+    keyring: Option<Keyring>,
+    /// Requests being looked up in the keyring, by number.
+    looking: Vec<(u64, Get)>,
+    looked_up: u64,
+    found: Sender<Wake>,
 }
 
 impl Runner {
@@ -213,10 +279,17 @@ impl Runner {
             && let Some(waiting) = self.waiting.remove(index)
         {
             let _ = waiting.get.reply.send(Err(error())).await;
+        } else if let Some(index) = self
+            .looking
+            .iter()
+            .position(|(_, get)| get.path == path && get.setting_name == setting_name)
+        {
+            let (_, get) = self.looking.remove(index);
+            let _ = get.reply.send(Err(error())).await;
         }
     }
 
-    /// Port of `shell_network_agent_get_secrets`, without its keyring.
+    /// Port of `shell_network_agent_get_secrets`.
     async fn get(&mut self, get: Get) {
         // Whoever gets an answer gets a password: only NetworkManager may
         // ask, as in libnm's `verify_sender`.
@@ -229,10 +302,63 @@ impl Runner {
         // Cancel it before starting the new one."
         self.withdraw(&get.path, &get.setting_name, "replaced by a newer request")
             .await;
-        // Nothing is stored here, so there is an answer only if the user
-        // may be asked for one.
+        // What is kept did not work, or nothing is ever kept: the user is
+        // asked at once. Otherwise the keyring first.
+        let ask_now = get.flags & REQUEST_NEW != 0
+            || (get.flags & ALLOW_INTERACTION != 0 && keyring::always_ask(&get.settings));
+        if !ask_now
+            && get.setting_name != "vpn"
+            && let Some(keyring) = self.keyring.clone()
+        {
+            let finder = keyring.clone();
+            self.looked_up += 1;
+            let number = self.looked_up;
+            let uuid = keyring::text(&get.settings, "connection", "uuid").unwrap_or_default();
+            let setting_name = get.setting_name.clone();
+            let found = self.found.clone();
+            keyring.spawn(async move {
+                let secrets = finder
+                    .find(&uuid, &setting_name)
+                    .await
+                    .unwrap_or_else(|error| {
+                        eprintln!("gniri: network agent: the keyring cannot be read: {error}");
+                        HashMap::new()
+                    });
+                let _ = found.send(Wake::Found(number, secrets)).await;
+            });
+            self.looking.push((number, get));
+            return;
+        }
+        self.ask(get).await;
+    }
+
+    /// `get_secrets_keyring_cb`: what the keyring had is the answer;
+    /// with nothing there, the user is asked if they may be.
+    async fn found(&mut self, number: u64, secrets: HashMap<String, String>) {
+        let Some(index) = self.looking.iter().position(|(other, _)| *other == number) else {
+            // Withdrawn meanwhile.
+            return;
+        };
+        let (_, get) = self.looking.remove(index);
+        if secrets.is_empty() {
+            self.ask(get).await;
+            return;
+        }
+        let setting = secrets
+            .into_iter()
+            .filter_map(|(key, value)| {
+                Some((key, OwnedVariant::try_from(Variant::from(value)).ok()?))
+            })
+            .collect();
+        let answer = HashMap::from([(get.setting_name.clone(), setting)]);
+        let _ = get.reply.send(Ok(answer)).await;
+    }
+
+    /// Puts the request before the user, once the others before it are
+    /// answered.
+    async fn ask(&mut self, get: Get) {
         if get.flags & (ALLOW_INTERACTION | REQUEST_NEW) == 0 {
-            let none = AgentError::NoSecrets("gniri stores no secrets".to_owned());
+            let none = AgentError::NoSecrets("gniri has none, and may not ask".to_owned());
             let _ = get.reply.send(Err(none)).await;
             return;
         }
@@ -255,6 +381,55 @@ impl Runner {
     async fn handle(&mut self, wake: Wake) {
         match wake {
             Wake::Call(Call::Get(get)) => self.get(*get).await,
+            Wake::Found(number, secrets) => self.found(number, secrets).await,
+            Wake::Call(Call::Save {
+                sender,
+                settings,
+                reply,
+            }) => {
+                if sender.is_none() || sender != self.owner {
+                    let denied =
+                        AgentError::PermissionDenied("only NetworkManager may ask".to_owned());
+                    let _ = reply.send(Err(denied)).await;
+                    return;
+                }
+                let Some(keyring) = self.keyring.clone() else {
+                    let _ = reply.send(Ok(())).await;
+                    return;
+                };
+                keyring.clone().spawn(async move {
+                    let saved = keyring.save(&settings).await.map_err(|error| {
+                        AgentError::Failed(format!("the keyring would not keep them: {error}"))
+                    });
+                    let _ = reply.send(saved).await;
+                });
+            }
+            Wake::Call(Call::Delete {
+                sender,
+                settings,
+                reply,
+            }) => {
+                if sender.is_none() || sender != self.owner {
+                    let denied =
+                        AgentError::PermissionDenied("only NetworkManager may ask".to_owned());
+                    let _ = reply.send(Err(denied)).await;
+                    return;
+                }
+                let Some(keyring) = self.keyring.clone() else {
+                    let _ = reply.send(Ok(())).await;
+                    return;
+                };
+                let uuid = keyring::text(&settings, "connection", "uuid").unwrap_or_default();
+                keyring.clone().spawn(async move {
+                    // "The request could not be completed. Keyring result: …"
+                    let deleted = keyring.delete(&uuid).await.map_err(|error| {
+                        AgentError::Failed(format!(
+                            "The request could not be completed.  Keyring result: {error}"
+                        ))
+                    });
+                    let _ = reply.send(deleted).await;
+                });
+            }
             Wake::Call(Call::Cancel {
                 sender,
                 path,
@@ -279,6 +454,18 @@ impl Runner {
                     return;
                 }
                 let answer = secrets(&active.get.setting_name, &active.request.fields, &values);
+                // "Save any updated secrets": those left to the agent go
+                // to the keyring.
+                if let Some(keyring) = self.keyring.clone() {
+                    let settings = keyring::with_secrets(&active.get.settings, &answer);
+                    keyring.clone().spawn(async move {
+                        if let Err(error) = keyring.save(&settings).await {
+                            eprintln!(
+                                "gniri: network agent: the keyring would not keep it: {error}"
+                            );
+                        }
+                    });
+                }
                 self.end(Ok(answer)).await;
             }
             Wake::Owner(owner) => {
@@ -289,6 +476,9 @@ impl Runner {
                 let gone = || AgentError::AgentCanceled("NetworkManager went away".to_owned());
                 for waiting in std::mem::take(&mut self.waiting) {
                     let _ = waiting.get.reply.send(Err(gone())).await;
+                }
+                for (_, get) in std::mem::take(&mut self.looking) {
+                    let _ = get.reply.send(Err(gone())).await;
                 }
                 self.end(Err(gone())).await;
                 self.owner = owner;
@@ -303,7 +493,25 @@ pub async fn run(
     events: Sender<Event>,
     commands: Receiver<Command>,
 ) -> zbus::Result<()> {
+    let keyring = match zbus::Connection::session().await {
+        Ok(session) => Some(Keyring::new(session)),
+        Err(error) => {
+            eprintln!("gniri: network agent: no session bus, so no keyring: {error}");
+            None
+        }
+    };
+    run_with(connection, keyring, events, commands).await
+}
+
+/// [`run`] with the keyring given: a test's, or none.
+pub async fn run_with(
+    connection: zbus::Connection,
+    keyring: Option<Keyring>,
+    events: Sender<Event>,
+    commands: Receiver<Command>,
+) -> zbus::Result<()> {
     let (calls, incoming) = async_channel::unbounded();
+    let (found, founds) = async_channel::unbounded();
     connection.object_server().at(PATH, Agent { calls }).await?;
 
     let bus = DBusProxy::new(&connection).await?;
@@ -332,6 +540,10 @@ pub async fn run(
             .map(|owner| owner.to_string()),
         active: None,
         waiting: VecDeque::new(),
+        keyring,
+        looking: Vec::new(),
+        looked_up: 0,
+        found,
     };
     runner.register().await;
 
@@ -339,6 +551,7 @@ pub async fn run(
         Box::pin(incoming.map(Wake::Call)) as Wakes<Wake>,
         Box::pin(commands.map(Wake::Command)),
         Box::pin(owners),
+        Box::pin(founds),
     ]);
     while let Some(wake) = wakes.next().await {
         // The shell closing its end means it is shutting down.

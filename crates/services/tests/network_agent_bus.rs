@@ -13,7 +13,10 @@ use async_channel::{Receiver, Sender};
 use common::{Follower, MockBus, TIMEOUT};
 use futures_lite::future::block_on;
 use gniri_services::network::agent::backend::{self, IDENTIFIER, PATH};
-use gniri_services::network::agent::{self, ALLOW_INTERACTION, Command, USER_REQUESTED};
+use gniri_services::network::agent::keyring::Keyring;
+use gniri_services::network::agent::{
+    self, ALLOW_INTERACTION, Command, REQUEST_NEW, USER_REQUESTED,
+};
 use zbus::{ObjectPath, OwnedVariant, Variant};
 
 const NM: &str = "org.freedesktop.NetworkManager";
@@ -79,7 +82,18 @@ fn next_registration(registered: &Receiver<String>) -> String {
 }
 
 fn setup() -> Option<Setup> {
-    let bus = MockBus::start_empty()?;
+    start(false)
+}
+
+/// The agent, with a keyring of its own if `keyring`.
+fn start(keyring: bool) -> Option<Setup> {
+    let mut bus = MockBus::start_empty()?;
+    let keyring = if keyring {
+        bus.start_keyring()?;
+        Some(Keyring::new(bus.connection()))
+    } else {
+        None
+    };
     let (manager, registered) = network_manager(&bus);
 
     // The agent's own connection, so the test knows where to call it.
@@ -87,7 +101,8 @@ fn setup() -> Option<Setup> {
     let agent_name = connection.unique_name().expect("a unique name").to_string();
     let (link, events, commands) = gniri_services::Link::new();
     std::thread::spawn(move || {
-        if let Err(error) = block_on(backend::run(connection, events, commands)) {
+        // Never the user's keyring.
+        if let Err(error) = block_on(backend::run_with(connection, keyring, events, commands)) {
             eprintln!("the agent stopped: {error}");
         }
     });
@@ -364,4 +379,131 @@ fn a_new_network_manager_is_registered_with_and_the_old_one_s_requests_end() {
     setup.agent.send(Command::Cancel);
     assert_eq!(error_of(call), format!("{ERROR}.UserCanceled"));
     assert!(setup.registered.is_empty());
+}
+
+type Groups = HashMap<&'static str, HashMap<&'static str, Variant<'static>>>;
+
+/// `NM_SETTING_SECRET_FLAG_AGENT_OWNED`
+const AGENT_OWNED: u32 = 0x1;
+
+/// The settings of the Wi-Fi connection `uuid`, whose password has these
+/// flags.
+fn cafe(uuid: &str, psk: Option<&str>, psk_flags: u32) -> Groups {
+    let mut settings = wifi("cafe");
+    settings
+        .get_mut("connection")
+        .unwrap()
+        .insert("uuid", Variant::from(uuid.to_owned()));
+    let security = settings.get_mut(WIFI_SECURITY).unwrap();
+    security.insert("psk-flags", Variant::from(psk_flags));
+    if let Some(psk) = psk {
+        security.insert("psk", Variant::from(psk.to_owned()));
+    }
+    settings
+}
+
+impl Setup {
+    fn get(&self, settings: Groups, flags: u32) -> Call {
+        let (caller, agent_name) = (self.manager.clone(), self.agent_name.clone());
+        std::thread::spawn(move || {
+            let hints: Vec<&str> = Vec::new();
+            let path = ObjectPath::try_from("/profile/7").unwrap();
+            let reply = block_on(caller.call_method(
+                Some(agent_name.as_str()),
+                PATH,
+                Some(AGENT),
+                "GetSecrets",
+                &(settings, path, WIFI_SECURITY, hints, flags),
+            ))?;
+            reply.body().deserialize::<Secrets>()
+        })
+    }
+
+    /// `SaveSecrets` or `DeleteSecrets`, as NetworkManager calls them.
+    fn hand_over(&self, method: &str, settings: Groups) {
+        let path = ObjectPath::try_from("/profile/7").unwrap();
+        block_on(self.manager.call_method(
+            Some(self.agent_name.as_str()),
+            PATH,
+            Some(AGENT),
+            method,
+            &(settings, path),
+        ))
+        .unwrap_or_else(|error| panic!("{method} fails: {error}"));
+    }
+
+    /// What the keyring answers for `uuid` with nobody to ask, once it
+    /// answers `wanted` (it keeps an answer while the agent goes on).
+    fn kept(&self, uuid: &str, wanted: Option<&str>) -> Option<String> {
+        let started = std::time::Instant::now();
+        loop {
+            let kept = match self.get(cafe(uuid, None, AGENT_OWNED), 0).join().unwrap() {
+                Ok(secrets) => Some(
+                    String::try_from(secrets[WIFI_SECURITY]["psk"].try_clone().unwrap()).unwrap(),
+                ),
+                Err(zbus::Error::MethodError(name, _, _))
+                    if name.as_str() == format!("{ERROR}.NoSecrets") =>
+                {
+                    None
+                }
+                Err(error) => panic!("the agent fails: {error}"),
+            };
+            if kept.as_deref() == wanted || started.elapsed() > TIMEOUT {
+                return kept;
+            }
+            std::thread::sleep(Duration::from_millis(100));
+        }
+    }
+}
+
+#[test]
+fn passwords_left_to_the_agent_are_kept_in_the_keyring() {
+    let Some(mut setup) = start(true) else { return };
+
+    // Nothing kept yet: the user is asked, and what they answer is kept.
+    let call = setup.get(cafe("uuid-1", None, AGENT_OWNED), ALLOW_INTERACTION);
+    setup.wait_for_request("cafe");
+    setup
+        .agent
+        .send(Command::Respond(vec!["open sesame".to_owned()]));
+    let secrets = call.join().unwrap().expect("the agent answers");
+    assert_eq!(*secrets[WIFI_SECURITY]["psk"], Variant::from("open sesame"));
+    setup.wait_for_no_request();
+    assert_eq!(
+        setup.kept("uuid-1", Some("open sesame")).as_deref(),
+        Some("open sesame")
+    );
+
+    // Next time the keyring answers, though the user could be asked.
+    let call = setup.get(cafe("uuid-1", None, AGENT_OWNED), ALLOW_INTERACTION);
+    let secrets = call.join().unwrap().expect("the keyring answers");
+    assert_eq!(*secrets[WIFI_SECURITY]["psk"], Variant::from("open sesame"));
+    assert_eq!(setup.agent.state.request, None);
+
+    // It did not work: the user is asked again.
+    let call = setup.get(
+        cafe("uuid-1", None, AGENT_OWNED),
+        ALLOW_INTERACTION | REQUEST_NEW,
+    );
+    setup.wait_for_request("cafe");
+    setup.agent.send(Command::Cancel);
+    assert_eq!(error_of(call), format!("{ERROR}.UserCanceled"));
+
+    // NetworkManager hands over another password for it.
+    setup.hand_over(
+        "SaveSecrets",
+        cafe("uuid-1", Some("new password"), AGENT_OWNED),
+    );
+    assert_eq!(
+        setup.kept("uuid-1", Some("new password")).as_deref(),
+        Some("new password")
+    );
+
+    // One that NetworkManager keeps itself is not kept here.
+    setup.hand_over("SaveSecrets", cafe("uuid-2", Some("not mine"), 0));
+    assert_eq!(setup.kept("uuid-2", None), None);
+
+    // The connection is deleted: so is its password.
+    setup.hand_over("DeleteSecrets", cafe("uuid-1", None, AGENT_OWNED));
+    assert_eq!(setup.kept("uuid-1", None), None);
 }

@@ -832,6 +832,20 @@ was unlocked by `loginctl unlock-session`.
   heading has an en dash).
 - **Dates are written with strftime formats, which are texts like any
   other**, and with the C library's names for months and weekdays.
+- **The lock screen asks the shell for the notifications, and waits.**
+  It is a process of its own, and the notifications are the shell's: it
+  sends what it already shows, and the shell answers once that is not
+  what there is (or after half a minute, and it asks again). Its media
+  players it asks itself, with the same backend the shell uses.
+- **The keyring after all.** M6 left it out as a piece of work of its
+  own; it came to a client of four Secret Service interfaces. Its calls
+  run on threads of their own, since unlocking a keyring waits on the
+  user and NetworkManager may withdraw the request meanwhile. Secrets go
+  over the bus in the "plain" session: the encrypted one is a
+  Diffie-Hellman exchange and AES, for a bus only the user's processes
+  are on. The tests run a gnome-keyring of their own on the private bus,
+  with a login keyring made for them and unlocked from its standard
+  input, so that nothing of the user's is touched and nothing asks.
 
 ### Harness
 

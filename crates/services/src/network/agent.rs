@@ -10,10 +10,10 @@
 //! bus.
 //!
 //! Not ported: VPN connections, whose plugins bring a program of their own
-//! to do the asking, and the keyring, where GNOME's agent keeps the secrets
-//! NetworkManager is told not to store itself.
+//! to do the asking.
 
 pub mod backend;
+pub mod keyring;
 
 use gniri_core::{fill, tr};
 use std::collections::HashMap;

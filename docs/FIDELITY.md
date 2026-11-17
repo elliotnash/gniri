@@ -93,11 +93,17 @@ asks for it.
   the dialog on a click. gniri opens the dialog.
 - **One at a time.** Requests for several connections are asked one after
   the other; GNOME opens a dialog for each.
-- **Nothing is kept in the keyring.** NetworkManager stores a Wi-Fi
-  password itself unless a connection says "for this user only", which
-  leaves it to the agent. GNOME's agent puts such a password in the
-  keyring and finds it there next time. gniri keeps nothing: such a
-  connection asks every time, and does not come up by itself.
+- **The keyring.** NetworkManager stores a Wi-Fi password itself unless a
+  connection says "for this user only", which leaves it to the agent. As
+  GNOME's, gniri's agent keeps such a password in the keyring, looks there
+  before asking, and forgets it with the connection. The items are
+  GNOME's (and nm-applet's), so a password either of them kept is found.
+  The secrets cross the session bus unencrypted (the Secret Service's
+  "plain" session); libsecret encrypts them. With no default keyring
+  (gnome-keyring started without one, as outside GDM), the first password
+  kept makes one, as libsecret does: gnome-keyring asks for its password in
+  gcr's own window, since gniri is no keyring prompter (GNOME Shell shows
+  those questions as its own dialogs).
 - **No VPN passwords.** GNOME hands a VPN's questions to a program the
   VPN's plugin brings. gniri answers that it has none; NetworkManager then
   asks another agent if one runs (`nm-applet`, say).
