@@ -75,9 +75,14 @@ lists everything known to fall outside that, and why.
 - **Brightness** follows what gniri sets and what the kernel reports when
   the menu opens; a change made by another program while the menu is open is
   not shown until it is reopened.
-- **Not ported:** the keyboard backlight item, background apps, screen
-  recording and the accessibility, location, Thunderbolt and auto-rotate
-  items.
+- **Not ported:** the keyboard backlight item, screen recording and the
+  accessibility, location, Thunderbolt and auto-rotate items.
+- **No background apps.** GNOME lists them from the portal's background
+  monitor, which knows an application runs without a window by asking
+  GNOME Shell's `org.gnome.Shell.Introspect` which applications have
+  windows. Under niri that name is niri's, and niri answers only the
+  window list screencasts need, so the monitor never lists anything.
+  Taking the name over would take that list from niri.
 
 ## Network passwords
 
