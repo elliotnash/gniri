@@ -246,6 +246,9 @@ impl BlurBehind {
     }
 }
 
+/// Finds a folder's icon by the folder's id.
+type SourceOf = dyn Fn(&str) -> Option<gtk::Widget>;
+
 struct Inner {
     services: Rc<Services>,
     container: gtk::Box,
@@ -254,7 +257,7 @@ struct Inner {
     zooming: crate::widgets::motion::Eased,
     fading: crate::widgets::motion::Eased,
     /// The icon of the folder with this id, to grow out of.
-    source: RefCell<Option<Box<dyn Fn(&str) -> Option<gtk::Widget>>>>,
+    source: RefCell<Option<Box<SourceOf>>>,
     /// The folder last opened: what to shrink back into once it is closed.
     opened: RefCell<Option<String>>,
     blur: BlurBehind,
