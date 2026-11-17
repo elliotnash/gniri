@@ -147,7 +147,8 @@ impl<M: Model> Service<M> {
 
     /// A service fed by a running backend. Commands are predicted at once,
     /// so widgets respond without waiting for the system, and whatever the
-    /// backend reports afterwards is the truth.
+    /// backend reports afterwards is the truth. Once the backend has
+    /// stopped, commands are dropped instead, and the first one says so.
     pub fn live(
         name: &'static str,
         link: Link<M>,
@@ -185,12 +186,21 @@ impl<M: Model> Service<M> {
         });
         let send = {
             let (state, log) = (state.clone(), log.clone());
+            let told = Cell::new(false);
             move |command: M::Command| {
                 log.push(name, &command);
-                state.update(|current| current.predict(&command));
-                // The channel is unbounded; this only fails once the
-                // backend has stopped, and then there is no one to tell.
-                let _ = commands.try_send(command);
+                // The channel is unbounded: this only fails once the
+                // backend has stopped. Then nothing will happen, so the
+                // state keeps what the system last said instead of a
+                // prediction no event will ever correct.
+                if commands.try_send(command.clone()).is_ok() {
+                    state.update(|current| current.predict(&command));
+                } else if !told.replace(true) {
+                    eprintln!(
+                        "gniri: {name}: the backend has stopped; dropping {command:?} and every \
+                         command after it"
+                    );
+                }
             }
         };
         Self {

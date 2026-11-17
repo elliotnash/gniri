@@ -82,14 +82,18 @@ pub async fn run(
     commands: Receiver<Command>,
 ) -> zbus::Result<()> {
     let backlight = Backlight::find(Path::new("/sys/class/backlight"));
-    let level = backlight.as_ref().and_then(Backlight::level);
-    if events.send(Event::Level(level)).await.is_err() {
+    let level = || backlight.as_ref().and_then(Backlight::level);
+    if events.send(Event::Level(level())).await.is_err() {
         return Ok(());
     }
-    let Some(backlight) = backlight else {
-        return Ok(());
+    // Without a backlight nothing is ever set, but the backend runs on all
+    // the same: to the shell a backend that has returned has stopped, and
+    // opening the quick settings still asks this one for a Refresh.
+    let session = if backlight.is_some() {
+        Some(SessionProxy::new(&connection).await?)
+    } else {
+        None
     };
-    let session = SessionProxy::new(&connection).await?;
 
     while let Ok(mut command) = commands.recv().await {
         // A slider being dragged sends faster than the backlight follows:
@@ -99,7 +103,9 @@ pub async fn run(
                 command = newer;
             }
         }
-        if let Command::Set(level) = command {
+        if let (Command::Set(level), Some(backlight), Some(session)) =
+            (command, &backlight, &session)
+        {
             let raw = backlight.raw(level);
             if let Err(error) = session
                 .set_brightness("backlight", &backlight.name, raw)
@@ -109,7 +115,7 @@ pub async fn run(
             }
         }
         // After a set, and on Refresh: report what the kernel now says.
-        if events.send(Event::Level(backlight.level())).await.is_err() {
+        if events.send(Event::Level(level())).await.is_err() {
             break;
         }
     }

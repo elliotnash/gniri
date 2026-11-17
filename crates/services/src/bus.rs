@@ -6,22 +6,24 @@
 //!
 //! Each backend is an `async fn run(connection, events, commands)` that only
 //! returns when its channels close or the bus goes away. They all run on the
-//! same thread, interleaved; none of them blocks.
+//! same thread, interleaved; none of them blocks. A backend that panics
+//! stops alone ([`contain`]): the others on its thread go on.
 //!
 //! `DBUS_SYSTEM_BUS_ADDRESS` and `DBUS_SESSION_BUS_ADDRESS` point the
 //! connections somewhere else, which is how tests put stand-ins in place of
 //! the real services.
 
 use std::future::Future;
+use std::panic::AssertUnwindSafe;
 use std::pin::Pin;
 
 use async_channel::{Receiver, Sender};
 use std::task::{Context, Poll};
 
-use futures_lite::Stream;
 #[cfg(test)]
 use futures_lite::stream;
 use futures_lite::stream::StreamExt;
+use futures_lite::{FutureExt, Stream};
 
 use crate::model::{Link, Model};
 
@@ -63,11 +65,9 @@ impl Bus {
     {
         let (link, events, commands) = Link::new();
         self.tasks.push(Box::new(move |connection| {
-            Box::pin(async move {
-                if let Err(error) = run(connection, events, commands).await {
-                    eprintln!("gniri: {name}: {error}");
-                }
-            })
+            Box::pin(contain(name, async move {
+                run(connection, events, commands).await
+            }))
         }));
         link
     }
@@ -109,6 +109,21 @@ impl Bus {
         if let Err(error) = spawned {
             eprintln!("gniri: cannot start the {name} bus thread: {error}");
         }
+    }
+}
+
+/// Runs one backend to its end and says why it ended, if not because the
+/// shell went away.
+///
+/// A panic ends only this backend. Unwinding out of it would take the bus
+/// thread down, and every other backend on it with nothing said: the shell
+/// would go on showing their last state and sending them commands.
+async fn contain(name: &str, backend: impl Future<Output = zbus::Result<()>>) {
+    match AssertUnwindSafe(backend).catch_unwind().await {
+        Ok(Ok(())) => {}
+        Ok(Err(error)) => eprintln!("gniri: {name}: {error}"),
+        // The panic hook has printed the message and where it happened.
+        Err(_) => eprintln!("gniri: {name}: stopped after it panicked"),
     }
 }
 
@@ -169,5 +184,32 @@ mod tests {
         let mut items: Vec<i32> = futures_lite::future::block_on(merged.collect());
         items.sort_unstable();
         assert_eq!(items, [1, 2, 10, 20, 30]);
+    }
+
+    #[test]
+    fn a_backend_that_panics_stops_alone() {
+        let (sender, receiver) = async_channel::unbounded();
+        let received = std::cell::Cell::new(None);
+        let panics = contain("panics", async {
+            futures_lite::future::yield_now().await;
+            panic!("a backend's bug");
+        });
+        // Still waiting for its command when the other one panics. (A
+        // failed assertion in here would be contained too: check outside.)
+        let goes_on = contain("goes on", async {
+            received.set(receiver.recv().await.ok());
+            Ok(())
+        });
+        let sends = async move {
+            for _ in 0..3 {
+                futures_lite::future::yield_now().await;
+            }
+            sender.send("after").await.unwrap();
+        };
+        futures_lite::future::block_on(futures_lite::future::zip(
+            futures_lite::future::zip(panics, goes_on),
+            sends,
+        ));
+        assert_eq!(received.get(), Some("after"));
     }
 }

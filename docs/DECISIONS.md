@@ -370,6 +370,13 @@ These hold for every widget port that follows.
   signal stream's queue (64 messages) is full: a backend must never await a
   reply while its own signals pile up. NetworkManager and BlueZ therefore
   read all their signals from one ordered stream and make calls beside it.
+  A panic is caught per backend (`bus::contain`): uncaught, it ends the
+  thread and all seven backends on it without a word. Once, that left the
+  brightness slider moving while the backlight stayed where the idle dim
+  had left it, and no idle lock, with nothing to say which backend it was.
+  A command sent to a backend that has stopped is dropped, not predicted,
+  and the first one is reported on stderr; so a backend returns only once
+  the shell has gone, even with nothing to do (no backlight).
 - **Proxies were written by hand**, not generated with `zbus_xmlgen` as
   planned: each backend uses a handful of properties.
 - **Sound runs libpulse's plain main loop on its own thread**, woken for
