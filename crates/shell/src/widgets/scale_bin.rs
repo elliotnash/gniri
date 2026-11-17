@@ -86,17 +86,20 @@ mod imp {
                 child.size_allocate(&gtk::Allocation::new(0, 0, width, height), -1);
                 return;
             }
-            // The child at its own height, drawn scaled about the middle of
-            // what this takes up.
-            let (_, natural, _, _) = child.measure(gtk::Orientation::Vertical, width);
+            // The child at its own size, drawn scaled about the middle of
+            // what this takes up. In a column the width is the column's; in
+            // a row, where this is narrower than the child, the child's own.
             let scale = scale.max(SMALLEST);
-            let (w, h) = (f64::from(width), f64::from(natural));
-            let x = (w - w * scale) / 2.0 + shift;
+            let (_, natural_width, _, _) = child.measure(gtk::Orientation::Horizontal, -1);
+            let child_width = width.max(natural_width.min((f64::from(width) / scale) as i32));
+            let (_, natural, _, _) = child.measure(gtk::Orientation::Vertical, child_width);
+            let (w, h) = (f64::from(child_width), f64::from(natural));
+            let x = (f64::from(width) - w * scale) / 2.0 + shift;
             let y = (f64::from(height) - h * scale) / 2.0;
             let transform = gsk::Transform::new()
                 .translate(&graphene::Point::new(x as f32, y as f32))
                 .scale(scale as f32, scale as f32);
-            child.allocate(width, natural, -1, Some(transform));
+            child.allocate(child_width, natural, -1, Some(transform));
         }
     }
 }

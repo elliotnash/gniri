@@ -45,6 +45,8 @@ use gtk::{glib, graphene};
 use super::icon::{self, DashButton};
 use super::layout::{self, DashMetrics};
 use crate::services::Services;
+use crate::widgets::motion::Eased;
+use crate::widgets::scale_bin::ScaleBin;
 
 /// The dash's own lengths in the theme (crates/theme/scss/widgets/_dash.scss),
 /// which `Dash._adjustIconSize` reads from the theme nodes.
@@ -73,12 +75,20 @@ const HOVER_TIMEOUT: Duration = Duration::from_millis(300);
 /// long.
 const LABEL_HIDE_TIME: Duration = Duration::from_millis(100);
 
+/// dash.js `DASH_ANIMATION_TIME`: an item grows in and shrinks away this
+/// fast.
+const DASH_ANIMATION_TIME: u32 = 200;
+
 /// One application's item.
 struct Item {
     /// What it shows; rebuilt when this changes.
     shown: (String, String, Option<String>),
     container: gtk::Box,
     button: DashButton,
+    /// What the row holds: the container, scaled as it comes and goes
+    /// (`DashItemContainer`'s scale).
+    bin: ScaleBin,
+    scale: Rc<Eased>,
 }
 
 struct Inner {
@@ -274,9 +284,7 @@ impl Inner {
         // After the item that comes before it, the separator not counted.
         let items = self.items.borrow();
         match position.checked_sub(1).and_then(|before| items.get(before)) {
-            Some(before) => self
-                .apps
-                .insert_child_after(&holder, Some(&before.container)),
+            Some(before) => self.apps.insert_child_after(&holder, Some(&before.bin)),
             None => self.apps.prepend(&holder),
         }
         drop(items);
@@ -297,27 +305,55 @@ impl Inner {
                 .iter()
                 .zip(&wanted)
                 .all(|(item, wanted)| item.shown == shown(wanted));
+        let mut grown = Vec::new();
+        let mut gone = Vec::new();
         if !unchanged {
             // The item a name shows over may be about to go.
             self.hide_label();
             let mut old: Vec<Item> = std::mem::take(&mut items);
-            for item in &old {
-                self.apps.remove(&item.container);
+            // The row as it is, with what is shrinking away.
+            let mut children = Vec::new();
+            let mut child = self.apps.first_child();
+            while let Some(widget) = child {
+                child = widget.next_sibling();
+                children.push(widget);
             }
-            if self.separator.parent().is_some() {
-                self.apps.remove(&self.separator);
-            }
+            let mut row: Vec<gtk::Widget> = Vec::new();
             for (index, wanted) in wanted.iter().enumerate() {
                 if index == dash.favorites.len() {
-                    self.apps.append(&self.separator);
+                    row.push(self.separator.clone().upcast());
                 }
                 let item = match old.iter().position(|item| item.shown == shown(wanted)) {
                     Some(index) => old.swap_remove(index),
-                    None => self.build_item(wanted),
+                    None => {
+                        let item = self.build_item(wanted);
+                        grown.push(Rc::clone(&item.scale));
+                        item
+                    }
                 };
-                self.apps.append(&item.container);
+                row.push(item.bin.clone().upcast());
                 items.push(item);
             }
+            // `animateOutAndDestroy`: what went shrinks away where it was.
+            for (index, widget) in children.iter().enumerate() {
+                let separator = widget == self.separator.upcast_ref::<gtk::Widget>();
+                if !separator && !row.contains(widget) {
+                    row.insert(index.min(row.len()), widget.clone());
+                }
+            }
+            if self.separator.parent().is_some() && !row.contains(self.separator.upcast_ref()) {
+                self.apps.remove(&self.separator);
+            }
+            let mut previous: Option<gtk::Widget> = None;
+            for widget in &row {
+                if widget.parent().is_none() {
+                    self.apps.insert_child_after(widget, previous.as_ref());
+                } else {
+                    self.apps.reorder_child_after(widget, previous.as_ref());
+                }
+                previous = Some(widget.clone());
+            }
+            gone = old;
             self.favorites.set(dash.favorites.len());
         }
         // The separator only shows between two parts that both have
@@ -328,6 +364,24 @@ impl Inner {
             item.button.set_running(wanted.running());
         }
         drop(items);
+        for scale in grown {
+            scale.ease(1.0, DASH_ANIMATION_TIME, adw::Easing::EaseOutQuad, || {});
+        }
+        for item in gone {
+            let (apps, bin) = (self.apps.downgrade(), item.bin.clone());
+            item.scale.ease(
+                0.0,
+                DASH_ANIMATION_TIME,
+                adw::Easing::EaseOutQuad,
+                move || {
+                    if let Some(apps) = apps.upgrade()
+                        && bin.parent().as_ref() == Some(apps.upcast_ref())
+                    {
+                        apps.remove(&bin);
+                    }
+                },
+            );
+        }
         if !unchanged {
             // More or fewer items may want another icon size.
             let (width, height) = self.sized_for.get();
@@ -358,10 +412,24 @@ impl Inner {
         });
         let container = container(&button.button);
         self.hook_label(&container, &button.button, &item.name);
+        let bin = ScaleBin::new(&container);
+        bin.set_scale(0.0);
+        bin.set_opacity(0.0);
+        let scale = Rc::new(Eased::new(&bin, 0.0, {
+            let bin = bin.downgrade();
+            move |scale| {
+                if let Some(bin) = bin.upgrade() {
+                    bin.set_scale(scale);
+                    bin.set_opacity(scale);
+                }
+            }
+        }));
         Item {
             shown: (item.id.clone(), item.name.clone(), item.icon.clone()),
             container,
             button,
+            bin,
+            scale,
         }
     }
 

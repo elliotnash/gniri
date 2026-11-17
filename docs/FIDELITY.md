@@ -348,8 +348,8 @@ search results to it and takes none of niri's own away.
   "Pin to Dash", "New Window" or "Quit", no list of its windows.
 - **Dragging** works as in GNOME: to the dash to pin, within it, onto the
   apps button to unpin ("Unpin"). Applications cannot be dragged from
-  the search results, nor onto a workspace to open there. An item makes
-  room and is moved at once where GNOME's grow and shrink.
+  the search results, nor onto a workspace to open there. The room made
+  for a dragged item opens at once, where GNOME's grows.
 - **A click** on an application that runs goes to the window of its that
   was used last. GNOME shows all its windows when there are several, and
   starts a new one on a middle click or with Ctrl held.
@@ -361,9 +361,9 @@ search results to it and takes none of niri's own away.
   icon.
 - **The order of the running applications** that are no favourites is the
   order their first windows opened in.
-- **Items come and go at once**; GNOME's grow in and shrink away. A
-  starting application shows no spinner on its icon, and its icon does
-  not zoom out as it starts.
+- **Items grow in and shrink away** as GNOME's do. A starting application
+  shows no spinner on its icon, and its icon does not zoom out as it
+  starts.
 - **The name over an item** is built from GNOME's stylesheet and source;
   the capture has none to compare with.
 
