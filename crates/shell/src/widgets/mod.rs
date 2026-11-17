@@ -7,5 +7,6 @@ pub mod level;
 pub mod motion;
 pub mod password_entry;
 pub mod picture;
+pub mod scale_bin;
 pub mod slider;
 pub mod square;

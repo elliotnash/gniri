@@ -164,6 +164,22 @@ A scene that `extends` another adds to its fixture service by service:
 scene's applications are in name order unless it gives an arrangement;
 the real shell starts from GNOME's.
 
+### Watching things move
+
+A scene's shell shows the end of every animation at once, so that a
+screenshot never catches one half way. A fixture with `animations = true`
+lets them run: the `motion` scene is the date menu's with that, for
+`cargo xtask nest --scene motion` and screenshots taken in a quick
+succession (`niri msg action screenshot-screen`).
+
+A nested niri draws only when its host shows its window: behind the host's
+lock screen, or with its screens off, every animation stands still until
+something asks for a frame. A headless mutter is a host that always draws:
+
+    dbus-run-session -- mutter --headless --wayland --no-x11 \
+        --virtual-monitor 1280x800 --wayland-display gniri-host &
+    env -u NIRI_SOCKET WAYLAND_DISPLAY=gniri-host cargo xtask nest --scene motion
+
 ### The lock screen and the dialogs
 
 The lock screen and the polkit agent are processes of their own. A scene

@@ -193,11 +193,15 @@ BlueZ's agent all the time.
 - **GTK's own interface.** GNOME Shell also serves `org.gtk.Notifications`.
   gniri does not; GTK applications then use the standard interface, which
   cannot say "high priority", only normal or critical.
-- **Animations in the list.** Messages appear, leave and move at once, Clear
-  does not sweep them out one after another, and a group opens and closes
-  at once. While a group is open GNOME fades the rest of the list by
-  distance from it; gniri dims the rest evenly. A long list has no fade at
-  its top and bottom edges.
+- **Animations in the list.** As in GNOME, an application's group or a
+  player's card grows in when it comes and shrinks away when it goes,
+  Clear slides the groups out one after another first, and a group's cards
+  move apart under its heading as it opens and together as it closes. A
+  notification that joins or leaves a group that is already there does so
+  at once, and a group that moves up the list jumps there; GNOME shrinks
+  and grows those. While a group is open GNOME fades the rest of the list
+  by distance from it; gniri dims the rest evenly. A long list has no fade
+  at its top and bottom edges.
 - **Links.** GNOME underlines web addresses in a notification's text and
   opens them on a click. gniri shows them as plain text.
 - **Keyboard.** A banner cannot be given the keyboard focus (GNOME:

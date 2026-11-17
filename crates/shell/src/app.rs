@@ -161,7 +161,9 @@ pub fn run_helper(
                 return;
             }
             if fixture.is_some() {
-                if let Some(settings) = gtk::Settings::default() {
+                if !fixture.as_ref().is_some_and(|fixture| fixture.animations)
+                    && let Some(settings) = gtk::Settings::default()
+                {
                     settings.set_gtk_enable_animations(false);
                 }
                 // Only a scene's process can be looked into: the real lock
@@ -374,7 +376,7 @@ fn activate(
 
     // A fixture is for reproducible screenshots: nothing may be half way
     // through an animation when one is taken.
-    if fixture.is_some()
+    if fixture.as_ref().is_some_and(|fixture| !fixture.animations)
         && let Some(settings) = gtk::Settings::default()
     {
         settings.set_gtk_enable_animations(false);

@@ -10,9 +10,10 @@
 //     box.message-list-placeholder                 .message-list-placeholder
 //     scrolledwindow
 //       box.message-view                           .message-view
-//         GniriMessageGroup.message-notification-group
-//           box.message-group-header                 .message-group-header
-//           box.message                              .message
+//         widget (GniriScaleBin: what grows and shrinks)
+//           GniriMessageGroup.message-notification-group
+//             box.message-group-header               .message-group-header
+//             box.message                            .message
 //     box.message-list-controls                    .message-list-controls
 //       button.message-list-clear-button.button
 //
@@ -75,8 +76,9 @@ $message_animation_time: 100ms;
 
     // `MessageView._highlightGroup`: while a group is open the rest of the
     // list fades back. GNOME fades it by distance from the group; here it
-    // is one level.
-    > .message-notification-group {
+    // is one level. Players' cards too.
+    .message-notification-group,
+    .message.media-message {
         transition: opacity $message_animation_time $ease_out_quad;
 
         &.shaded { opacity: 0.4; }

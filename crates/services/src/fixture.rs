@@ -57,6 +57,9 @@ pub struct Fixture {
     pub network_agent: network::agent::State,
     /// What the Bluetooth pairing agent is asking.
     pub bluetooth_agent: bluetooth::agent::State,
+    /// Let things move, for looking at how. A scene's shell otherwise
+    /// shows every animation's end at once, as screenshots need.
+    pub animations: bool,
 }
 
 /// The lock screen of a scene.

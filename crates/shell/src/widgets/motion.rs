@@ -35,15 +35,6 @@ impl Eased {
         self.value.get()
     }
 
-    /// Where it is going: where it is, unless it is on its way.
-    pub fn target(&self) -> f64 {
-        self.animation
-            .borrow()
-            .as_ref()
-            .filter(|animation| animation.state() == adw::AnimationState::Playing)
-            .map_or(self.value.get(), adw::TimedAnimation::value_to)
-    }
-
     fn stop(&self) {
         if let Some(animation) = self.animation.borrow_mut().take() {
             animation.pause();

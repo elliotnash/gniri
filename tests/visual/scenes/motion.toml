@@ -1,0 +1,8 @@
+# The date menu's scene with animations on, for watching things move: the
+# shell of any other scene shows the end of every animation at once, as
+# screenshots need. Not compared with anything.
+
+extends = "date-menu"
+
+[fixture]
+animations = true

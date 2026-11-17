@@ -5,13 +5,14 @@
 //! `js/ui/messageList.js` and `CalendarMessageList` in `js/ui/calendar.js`.
 
 use gniri_core::tr;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::rc::{Rc, Weak};
 
 use gniri_core::Subscription;
 use gniri_services::mpris::{self, Player};
 use gniri_services::notifications::{self, Command};
+use gtk::glib;
 use gtk::prelude::*;
 
 use super::group::MessageGroup;
@@ -19,6 +20,8 @@ use super::media::MediaCard;
 use super::message::Message;
 use super::{notification_message, show_notification};
 use crate::services::Services;
+use crate::widgets::motion::Eased;
+use crate::widgets::scale_bin::ScaleBin;
 
 struct Group {
     widget: MessageGroup,
@@ -27,10 +30,32 @@ struct Group {
     messages: HashMap<u32, Message>,
 }
 
+/// messageList.js `MESSAGE_ANIMATION_TIME`
+const MESSAGE_ANIMATION_TIME: u32 = 100;
+
+/// One of the view's items, a group or a player's card, in the bin it
+/// grows and shrinks in (`MessageView._addMessageAtIndex`).
+struct Item {
+    /// The group's widget or the card's root.
+    widget: gtk::Widget,
+    bin: ScaleBin,
+    scale: Rc<Eased>,
+    /// Clear's sweep: 0 in place, 1 gone to the right, faded out.
+    sweep: Rc<Eased>,
+    /// Shrinking away; it goes once it has.
+    leaving: Cell<bool>,
+    /// A notification group, which Clear takes, rather than a player.
+    closable: bool,
+}
+
 struct Inner {
     services: Rc<Services>,
     /// `.message-view`
     view: gtk::Box,
+    /// The view's children, those shrinking away included, in order.
+    items: RefCell<Vec<Rc<Item>>>,
+    /// Clear is sweeping the groups out.
+    clearing: Cell<bool>,
     placeholder: gtk::Box,
     clear: gtk::Button,
     /// By source key.
@@ -87,6 +112,113 @@ fn media_card(inner: &Rc<Inner>, bus_name: &str) -> MediaCard {
 }
 
 impl Inner {
+    /// A bin for `widget`, growing in.
+    fn new_item(self: &Rc<Self>, widget: &gtk::Widget, closable: bool) -> Rc<Item> {
+        let bin = ScaleBin::new(widget);
+        bin.set_scale(0.0);
+        let scale = Rc::new(Eased::new(&bin, 0.0, {
+            let bin = bin.downgrade();
+            move |scale| {
+                if let Some(bin) = bin.upgrade() {
+                    bin.set_scale(scale);
+                }
+            }
+        }));
+        let sweep = Rc::new(Eased::new(&bin, 0.0, {
+            let bin = bin.downgrade();
+            move |sweep| {
+                if let Some(bin) = bin.upgrade() {
+                    bin.set_shift(sweep * f64::from(bin.width()));
+                    bin.set_opacity(1.0 - sweep);
+                }
+            }
+        }));
+        Rc::new(Item {
+            widget: widget.clone(),
+            bin,
+            scale,
+            sweep,
+            leaving: Cell::new(false),
+            closable,
+        })
+    }
+
+    /// `MessageView._removeMessage`: shrinks `item` away, then lets it go.
+    fn remove_item(self: &Rc<Self>, item: &Rc<Item>) {
+        item.leaving.set(true);
+        let (inner, gone) = (Rc::downgrade(self), Rc::downgrade(item));
+        item.scale.ease(
+            0.0,
+            MESSAGE_ANIMATION_TIME,
+            adw::Easing::EaseOutQuad,
+            move || {
+                // Not from inside a sync, which may have started this.
+                glib::idle_add_local_once(move || {
+                    let (Some(inner), Some(gone)) = (inner.upgrade(), gone.upgrade()) else {
+                        return;
+                    };
+                    inner
+                        .items
+                        .borrow_mut()
+                        .retain(|item| !Rc::ptr_eq(item, &gone));
+                    if gone.bin.parent().is_some() {
+                        inner.view.remove(&gone.bin);
+                    }
+                    gone.bin.take_child();
+                });
+            },
+        );
+    }
+
+    /// `MessageView.clear`: one or no group goes as any would; more slide
+    /// out to the right one after another first.
+    fn clear(self: &Rc<Self>) {
+        if self.clearing.get() {
+            return;
+        }
+        let swept: Vec<Rc<Item>> = self
+            .items
+            .borrow()
+            .iter()
+            .filter(|item| item.closable && !item.leaving.get())
+            .cloned()
+            .collect();
+        if swept.len() < 2 {
+            self.services.notifications.send(Command::Clear);
+            return;
+        }
+        self.clearing.set(true);
+        // "MESSAGE_ANIMATION_TIME / Math.max(messages.length, 5)"
+        let delay = MESSAGE_ANIMATION_TIME / swept.len().max(5) as u32;
+        let last = swept.len() - 1;
+        for (index, item) in swept.into_iter().enumerate() {
+            let inner = Rc::downgrade(self);
+            let start = move || {
+                item.sweep.ease(
+                    1.0,
+                    MESSAGE_ANIMATION_TIME,
+                    adw::Easing::EaseOutQuad,
+                    move || {
+                        if index == last
+                            && let Some(inner) = inner.upgrade()
+                        {
+                            inner.clearing.set(false);
+                            inner.services.notifications.send(Command::Clear);
+                        }
+                    },
+                );
+            };
+            if index == 0 {
+                start();
+            } else {
+                glib::timeout_add_local_once(
+                    std::time::Duration::from_millis(u64::from(delay) * index as u64),
+                    start,
+                );
+            }
+        }
+    }
+
     fn build_group(self: &Rc<Self>, key: &str) -> Group {
         let title = gtk::Label::builder()
             .css_classes(["message-group-title"])
@@ -171,7 +303,7 @@ impl Inner {
     fn sync(self: &Rc<Self>) {
         let services = &self.services;
         let now = services.time.get();
-        let mut wanted: Vec<gtk::Widget> = Vec::new();
+        let mut wanted: Vec<(gtk::Widget, bool)> = Vec::new();
 
         // `MessageView._addPlayer`: players come first.
         let shown: Vec<Player> = services
@@ -186,7 +318,7 @@ impl Inner {
                     .entry(player.bus_name.clone())
                     .or_insert_with(|| media_card(self, &player.bus_name));
                 card.update(player);
-                wanted.push(card.message.root().clone().upcast());
+                wanted.push((card.message.root().clone().upcast(), false));
             }
         }
 
@@ -229,7 +361,7 @@ impl Inner {
                     cards.push(message.root().clone().upcast());
                 }
                 group.widget.set_messages(&cards);
-                wanted.push(group.widget.clone().upcast());
+                wanted.push((group.widget.clone().upcast(), true));
             }
         }
 
@@ -247,20 +379,50 @@ impl Inner {
         }
         self.apply_expanded();
 
-        // Put the view's children in the wanted order.
-        let mut current = Vec::new();
-        let mut child = self.view.first_child();
-        while let Some(widget) = child {
-            child = widget.next_sibling();
-            current.push(widget);
+        // Each wanted widget in its bin, new ones growing in; what is no
+        // longer wanted shrinks away where it was.
+        let old: Vec<Rc<Item>> = self.items.borrow().clone();
+        let mut row: Vec<Rc<Item>> = Vec::new();
+        let mut grown = Vec::new();
+        for (widget, closable) in &wanted {
+            match old
+                .iter()
+                .find(|item| item.widget == *widget && !item.leaving.get())
+            {
+                Some(item) => row.push(Rc::clone(item)),
+                None => {
+                    let item = self.new_item(widget, *closable);
+                    grown.push(Rc::clone(&item));
+                    row.push(item);
+                }
+            }
         }
-        if current != wanted {
-            for widget in &current {
-                self.view.remove(widget);
+        let gone: Vec<Rc<Item>> = old
+            .iter()
+            .filter(|item| !item.leaving.get() && !row.iter().any(|kept| Rc::ptr_eq(kept, item)))
+            .cloned()
+            .collect();
+        for (index, item) in old.iter().enumerate() {
+            if !row.iter().any(|kept| Rc::ptr_eq(kept, item)) {
+                row.insert(index.min(row.len()), Rc::clone(item));
             }
-            for widget in &wanted {
-                self.view.append(widget);
+        }
+        let mut previous: Option<gtk::Widget> = None;
+        for item in &row {
+            if item.bin.parent().is_none() {
+                self.view.insert_child_after(&item.bin, previous.as_ref());
+            } else {
+                self.view.reorder_child_after(&item.bin, previous.as_ref());
             }
+            previous = Some(item.bin.clone().upcast());
+        }
+        *self.items.borrow_mut() = row;
+        for item in grown {
+            item.scale
+                .ease(1.0, MESSAGE_ANIMATION_TIME, adw::Easing::EaseOutQuad, || {});
+        }
+        for item in &gone {
+            self.remove_item(item);
         }
 
         // `CalendarMessageList`: the placeholder instead of an empty list,
@@ -302,10 +464,7 @@ impl MessageList {
             .halign(gtk::Align::Start)
             .child(&gtk::Label::new(Some(&tr("Clear"))))
             .build();
-        clear.connect_clicked({
-            let services = Rc::clone(services);
-            move |_| services.notifications.send(Command::Clear)
-        });
+
         let controls = gtk::Box::builder()
             .css_classes(["message-list-controls"])
             .build();
@@ -337,6 +496,16 @@ impl MessageList {
             groups: RefCell::default(),
             players: RefCell::default(),
             radius,
+            items: RefCell::default(),
+            clearing: Cell::new(false),
+        });
+        inner.clear.connect_clicked({
+            let inner = Rc::downgrade(&inner);
+            move |_| {
+                if let Some(inner) = inner.upgrade() {
+                    inner.clear();
+                }
+            }
         });
 
         let sync = |inner: &Rc<Inner>| {

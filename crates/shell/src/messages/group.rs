@@ -24,6 +24,8 @@ const HEIGHT_OFFSET_STACKED: f64 = 10.0;
 const HEIGHT_OFFSET_REDUCTION_STACKED: f64 = 1.4;
 /// messageList.js `ADDITIONAL_BOTTOM_MARGIN_EXPANDED_GROUP`.
 const ADDITIONAL_BOTTOM_MARGIN_EXPANDED_GROUP: i32 = 15;
+/// messageList.js `GROUP_EXPENSION_TIME`
+const GROUP_EXPANSION_TIME: u32 = 200;
 
 mod imp {
     use super::*;
@@ -35,6 +37,10 @@ mod imp {
         /// Top first.
         pub(super) messages: RefCell<Vec<gtk::Widget>>,
         pub(super) expanded: Cell<bool>,
+        /// `MessageGroupExpanderLayout.expansion`: 0 a stack, 1 open, and
+        /// between while it opens or closes.
+        pub(super) expansion: Cell<f64>,
+        pub(super) easing: RefCell<Option<crate::widgets::motion::Eased>>,
         /// Corner radius of a card, for cutting the cards under it to
         /// shape.
         pub(super) radius: Cell<f32>,
@@ -69,6 +75,80 @@ mod imp {
             !self.expanded.get() && self.messages.borrow().len() > 1
         }
 
+        /// Cards may overlap: a stack, or one opening or closing.
+        fn overlapping(&self) -> bool {
+            self.messages.borrow().len() > 1 && (self.stacked() || self.expansion.get() < 1.0)
+        }
+
+        /// The stack's height, and the open group's.
+        fn heights(&self, for_size: i32) -> ((i32, i32), (i32, i32)) {
+            let messages = self.messages.borrow();
+            let stacked = match messages.first() {
+                Some(top) => {
+                    let (min, natural) = height(top, for_size);
+                    let under: i32 = Self::stack_offsets(messages.len()).iter().sum();
+                    (min + under, natural + under)
+                }
+                None => (0, 0),
+            };
+            let (mut min, mut natural) = (
+                ADDITIONAL_BOTTOM_MARGIN_EXPANDED_GROUP,
+                ADDITIONAL_BOTTOM_MARGIN_EXPANDED_GROUP,
+            );
+            let header = self.header.borrow();
+            for child in header.iter().chain(messages.iter()) {
+                let (child_min, child_natural) = height(child, for_size);
+                min += child_min;
+                natural += child_natural;
+            }
+            (stacked, (min, natural))
+        }
+
+        /// `MessageGroupExpanderLayout.vfunc_allocate` part way open.
+        fn allocate_between(&self, width: i32, height_limit: i32, expansion: f64) {
+            let messages = self.messages.borrow();
+            let mut y = 0.0;
+            if let Some(header) = &*self.header.borrow()
+                && header.is_visible()
+            {
+                let (header_height, _) = height(header, width);
+                header.size_allocate(&gtk::Allocation::new(0, 0, width, header_height), -1);
+                y = expansion * f64::from(header_height);
+            }
+            let Some(top) = messages.first() else {
+                return;
+            };
+            let (top_height, _) = height(top, width);
+            top.size_allocate(
+                &gtk::Allocation::new(0, y.round() as i32, width, top_height),
+                -1,
+            );
+            let (mut bottom, mut inset) = (y + f64::from(top_height), 0.0);
+            let mut offset = HEIGHT_OFFSET_STACKED;
+            let limit = f64::from(height_limit);
+            for message in &messages[1..] {
+                inset += (1.0 - expansion) * f64::from(WIDTH_OFFSET_STACKED);
+                let child_width = (f64::from(width) - 2.0 * inset).max(0.0).round() as i32;
+                let (child_height, _) = height(message, child_width);
+                // "Stack children with a small reveal when collapsed"
+                bottom += offset + expansion * (f64::from(child_height) - offset);
+                if bottom > limit {
+                    bottom = limit;
+                } else {
+                    offset /= HEIGHT_OFFSET_REDUCTION_STACKED;
+                }
+                message.size_allocate(
+                    &gtk::Allocation::new(
+                        inset.round() as i32,
+                        (bottom - f64::from(child_height)).round() as i32,
+                        child_width,
+                        child_height,
+                    ),
+                    -1,
+                );
+            }
+        }
+
         /// How far the bottom edge of each card under the first lies below
         /// the one above it, whole pixels as St would place them.
         fn stack_offsets(count: usize) -> Vec<i32> {
@@ -99,32 +179,29 @@ mod imp {
                 });
                 return (min, natural, -1, -1);
             }
-            if self.expanded.get() {
-                let (mut min, mut natural) = (
-                    ADDITIONAL_BOTTOM_MARGIN_EXPANDED_GROUP,
-                    ADDITIONAL_BOTTOM_MARGIN_EXPANDED_GROUP,
-                );
-                let header = self.header.borrow();
-                for child in header.iter().chain(messages.iter()) {
-                    let (child_min, child_natural) = height(child, for_size);
-                    min += child_min;
-                    natural += child_natural;
-                }
-                (min, natural, -1, -1)
-            } else {
-                let Some(top) = messages.first() else {
-                    return (0, 0, -1, -1);
-                };
-                let (min, natural) = height(top, for_size);
-                let under: i32 = Self::stack_offsets(messages.len()).iter().sum();
-                (min + under, natural + under, -1, -1)
-            }
+            drop(messages);
+            let ((stacked_min, stacked_natural), (open_min, open_natural)) = self.heights(for_size);
+            let expansion = self.expansion.get();
+            let between = |stacked: i32, open: i32| {
+                (f64::from(stacked) + expansion * f64::from(open - stacked)).round() as i32
+            };
+            (
+                between(stacked_min, open_min),
+                between(stacked_natural, open_natural),
+                -1,
+                -1,
+            )
         }
 
-        fn size_allocate(&self, width: i32, _height: i32, _baseline: i32) {
+        fn size_allocate(&self, width: i32, height_limit: i32, _baseline: i32) {
+            let expansion = self.expansion.get();
+            if expansion > 0.0 && expansion < 1.0 {
+                self.allocate_between(width, height_limit, expansion);
+                return;
+            }
             let messages = self.messages.borrow();
             let header = self.header.borrow();
-            if self.expanded.get() {
+            if expansion >= 1.0 {
                 let mut y = 0;
                 for child in header.iter().chain(messages.iter()) {
                     let (child_height, _) = height(child, width);
@@ -157,7 +234,7 @@ mod imp {
         fn snapshot(&self, snapshot: &gtk::Snapshot) {
             let widget = self.obj();
             let messages = self.messages.borrow();
-            if !self.stacked() {
+            if !self.overlapping() {
                 if let Some(header) = &*self.header.borrow() {
                     widget.snapshot_child(header, snapshot);
                 }
@@ -171,7 +248,18 @@ mod imp {
             // does not cover it. The cards are translucent, so the one
             // above cannot simply be painted over it: its shape is cut out
             // of the one below instead, as blur-my-shell does.
-            let shown = messages.len().min(MAX_VISIBLE_STACKED_MESSAGES);
+            // A stack shows three; a group on its way open or closed, all
+            // it shows.
+            if let Some(header) = &*self.header.borrow()
+                && header.is_visible()
+            {
+                widget.snapshot_child(header, snapshot);
+            }
+            let shown = if self.stacked() {
+                messages.len().min(MAX_VISIBLE_STACKED_MESSAGES)
+            } else {
+                messages.len()
+            };
             let bounds = |child: &gtk::Widget| child.compute_bounds(&*widget);
             let top_edge = bounds(&messages[0]).map_or(0.0, |top| top.y());
             let below_top = graphene::Rect::new(
@@ -254,18 +342,38 @@ impl MessageGroup {
         self.imp().stacked()
     }
 
-    /// `NotificationMessageGroup.expand` and `collapse`, without the
-    /// animation.
+    /// `NotificationMessageGroup.expand` and `collapse`: the cards move
+    /// apart under the heading, or together, which then goes.
     pub fn set_expanded(&self, expanded: bool) {
         let imp = self.imp();
         if imp.expanded.replace(expanded) == expanded {
             return;
         }
-        if let Some(header) = &*imp.header.borrow() {
-            header.set_visible(expanded);
+        let header = imp.header.borrow().clone();
+        if expanded && let Some(header) = &header {
+            header.set_visible(true);
         }
         self.update_stack();
-        self.queue_resize();
+        let mut easing = imp.easing.borrow_mut();
+        let easing = easing.get_or_insert_with(|| {
+            let group = self.downgrade();
+            crate::widgets::motion::Eased::new(self, imp.expansion.get(), move |expansion| {
+                if let Some(group) = group.upgrade() {
+                    group.imp().expansion.set(expansion);
+                    group.queue_resize();
+                }
+            })
+        });
+        easing.ease(
+            if expanded { 1.0 } else { 0.0 },
+            GROUP_EXPANSION_TIME,
+            adw::Easing::EaseOutQuad,
+            move || {
+                if !expanded && let Some(header) = &header {
+                    header.set_visible(false);
+                }
+            },
+        );
     }
 
     /// `_updateStackedMessagesFade`: marks the cards under the first of a
