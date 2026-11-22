@@ -13,6 +13,7 @@ pub mod auth;
 pub mod bluetooth;
 pub mod brightness;
 pub mod bus;
+pub mod capture;
 pub mod desktop_entry;
 pub mod events;
 pub mod fixture;
