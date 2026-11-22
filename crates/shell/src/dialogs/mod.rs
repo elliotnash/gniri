@@ -6,7 +6,8 @@
 //! A dialog has a surface of its own, on the overlay layer, mapped only
 //! while the dialog is open. The shade and the dialog are both blurred
 //! (docs/DECISIONS.md, M4), and the surface takes the keyboard, as GNOME's
-//! modal grab does.
+//! modal grab does. A dialog fades out as a picture of the screen, which
+//! takes the blur along ([`Frosted`]).
 
 pub mod auth;
 pub mod end_session;
@@ -26,6 +27,7 @@ use gtk4_layer_shell::{KeyboardMode, Layer, LayerShell};
 
 use crate::services::Services;
 use crate::surfaces::layer::{self, Anchor, Zone};
+use crate::widgets::frosted::{self, Frosted};
 
 /// modalDialog.js `OPEN_AND_CLOSE_TIME`. The theme's transition on
 /// `.modal-dialog-lightbox` lasts as long.
@@ -51,7 +53,7 @@ pub fn monitor(output: Option<&str>) -> Option<gdk::Monitor> {
 pub struct Modal {
     pub window: gtk::ApplicationWindow,
     /// The shade, which fades in and out with the dialog on it.
-    lightbox: gtk::Box,
+    lightbox: Frosted,
     /// `Dialog.contentLayout`
     pub content: gtk::Box,
     /// `Dialog.buttonLayout`
@@ -97,11 +99,10 @@ impl Modal {
         dialog.append(&content);
         dialog.append(&buttons);
 
-        let lightbox = gtk::Box::builder()
-            .css_classes(["modal-dialog-lightbox"])
-            .build();
+        let lightbox = Frosted::new(&["modal-dialog-lightbox"]);
         lightbox.append(&dialog);
         window.set_child(Some(&lightbox));
+        frosted::prepare();
 
         Self {
             window,
@@ -149,7 +150,7 @@ impl Modal {
             let (lightbox, closed) = (self.lightbox.clone(), Rc::clone(&self.closed));
             move || {
                 if !closed.get() {
-                    lightbox.add_css_class("open");
+                    lightbox.open();
                 }
             }
         });
@@ -160,15 +161,22 @@ impl Modal {
         if self.closed.replace(true) {
             return;
         }
-        self.lightbox.remove_css_class("open");
-        let window = self.window.clone();
-        let animated =
-            gtk::Settings::default().is_some_and(|settings| settings.is_gtk_enable_animations());
-        if animated {
-            glib::timeout_add_local_once(OPEN_AND_CLOSE_TIME, move || window.destroy());
-        } else {
-            window.destroy();
-        }
+        // The shade covers its output, and so does the picture: the
+        // whole screen as it was, blurred where the shade blurred it.
+        self.lightbox
+            .shoot(frosted::Place::Fill, OPEN_AND_CLOSE_TIME, {
+                let (lightbox, window) = (self.lightbox.clone(), self.window.clone());
+                move |shot| {
+                    lightbox.close(shot);
+                    let animated = gtk::Settings::default()
+                        .is_some_and(|settings| settings.is_gtk_enable_animations());
+                    if animated {
+                        glib::timeout_add_local_once(OPEN_AND_CLOSE_TIME, move || window.destroy());
+                    } else {
+                        window.destroy();
+                    }
+                }
+            });
     }
 }
 

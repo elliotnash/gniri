@@ -272,14 +272,24 @@ impl Outputs {
             .map(|source| wallpaper::build(&self.app, monitor, source))
     }
 
-    fn build_stage(&self, monitor: &gdk::Monitor, panel: Option<&Panel>) -> Stage {
+    /// Says how high `panel` is whenever it is asked, 0 without one.
+    fn panel_height(panel: Option<&Panel>) -> impl Fn() -> i32 + 'static {
         let panel_window = panel.map(|panel| panel.window.downgrade());
-        stage::build(&self.app, monitor, &self.services, move || {
+        move || {
             panel_window
                 .as_ref()
                 .and_then(|window| window.upgrade())
                 .map_or(0, |window| window.height())
-        })
+        }
+    }
+
+    fn build_stage(&self, monitor: &gdk::Monitor, panel: Option<&Panel>) -> Stage {
+        stage::build(
+            &self.app,
+            monitor,
+            &self.services,
+            Self::panel_height(panel),
+        )
     }
 
     /// The dash and the search belong with the panel: an output without
@@ -313,7 +323,7 @@ impl Outputs {
             .then(|| panel::build(&self.app, &monitor, &self.services));
         let stage = self.build_stage(&monitor, panel.as_ref());
         let osd = osd::build(&self.app, &monitor);
-        let banner = banner::build(&self.app, &monitor);
+        let banner = banner::build(&self.app, &monitor, Self::panel_height(panel.as_ref()));
         let overview = self.build_overview(&monitor, wallpaper.as_ref(), panel.as_ref());
         Output {
             monitor,

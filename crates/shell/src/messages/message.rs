@@ -10,6 +10,7 @@ use gniri_services::notifications::{Action, Image, markup};
 use gtk::prelude::*;
 use gtk::{gdk, glib, pango};
 
+use crate::widgets::frosted::Frosted;
 use crate::widgets::picture;
 
 /// messageList.js `DEFAULT_EXPAND_LINES`.
@@ -162,12 +163,13 @@ impl Message {
             .visible(false)
             .build();
 
-        let root = gtk::Box::builder()
-            .orientation(gtk::Orientation::Vertical)
-            .css_classes(["message"])
-            .hexpand(true)
-            .focusable(true)
-            .build();
+        // A message that is a banner is blurred behind, and fades out
+        // with its blur.
+        let root = Frosted::new(&["message"]);
+        root.set_orientation(gtk::Orientation::Vertical);
+        root.set_hexpand(true);
+        root.set_focusable(true);
+        let root: gtk::Box = root.upcast();
         root.append(&header);
         root.append(&message_box);
         root.append(&action_bin);

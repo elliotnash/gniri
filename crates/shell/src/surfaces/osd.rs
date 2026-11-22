@@ -4,7 +4,8 @@
 //! `js/ui/osdWindow.js`.
 //!
 //! A small overlay surface at the bottom centre of each output, mapped only
-//! while it shows something.
+//! while it shows something. It fades out as a picture of itself, which
+//! takes the blur behind it along ([`Frosted`]).
 
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
@@ -14,6 +15,7 @@ use adw::prelude::*;
 use gtk::{cairo, gdk, glib};
 use gtk4_layer_shell::{Edge, KeyboardMode, Layer, LayerShell};
 
+use crate::widgets::frosted::{self, Frosted, Place, Shot};
 use crate::widgets::level::{Colours, LevelBar, token_colour};
 
 /// osdWindow.js `HIDE_TIMEOUT`.
@@ -37,7 +39,7 @@ pub struct Content {
 
 struct Inner {
     window: gtk::ApplicationWindow,
-    bubble: gtk::Box,
+    bubble: Frosted,
     icon: gtk::Image,
     label: gtk::Label,
     level: LevelBar,
@@ -80,10 +82,12 @@ pub fn build(app: &adw::Application, monitor: &gdk::Monitor) -> Osd {
     column.append(&label);
     column.append(&level.widget);
 
-    let bubble = gtk::Box::builder().css_classes(["osd-window"]).build();
+    let bubble = Frosted::new(&["osd-window"]);
     bubble.append(&icon);
     bubble.append(&column);
     window.set_child(Some(&bubble));
+
+    frosted::prepare();
 
     // The display takes no input: clicks go to what is under it.
     window.connect_map(|window| {
@@ -129,17 +133,20 @@ impl Osd {
         }
 
         if !inner.window.is_visible() {
+            // A picture may be left from when it last faded out.
+            inner.bubble.show_live();
             inner.window.present();
             glib::idle_add_local_once({
                 let inner = Rc::clone(inner);
                 move || {
                     if inner.generation.get() == generation {
-                        inner.bubble.add_css_class("open");
+                        inner.bubble.open();
                     }
                 }
             });
         } else {
-            inner.bubble.add_css_class("open");
+            // Fading out, perhaps: it comes back as itself.
+            inner.bubble.open();
         }
 
         if let Some(timer) = inner.hide_timer.take() {
@@ -149,22 +156,34 @@ impl Osd {
             let inner = Rc::clone(inner);
             move || {
                 inner.hide_timer.take();
-                inner.bubble.remove_css_class("open");
-                let unmap = {
+                // Starts the fade, of the bubble's picture if there is one.
+                let close = {
                     let inner = Rc::clone(&inner);
-                    move || {
-                        if inner.generation.get() == generation {
-                            inner.window.set_visible(false);
+                    move |shot: Option<Shot>| {
+                        // A key was pressed while the picture was on its
+                        // way: the display stays.
+                        if inner.generation.get() != generation {
+                            return;
+                        }
+                        inner.bubble.close(shot);
+                        let unmap = {
+                            let inner = Rc::clone(&inner);
+                            move || {
+                                if inner.generation.get() == generation {
+                                    inner.window.set_visible(false);
+                                }
+                            }
+                        };
+                        let animated = gtk::Settings::default()
+                            .is_some_and(|settings| settings.is_gtk_enable_animations());
+                        if animated {
+                            glib::timeout_add_local_once(FADE_TIME, unmap);
+                        } else {
+                            unmap();
                         }
                     }
                 };
-                let animated = gtk::Settings::default()
-                    .is_some_and(|settings| settings.is_gtk_enable_animations());
-                if animated {
-                    glib::timeout_add_local_once(FADE_TIME, unmap);
-                } else {
-                    unmap();
-                }
+                inner.bubble.shoot(Place::Bottom, FADE_TIME, close);
             }
         });
         inner.hide_timer.replace(Some(timer));

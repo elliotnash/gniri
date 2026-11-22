@@ -4,6 +4,9 @@
 //! output, mapped only while it shows a notification, and the tray that
 //! decides which notification that is and for how long. Port of
 //! `MessageTray` in `js/ui/messageTray.js`.
+//!
+//! A banner fades out as a picture of itself, which takes the blur behind
+//! it along ([`Frosted`]).
 
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
@@ -19,6 +22,7 @@ use super::layer;
 use crate::menus::Menu;
 use crate::messages::{self, Message};
 use crate::services::Services;
+use crate::widgets::frosted::{self, Frosted, Place, Shot};
 
 /// messageTray.js `ANIMATION_TIME`. The theme's transition on
 /// `.notification-banner` lasts as long.
@@ -37,6 +41,9 @@ struct Surface {
     window: gtk::ApplicationWindow,
     /// `.gniri-banner-area`: the banner with room around it for its shadow.
     area: gtk::Box,
+    /// Height of this output's panel right now, 0 without one: how far
+    /// down the compositor has put the surface.
+    panel_height: Box<dyn Fn() -> i32>,
     /// Counts shows and hides, so a fade-out overtaken by a new banner does
     /// not unmap.
     generation: Cell<u64>,
@@ -49,8 +56,13 @@ pub struct Banner {
     surface: Rc<Surface>,
 }
 
-/// Builds the banner surface for `monitor`, unmapped.
-pub fn build(app: &adw::Application, monitor: &gdk::Monitor) -> Banner {
+/// Builds the banner surface for `monitor`, unmapped. `panel_height` is
+/// asked for the height of the output's panel whenever a banner goes.
+pub fn build(
+    app: &adw::Application,
+    monitor: &gdk::Monitor,
+    panel_height: impl Fn() -> i32 + 'static,
+) -> Banner {
     let window = gtk::ApplicationWindow::builder()
         .application(app)
         .css_classes(["gniri-layer", "gniri-banner-window"])
@@ -68,10 +80,12 @@ pub fn build(app: &adw::Application, monitor: &gdk::Monitor) -> Banner {
         .css_classes(["gniri-banner-area"])
         .build();
     window.set_child(Some(&area));
+    frosted::prepare();
 
     let surface = Rc::new(Surface {
         window: window.clone(),
         area,
+        panel_height: Box::new(panel_height),
         generation: Cell::new(0),
     });
     // Only the banner itself takes input, not the room for its shadow.
@@ -125,7 +139,10 @@ impl Banner {
             let (surface, banner) = (Rc::clone(surface), banner.clone());
             move || {
                 if surface.generation.get() == generation {
-                    banner.add_css_class("open");
+                    match banner.downcast_ref::<Frosted>() {
+                        Some(banner) => banner.open(),
+                        None => banner.add_css_class("open"),
+                    }
                 }
             }
         });
@@ -137,9 +154,9 @@ impl Banner {
         let surface = &self.surface;
         let generation = surface.generation.get() + 1;
         surface.generation.set(generation);
-        if let Some(banner) = surface.area.first_child() {
-            banner.remove_css_class("open");
-        }
+        let banner = surface.area.first_child();
+        // A message's root, which a banner is, is one.
+        let frosted = banner.clone().and_downcast::<Frosted>();
         let finish = {
             let surface = Rc::clone(surface);
             move || {
@@ -154,10 +171,30 @@ impl Banner {
                 done();
             }
         };
-        if animate && animated() {
-            glib::timeout_add_local_once(ANIMATION_TIME, finish);
-        } else {
-            finish();
+        // Starts the fade, of the banner's picture if there is one.
+        let close = {
+            let frosted = frosted.clone();
+            move |shot: Option<Shot>| {
+                match (&frosted, &banner) {
+                    (Some(frosted), _) => frosted.close(shot),
+                    (None, Some(banner)) => banner.remove_css_class("open"),
+                    (None, None) => {}
+                }
+                if animate && animated() {
+                    glib::timeout_add_local_once(ANIMATION_TIME, finish);
+                } else {
+                    finish();
+                }
+            }
+        };
+        match &frosted {
+            // The surface is under the panel, which keeps its height to
+            // itself.
+            Some(frosted) if animate => {
+                let below = (surface.panel_height)();
+                frosted.shoot(Place::Top { below }, ANIMATION_TIME, close);
+            }
+            _ => close(None),
         }
     }
 }
