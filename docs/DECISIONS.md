@@ -97,8 +97,9 @@ Script: `spikes/gjs/interact.js`, command `anim`.
 - Opacity 0.5 on the bubble: no new region is sent and niri keeps blurring at
   full strength behind the half-faded tint. So during a fade the blur does
   not fade; it disappears when the surface unmaps. blur-my-shell fades the
-  blur with the menu. GNOME's menu fades are short (about 150 ms), so this is
-  a small, recorded difference.
+  blur with the menu. GNOME's menu fades are short (about 150 ms), so this
+  was first recorded as a small difference. It showed all the same, and a
+  closing surface now fades as a picture ("Closing what is blurred").
 - CSS `transform: scale(0.8)` on the bubble: GTK sent a wrong region (the
   lower right part of the bubble only, 110x91 instead of 240x120) and the
   screenshot shows no blur under most of the bubble.
@@ -927,6 +928,85 @@ was unlocked by `loginctl unlock-session`.
   service**, one level down, which changed none of the scenes there were.
 - **Behind gniri's own lock screen a nested session goes on, slowly**,
   where behind GNOME's it stalls; the harness waits longer then.
+
+## Closing what is blurred
+
+A menu that faded out left a patch of the screen blurred to its last
+frame, where the blur went at once (S3). Looked at again, in niri's source
+(26.04 and main of November 2026), in GTK's (4.24.1) and with a spike.
+
+What there is to work with:
+
+- **The protocol says where, not how much.** `ext-background-effect-v1`
+  has one request that matters, `set_blur_region`. niri offers the blur
+  capability alone.
+- **niri draws the blur at full strength** over the region, whatever the
+  surface's own pixels (`FramebufferEffectElement::draw` passes an alpha
+  of 1). A layer rule's `opacity` is fixed and is for the surface's
+  pixels. There is no opening or closing animation for layer surfaces;
+  the wiki's one remark on animations is that blur of what is really
+  behind goes missing during a window's. `xray` blur is no different in
+  any of this.
+- **GTK reads the region off the render nodes** (`gskblurutils.c`): a
+  blur of radius 20 or more over a paste of the background, cut by the
+  clips, transforms, fills and strokes around it. Opacity is not among
+  them. So the region follows a widget's size, place and shape, and
+  nothing else about it.
+- **A widget can draw those nodes itself** (`push_copy`, `push_blur`,
+  `append_paste`), and then the region is any shape it likes. The copy
+  must be taken outside the widget's opacity: inside, the group has
+  nothing behind it, the paste is empty and no region is sent at all.
+
+Script: `spikes/gjs/close_blur.js`, with `spikes/shot` for the picture. A
+mock menu on the stage's namespace, closed six ways, each looked at
+frame by frame slowed down sixteen times:
+
+| Way | What it showed |
+|---|---|
+| As it was: fade and slide | The blurred patch outlives the menu. |
+| A picture of the screen in place of the menu and its blur, faded | The blur fades with the menu. The frame after the swap is the frame before. |
+| Fewer and fewer rows of the region as the menu fades | The blur thins out, and text behind shows as scanlines meanwhile. |
+| Rolling up into the panel, the region with it | No pop. Not GNOME's animation. |
+| Shrinking into its corner, the box resized and its content scaled | No pop. Not GNOME's animation. |
+| The tint turning opaque, the blur dropped behind it, then the fade | No pop, but the opaque colour is a guess at what is behind, and showed as a flash. |
+
+The picture was chosen, for menus, banners, the OSD and dialogs.
+
+- **`Frosted`** (`crates/shell/src/widgets/frosted.rs`) is the box each
+  of them is. As it starts to close it asks for a picture of the screen
+  where it is, draws that in place of its content, and loses its
+  `backdrop-filter` (the `ghost` class) in the same frame. The theme's
+  transition then fades and moves the box as before.
+- **The picture comes over `wlr-screencopy`**, without the pointer, from
+  a client on a connection of its own
+  (`crates/services/src/capture.rs`). About 5 ms for a menu and 30 ms
+  for a whole output (a dialog's shade) on this machine; the fade starts
+  that much later. After 100 ms without one the box closes as it used
+  to.
+- **It is taken on whole device pixels of the surface.** At scale 1.25
+  four logical pixels are five device pixels, so the rectangle asked for
+  is the one around the box whose edges, counted from the surface's
+  corner, are multiples of four. niri rounds a surface's corner and the
+  rectangle's to device pixels the same way, so the picture lands on the
+  pixels it was taken from.
+- **Where a surface is on its output has to be worked out.** The stage
+  and a dialog cover it. A banner's and the OSD's are centred, at
+  `width / 2 - surface / 2` with each half rounded down (smithay's
+  `LayerMap::arrange`), the banner's under the panel's exclusive zone
+  and the OSD's at the bottom.
+- **Not before it has finished opening.** A picture of a box half faded
+  in would be faded once more; a box closed that soon closes as it used
+  to.
+- **Not where nothing animates.** With GTK's animations off, as under a
+  fixture, no picture is asked for and no connection is made.
+- **The border is left out.** The picture is cut to the box's corners by
+  hiding its overflow, which cuts at the padding box: the one pixel of
+  border is drawn over what is no longer blurred. Measured at the swap:
+  no pixel of a menu changes by more than 4 in 255, and of the OSD only
+  a few on that ring do.
+- **What is behind stands still while the box fades**, 100 to 200 ms.
+- **Opening is as it was**: the blur is there in full from the first
+  frame, under a tint that fades in.
 
 ## Standing rules
 

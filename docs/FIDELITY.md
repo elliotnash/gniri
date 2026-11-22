@@ -14,8 +14,14 @@ lists everything known to fall outside that, and why.
   output scale 1.25 only.
 - **Dither.** blur-my-shell adds a dither of at most one 8-bit level to its
   blur. gniri does not.
-- **Fades.** When a blurred surface fades, niri keeps blurring at full
-  strength until the surface is gone; blur-my-shell fades the blur with it.
+- **Fades.** niri blurs at full strength wherever a surface says, from
+  its first frame to its last; blur-my-shell fades the blur with what it
+  is behind. So a menu, a banner, the OSD or a dialog fades in over blur
+  that is there at once. Fading out, each is a picture of the screen
+  taken as it starts to close, and the blur in the picture fades with it:
+  what is behind stands still for those 100 to 200 ms, and the fade
+  starts as late as the picture takes, about 5 ms, or 30 ms for a dialog
+  (docs/DECISIONS.md, "Closing what is blurred").
 
 ## Panel
 
