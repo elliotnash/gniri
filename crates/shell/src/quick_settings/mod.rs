@@ -52,12 +52,13 @@ fn follow_submenu(
     ));
 }
 
-fn open_submenu(services: &Rc<Services>, submenu: Submenu) -> impl Fn() + 'static {
+/// What a menu arrow does: opens `submenu`, or closes it if it is open.
+fn toggle_submenu(services: &Rc<Services>, submenu: Submenu) -> impl Fn() + 'static {
     let services = Rc::clone(services);
     move || {
-        services
-            .menus
-            .update(|menus| menus.set_submenu(Some(submenu)));
+        services.menus.update(|menus| {
+            menus.toggle_submenu(submenu);
+        });
     }
 }
 
@@ -226,7 +227,7 @@ fn volume_slider(
             }
         }
     });
-    row.connect_menu_clicked(open_submenu(services, slider.submenu));
+    row.connect_menu_clicked(toggle_submenu(services, slider.submenu));
 
     let menu = ToggleMenu::new(slider.menu_icon, &slider.menu_title);
     add_settings_action(services, &menu, &tr("Sound Settings"), "sound");
@@ -403,11 +404,14 @@ fn wifi_toggle(services: &Rc<Services>, grid: &QuickGrid, subscriptions: &mut Ve
     toggle.connect_menu_clicked({
         let services = Rc::clone(services);
         move || {
-            // The list in the menu should be fresh.
-            services.network.send(network::Command::ScanWifi);
+            let mut opened = false;
             services
                 .menus
-                .update(|menus| menus.set_submenu(Some(Submenu::Wifi)));
+                .update(|menus| opened = menus.toggle_submenu(Submenu::Wifi));
+            // The list in the menu should be fresh.
+            if opened {
+                services.network.send(network::Command::ScanWifi);
+            }
         }
     });
 
@@ -471,7 +475,7 @@ fn bluetooth_toggle(
             services.bluetooth.send(command);
         }
     });
-    toggle.connect_menu_clicked(open_submenu(services, Submenu::Bluetooth));
+    toggle.connect_menu_clicked(toggle_submenu(services, Submenu::Bluetooth));
 
     let menu = ToggleMenu::new("bluetooth-active-symbolic", &tr("Bluetooth"));
     add_settings_action(services, &menu, &tr("Bluetooth Settings"), "bluetooth");
@@ -530,7 +534,7 @@ fn power_toggle(services: &Rc<Services>, grid: &QuickGrid, subscriptions: &mut V
             services.power.send(power::Command::SetProfile(profile));
         }
     });
-    toggle.connect_menu_clicked(open_submenu(services, Submenu::PowerMode));
+    toggle.connect_menu_clicked(toggle_submenu(services, Submenu::PowerMode));
 
     let menu = ToggleMenu::new(
         "power-profile-balanced-symbolic",

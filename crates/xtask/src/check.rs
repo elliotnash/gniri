@@ -1244,12 +1244,29 @@ fn quick_settings() -> Result<(usize, usize)> {
             &checker.session,
             &format!("{POWER_MODE} .quick-toggle-menu-button"),
         )?;
-        checker.expect("clicking Power Mode's arrow opens its menu", |session| {
+        let power_mode_open = |session: &Session| -> Result<bool> {
             Ok(on_stage(session, ".quick-toggle-menu")?
                 .and_then(|menu| text_of(&menu, ".title"))
                 .as_deref()
                 == Some("Power Mode"))
+        };
+        checker.expect(
+            "clicking Power Mode's arrow opens its menu",
+            power_mode_open,
+        );
+        click(
+            &checker.session,
+            &format!("{POWER_MODE} .quick-toggle-menu-button"),
+        )?;
+        checker.expect("clicking the arrow again closes the menu", |session| {
+            Ok(on_stage(session, ".quick-toggle-menu")?.is_none()
+                && on_stage(session, ".quick-settings")?.is_some())
         });
+        click(
+            &checker.session,
+            &format!("{POWER_MODE} .quick-toggle-menu-button"),
+        )?;
+        checker.expect("(and once more opens it)", power_mode_open);
         click(
             &checker.session,
             ".quick-toggle-menu .popup-menu-section .popup-menu-item:1",

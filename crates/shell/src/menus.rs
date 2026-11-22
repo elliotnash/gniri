@@ -93,6 +93,15 @@ impl Menus {
         }
     }
 
+    /// What clicking a menu arrow does: open `submenu` (closing any other),
+    /// or close it if it is the one showing. Opening also reports so, for
+    /// what should only happen then.
+    pub fn toggle_submenu(&mut self, submenu: Submenu) -> bool {
+        let opening = self.submenu() != Some(submenu);
+        self.set_submenu(opening.then_some(submenu));
+        opening && self.submenu() == Some(submenu)
+    }
+
     /// The notification source whose group is open in the date menu.
     pub fn group(&self) -> Option<&str> {
         self.open.as_ref().and_then(|open| open.group.as_deref())
@@ -192,6 +201,28 @@ mod tests {
         assert_eq!(menus.group(), None);
         menus.back();
         assert_eq!(menus, Menus::default());
+    }
+
+    #[test]
+    fn a_menu_arrow_toggles_its_submenu() {
+        let mut menus = Menus::default();
+        assert!(!menus.toggle_submenu(Submenu::Wifi), "no menu is open");
+        assert_eq!(menus.submenu(), None);
+
+        menus.open(Menu::QuickSettings, None);
+        assert!(menus.toggle_submenu(Submenu::Wifi));
+        assert_eq!(menus.submenu(), Some(Submenu::Wifi));
+        assert!(
+            menus.toggle_submenu(Submenu::Bluetooth),
+            "another one swaps"
+        );
+        assert_eq!(menus.submenu(), Some(Submenu::Bluetooth));
+        assert!(!menus.toggle_submenu(Submenu::Bluetooth));
+        assert_eq!(menus.submenu(), None);
+        assert!(
+            menus.is_open(Menu::QuickSettings, None),
+            "closing the submenu leaves the menu"
+        );
     }
 
     #[test]

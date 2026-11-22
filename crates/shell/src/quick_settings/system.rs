@@ -118,9 +118,9 @@ pub fn build(services: &Rc<Services>, subscriptions: &mut Vec<Subscription>) -> 
     shutdown.connect_clicked({
         let services = Rc::clone(services);
         move |_| {
-            services
-                .menus
-                .update(|menus| menus.set_submenu(Some(Submenu::Shutdown)));
+            services.menus.update(|menus| {
+                menus.toggle_submenu(Submenu::Shutdown);
+            });
         }
     });
     row.append(&shutdown);
