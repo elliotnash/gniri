@@ -14,6 +14,7 @@ use gtk::prelude::*;
 use self::calendar::Calendar;
 use crate::messages::MessageList;
 use crate::services::{Services, SystemClock};
+use crate::widgets::frosted::Frosted;
 
 /// The applications the cards under the calendar start, by desktop entry.
 const CALENDAR_APP: &str = "org.gnome.Calendar";
@@ -23,7 +24,7 @@ const WEATHER_APP: &str = "org.gnome.Weather";
 /// The menu and what keeps it up to date. Dropping it stops the updates.
 pub struct DateMenu {
     /// `.popup-menu-content.datemenu-popover`
-    pub widget: gtk::Box,
+    pub widget: Frosted,
     services: Rc<Services>,
     calendar: Calendar,
     _messages: Rc<MessageList>,
@@ -352,9 +353,7 @@ pub fn build(services: &Rc<Services>) -> DateMenu {
     area.append(&messages.root);
     area.append(&column);
 
-    let widget = gtk::Box::builder()
-        .css_classes(["popup-menu-content", "datemenu-popover"])
-        .build();
+    let widget = Frosted::new(&["popup-menu-content", "datemenu-popover"]);
     widget.append(&area);
 
     // The selected day decides the events card's title and whether the

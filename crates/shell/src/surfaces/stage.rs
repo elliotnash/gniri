@@ -5,7 +5,9 @@
 //!
 //! The menu is an ordinary widget on it; the compositor blurs behind the
 //! menu alone because GTK reports the `backdrop-filter` region of that
-//! widget (docs/DECISIONS.md, S2). The rest of the surface is transparent
+//! widget (docs/DECISIONS.md, S2). As a menu closes, a picture of the
+//! screen stands in for it and its blur, so that the blur fades with it
+//! ([`Frosted`]). The rest of the surface is transparent
 //! and catches the click that closes the menu. The strip over the panel is
 //! left out of the input region, so the panel's own buttons still work while
 //! a menu is open (S12).
@@ -24,6 +26,7 @@ use crate::date_menu::{self, DateMenu};
 use crate::menus::Menu;
 use crate::quick_settings::{self, QuickSettings};
 use crate::services::Services;
+use crate::widgets::frosted::{self, Frosted, Place, Shot};
 
 /// boxpointer.js `POPUP_ANIMATION_TIME`: how long a menu takes to fade in or
 /// out. The theme's transition on `.popup-menu-content` lasts as long.
@@ -77,7 +80,7 @@ impl Inner {
     }
 
     /// The widget of `menu`, if it has been built.
-    fn widget(&self, menu: Menu) -> Option<gtk::Box> {
+    fn widget(&self, menu: Menu) -> Option<Frosted> {
         match menu {
             Menu::QuickSettings => self
                 .quick_settings
@@ -102,7 +105,7 @@ impl Inner {
             if other != menu
                 && let Some(widget) = self.widget(other)
             {
-                widget.remove_css_class("open");
+                widget.close(None);
                 widget.set_visible(false);
             }
         }
@@ -139,6 +142,8 @@ impl Inner {
             }
             self.root.append(&widget);
         }
+        // A picture may be left from when it last closed.
+        widget.show_live();
         widget.set_visible(true);
         widget.set_margin_top((self.panel_height)() + ARROW_RISE);
 
@@ -150,7 +155,7 @@ impl Inner {
             let inner = Rc::clone(self);
             move || {
                 if inner.generation.get() == generation {
-                    widget.add_css_class("open");
+                    widget.open();
                 }
             }
         });
@@ -162,26 +167,42 @@ impl Inner {
         if !self.window.is_visible() {
             return;
         }
-        if let Some(widget) = self.shown.take().and_then(|menu| self.widget(menu)) {
-            widget.remove_css_class("open");
-        }
+        let widget = self.shown.take().and_then(|menu| self.widget(menu));
 
-        let unmap = {
-            let inner = Rc::clone(self);
-            move || {
-                // A mapped surface with nothing to draw is never repainted
-                // (S3), so it goes away with its menu.
-                if inner.generation.get() == generation {
-                    inner.window.set_visible(false);
+        // Starts the fade, of the menu's picture if there is one.
+        let close = {
+            let (inner, widget) = (Rc::clone(self), widget.clone());
+            move |shot: Option<Shot>| {
+                // A menu opened while the picture was on its way.
+                if inner.generation.get() != generation {
+                    return;
+                }
+                if let Some(widget) = &widget {
+                    widget.close(shot);
+                }
+                let unmap = {
+                    let inner = Rc::clone(&inner);
+                    move || {
+                        // A mapped surface with nothing to draw is never
+                        // repainted (S3), so it goes away with its menu.
+                        if inner.generation.get() == generation {
+                            inner.window.set_visible(false);
+                        }
+                    }
+                };
+                let animated = gtk::Settings::default()
+                    .is_some_and(|settings| settings.is_gtk_enable_animations());
+                if animated {
+                    glib::timeout_add_local_once(POPUP_ANIMATION, unmap);
+                } else {
+                    unmap();
                 }
             }
         };
-        let animated =
-            gtk::Settings::default().is_some_and(|settings| settings.is_gtk_enable_animations());
-        if animated {
-            glib::timeout_add_local_once(POPUP_ANIMATION, unmap);
-        } else {
-            unmap();
+        match &widget {
+            // The stage covers its output.
+            Some(widget) => widget.shoot(Place::Fill, POPUP_ANIMATION, close),
+            None => close(None),
         }
     }
 }
@@ -204,6 +225,7 @@ pub fn build(
     );
     // A menu takes the keyboard while it is open, as GNOME's grab does.
     window.set_keyboard_mode(KeyboardMode::Exclusive);
+    frosted::prepare();
 
     let root = gtk::Box::builder().hexpand(true).vexpand(true).build();
     window.set_child(Some(&root));

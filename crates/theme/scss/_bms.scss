@@ -29,6 +29,10 @@ $bms_brightness: 0.6;
 // least 10px (docs/DECISIONS.md, S2). The compositor sets the real strength.
 @mixin bms-blur {
     backdrop-filter: blur(10px);
+
+    // While it closes, a picture of the screen stands in for the widget
+    // and for the blur behind it (crates/shell/src/widgets/frosted.rs).
+    &.ghost { backdrop-filter: none; }
 }
 
 // The extension styles each component "automatically" by default: light

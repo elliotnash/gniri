@@ -22,6 +22,7 @@ use self::slider::SliderRow;
 use self::toggle::Toggle;
 use crate::menus::Submenu;
 use crate::services::{Service, Services};
+use crate::widgets::frosted::Frosted;
 
 /// `.quick-settings-grid`: `spacing-rows` and `spacing-columns`,
 /// `$base_padding * 2`.
@@ -32,7 +33,7 @@ const COLUMNS: usize = 2;
 /// The menu and what keeps it up to date. Dropping it stops the updates.
 pub struct QuickSettings {
     /// `.popup-menu-content.quick-settings`
-    pub widget: gtk::Box,
+    pub widget: Frosted,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -161,9 +162,7 @@ pub fn build(services: &Rc<Services>) -> QuickSettings {
 
     // While a submenu is open everything else in the menu is dimmed
     // (`QuickSettingsMenu._setDimmed`).
-    let widget = gtk::Box::builder()
-        .css_classes(["popup-menu-content", "quick-settings"])
-        .build();
+    let widget = Frosted::new(&["popup-menu-content", "quick-settings"]);
     widget.append(&grid);
     subscriptions.push(services.menus.select(|menus| menus.submenu().is_some(), {
         let (widget, grid) = (widget.clone(), grid.clone());

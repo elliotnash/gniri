@@ -3,6 +3,7 @@
 //! Widgets shared by several parts of the shell.
 
 pub mod avatar;
+pub mod frosted;
 pub mod level;
 pub mod motion;
 pub mod password_entry;
