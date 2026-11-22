@@ -1,0 +1,14 @@
+# Spike helper, not part of the workspace: one wlr-screencopy capture of a
+# part of an output, for spikes/gjs/close_blur.js.
+[package]
+name = "gniri-spike-shot"
+version = "0.0.0"
+edition = "2024"
+license = "GPL-3.0-or-later"
+publish = false
+
+[workspace]
+
+[dependencies]
+wayland-client = "0.31"
+wayland-protocols-wlr = { version = "0.3", features = ["client"] }
