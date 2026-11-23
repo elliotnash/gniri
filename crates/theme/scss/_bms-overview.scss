@@ -15,12 +15,21 @@
 // (data/niri/gniri.kdl). That is mostly the backdrop, but niri's overview
 // also passes the workspace above the active one behind the entry and the
 // one below behind the dash, and nothing has dimmed those or their
-// windows. While one does (the controls are `.workspace-above` or
-// `.workspace-below`), the entry's or the dash's tint has the dimming
-// folded in, as a menu's has (`bms-fold`). Over the cover, behind the app
-// grid and a search, the backdrop is behind them again whatever the
-// workspaces: the controls are `.covered`, and the tint changes as the
-// cover fades.
+// windows. While one is below (the controls are `.workspace-below`), the
+// dash's tint has the dimming folded in, as a menu's has (`bms-fold`).
+// Over the cover, behind the app grid and a search, the backdrop is
+// behind it again whatever the workspaces: the controls are `.covered`,
+// and the tint changes as the cover fades.
+//
+// The entry's fill is the extension's until something light is behind it:
+// 7% of white over a white window is white, with white text on it. The
+// shell looks at the screen where the entry is (overview/behind.rs) and
+// calls the entry `.light-behind` while a good part of that is light.
+// Then the fill has a dimming folded in, and one strong enough to bring
+// white down to the grey the overview's background has in GNOME's
+// capture, where the entry is as the extension means it. On the light
+// style the entry is a nearly white card with black on it, which reads
+// over anything.
 
 // overview.css: the fills of a tile, an entry or an arrow, and how they
 // brighten.
@@ -36,6 +45,10 @@ $bms_overview_active: rgba(255, 255, 255, bms-pick(0.19, 0.25));
 $bms_overview_selected_active: rgba(255, 255, 255, bms-pick(0.24, 0.38));
 $bms_overview_entry_fg: bms-pick(white, rgba(0, 0, 0, 0.85));
 $bms_overview_entry_focus: rgba(255, 255, 255, bms-pick(0.12, 0.78));
+// How bright something light behind the entry is drawn: 255 comes out as
+// the reference backdrop's 77.
+$bms_entry_light_behind: 0.3;
+$bms_overview_fill_light_behind: bms-fold($bms_overview_fill, $bms_entry_light_behind);
 $bms_overview_dim_fg: bms-ink(0.65);
 $bms_overview_description_fg: bms-ink(bms-pick(0.5, 0.55));
 // What is on a card.
@@ -96,10 +109,14 @@ $bms_dash_checked_hover: bms-ink(0.25);
 
     &.focused { background-color: $bms_overview_entry_focus; }
 
-    .controls-manager.workspace-above:not(.covered) > & {
-        background-color: bms-fold($bms_overview_fill);
+    @if not $bms_light {
+        .controls-manager:not(.covered) > &.light-behind {
+            background-color: $bms_overview_fill_light_behind;
 
-        &.focused { background-color: bms-fold($bms_overview_entry_focus); }
+            &.focused {
+                background-color: bms-fold($bms_overview_entry_focus, $bms_entry_light_behind);
+            }
+        }
     }
 
     .search-entry-icon,
@@ -288,4 +305,12 @@ $bms_folder_fg: bms-pick(rgba(255, 255, 255, 0.9), rgba(0, 0, 0, 0.85));
     --gniri-bms-overview-entry-focus: #{$bms_overview_entry_focus};
     --gniri-bms-overview-dim-fg: #{$bms_overview_dim_fg};
     --gniri-bms-overview-description-fg: #{$bms_overview_description_fg};
+}
+
+// What the shell takes out of a picture of the entry to see what is
+// behind it. Only the dark style has the second fill.
+@if not $bms_light {
+    :root {
+        --gniri-bms-overview-fill-light-behind: #{$bms_overview_fill_light_behind};
+    }
 }

@@ -36,7 +36,7 @@ fn animated() -> bool {
 }
 
 /// The process's connection for pictures, made when first asked for.
-fn capturer() -> Capturer {
+pub(crate) fn capturer() -> Capturer {
     CAPTURER.with(|capturer| capturer.get_or_init(Capturer::spawn).clone())
 }
 

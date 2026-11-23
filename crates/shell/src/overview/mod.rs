@@ -8,6 +8,7 @@
 //! has done so. This module only keeps what is shown on top of that.
 
 pub mod app_grid;
+pub mod behind;
 pub mod controls;
 pub mod dash;
 pub mod drag;

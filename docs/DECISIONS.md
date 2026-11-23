@@ -611,12 +611,28 @@ was unlocked by `loginctl unlock-session`.
   overview puts the workspace above the active one behind the entry, and
   the one below behind most of the dash (it spaces them by a tenth of the
   output's height times the zoom). The backdrop is dimmed already; a
-  workspace and its windows are not, and white windows under the
-  extension's 7% white entry left white text on white. So while there is
-  a workspace above or below, the entry's or the dash's tint has the
-  dimming folded in, as a menu's (S5); with none, and over the cover, it
-  is the extension's own, which is what GNOME's capture is compared
-  with.
+  workspace and its windows are not. So while there is a workspace
+  below, the dash's tint has the dimming folded in, as a menu's (S5);
+  with none, and over the cover, it is the extension's own, which is
+  what GNOME's capture is compared with.
+- **The entry darkens by what is behind it, and that takes a picture.**
+  White windows under the extension's 7% white entry left white text on
+  white, so the entry's tint was folded too, while there was a workspace
+  above. That was the wrong test twice over: a dark window is no reason
+  to darken (folded, the entry was darker than the terminal behind it
+  and had no edge left), and niri only says which workspace is active
+  once a scroll ends, so the entry changed colour as the fingers
+  lifted. Nothing niri says tells what colour is behind the entry, so
+  the shell looks: ten times a second while the windows show it takes a
+  picture of the screen where the entry is (about 2 ms of niri's time),
+  takes the entry's own fill out of it, and calls the entry
+  `.light-behind` while a quarter of the rest is brighter than half
+  (`overview/behind.rs`). It follows a scroll while it is under way.
+  The fill it then has is folded for a brightness of 0.3, not the
+  extension's 0.6: at 0.6 white still came out at 160 under white
+  text, and at 0.3 it is 89, the entry of GNOME's capture. The light
+  style's entry is a white card with black on it and has no second
+  fill.
 - **GNOME's layout is arithmetic, and reproducing the arithmetic
   reproduces the layout.** Where the overview's parts go, how many icons
   a page holds and at what spacing, and how large the dash's icons are,

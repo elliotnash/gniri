@@ -24,6 +24,7 @@ use std::time::Duration;
 
 use adw::prelude::*;
 use gniri_core::Subscription;
+use gniri_services::capture;
 use gtk::{cairo, gdk, glib, graphene};
 use gtk4_layer_shell::{KeyboardMode, Layer, LayerShell};
 use niri_ipc::Action;
@@ -31,8 +32,12 @@ use niri_ipc::Action;
 use super::layer::{self, Anchor, Zone};
 use crate::overview::app_grid::{self, Shown, View};
 use crate::overview::controls::{Controls, Parts};
-use crate::overview::{self, Direction, dash, drag, folder, icon, search_entry, search_results};
+use crate::overview::{
+    self, Direction, behind, dash, drag, folder, icon, search_entry, search_results,
+};
 use crate::services::Services;
+use crate::style;
+use crate::widgets::frosted;
 use crate::widgets::motion::Eased;
 
 /// An opacity, eased.
@@ -49,6 +54,12 @@ fn opacity_of(widget: &impl IsA<gtk::Widget>) -> Eased {
 /// and the entry take to come and go. The theme's transitions last as
 /// long.
 const CONTROLS_ANIMATION: Duration = Duration::from_millis(250);
+
+/// How often the shell looks at what is behind the entry while the
+/// windows show. A picture of that little takes niri about 2 ms.
+const BEHIND_INTERVAL: Duration = Duration::from_millis(100);
+/// How long such a picture may take to come.
+const BEHIND_PATIENCE: Duration = Duration::from_millis(200);
 
 struct Inner {
     window: gtk::ApplicationWindow,
@@ -125,6 +136,73 @@ impl Inner {
             }
         }
         surface.set_input_region(Some(&region));
+    }
+
+    /// What to ask for a picture of to see what is behind the entry, and
+    /// the fill the entry has on it there. Nothing while the cover is
+    /// behind the entry, where its fill is the theme's own whatever the
+    /// picture, and nothing on the light style, whose entry reads over
+    /// anything (_bms-overview.scss).
+    fn behind_target(&self) -> Option<(String, capture::Rect, behind::Fill)> {
+        if self.services.overview.with(overview::Overview::covered) {
+            return None;
+        }
+        // Only the dark style has the second fill.
+        let darkened = style::token("bms-overview-fill-light-behind")?;
+        let fill = behind::Fill::parse(if self.entry.widget.has_css_class("light-behind") {
+            darkened
+        } else {
+            style::token("bms-overview-fill")?
+        })?;
+        let output = self.monitor.connector()?;
+        let bounds = self.bounds(&self.entry.widget)?;
+        // Without the round ends, which what is beside the entry shows
+        // through, and without the edge.
+        let (ends, edge) = (bounds.height() / 2, 2);
+        // The surface starts under whatever reserves the top of the
+        // output, and the entry comes out from under that.
+        let above = (self.monitor.geometry().height() - self.window.height()).max(0);
+        let top = (above + bounds.y() + edge).max(0);
+        let rect = capture::Rect {
+            x: bounds.x() + ends,
+            y: top,
+            width: bounds.width() - 2 * ends,
+            height: above + bounds.y() + bounds.height() - edge - top,
+        };
+        (rect.x >= 0 && rect.width > 0 && rect.height > 0).then(|| (output.into(), rect, fill))
+    }
+
+    /// Keeps the entry `.light-behind` while what is behind it is light,
+    /// for as long as the opening that is number `generation` lasts.
+    fn watch_behind(self: &Rc<Self>, generation: u64) {
+        let inner = Rc::downgrade(self);
+        let current = move || {
+            inner
+                .upgrade()
+                .filter(|inner| inner.generation.get() == generation)
+        };
+        glib::spawn_future_local(async move {
+            while let Some(inner) = current() {
+                let asked = inner
+                    .behind_target()
+                    .map(|(output, rect, fill)| (frosted::capturer().capture(&output, rect), fill));
+                drop(inner);
+                if let Some((answer, fill)) = asked {
+                    let picture = glib::future_with_timeout(BEHIND_PATIENCE, answer.recv())
+                        .await
+                        .ok()
+                        .and_then(Result::ok)
+                        .flatten();
+                    let brightness = picture.and_then(|picture| behind::brightness(&picture, fill));
+                    if let (Some(brightness), Some(inner)) = (brightness, current()) {
+                        let entry = &inner.entry.widget;
+                        let was = entry.has_css_class("light-behind");
+                        icon::set_class(entry, "light-behind", behind::is_light(brightness, was));
+                    }
+                }
+                glib::timeout_future(BEHIND_INTERVAL).await;
+            }
+        });
     }
 
     /// Shows or hides the cover. Its part behind the panel shows only
@@ -233,6 +311,7 @@ impl Inner {
         self.window.present();
         self.entry.grab_focus();
         self.show_view();
+        self.watch_behind(generation);
         // The surface must be on screen with its parts in their closed
         // look before the class that starts the transitions is added.
         glib::idle_add_local_once({
@@ -424,10 +503,10 @@ impl Inner {
     }
 }
 
-/// Whether niri has a workspace above and one below the active workspace
-/// of `output`. In its overview those are the ones that pass behind the
-/// search entry and the dash; with none, only the backdrop is there.
-fn neighbours(niri: &gniri_services::niri::State, output: Option<&str>) -> (bool, bool) {
+/// Whether niri has a workspace below the active workspace of `output`.
+/// In its overview that one passes behind the dash; with none, only the
+/// backdrop is there.
+fn workspace_below(niri: &gniri_services::niri::State, output: Option<&str>) -> bool {
     let active: Vec<bool> = match output {
         Some(output) => niri
             .workspaces_on(output)
@@ -439,10 +518,10 @@ fn neighbours(niri: &gniri_services::niri::State, output: Option<&str>) -> (bool
             .map(|workspace| workspace.active)
             .collect(),
     };
-    match active.iter().position(|active| *active) {
-        Some(index) => (index > 0, index + 1 < active.len()),
-        None => (false, false),
-    }
+    active
+        .iter()
+        .position(|active| *active)
+        .is_some_and(|index| index + 1 < active.len())
 }
 
 /// Builds the overview surface for `monitor`, unmapped. `cover` is the
@@ -466,6 +545,9 @@ pub fn build(
         Zone::Respect,
     );
     window.set_keyboard_mode(KeyboardMode::Exclusive);
+    // The connection for pictures of what is behind the entry, ahead of
+    // the first one: the compositor names its outputs to it meanwhile.
+    frosted::capturer();
 
     cover.add_css_class("overview-cover");
     cover.set_visible(false);
@@ -643,19 +725,15 @@ pub fn build(
                 let inner = Rc::clone(&inner);
                 move |_| inner.show_view()
             }),
-        // What passes behind the entry and the dash sets their tint
-        // (_bms-overview.scss).
+        // What passes behind the dash sets its tint (_bms-overview.scss).
         services.niri.select(
             {
                 let output = monitor.connector().map(String::from);
-                move |niri| neighbours(niri, output.as_deref())
+                move |niri| workspace_below(niri, output.as_deref())
             },
             {
                 let controls = inner.controls.clone();
-                move |&(above, below)| {
-                    icon::set_class(&controls, "workspace-above", above);
-                    icon::set_class(&controls, "workspace-below", below);
-                }
+                move |below| icon::set_class(&controls, "workspace-below", *below)
             },
         ),
         services.niri.select(|niri| niri.windows.len(), {
@@ -678,7 +756,7 @@ pub fn build(
 mod tests {
     use gniri_services::niri::{State, Workspace};
 
-    use super::neighbours;
+    use super::workspace_below;
 
     fn workspace(output: &str, active: bool) -> Workspace {
         Workspace {
@@ -689,7 +767,7 @@ mod tests {
     }
 
     #[test]
-    fn neighbours_are_those_of_the_active_workspace_on_the_output() {
+    fn the_workspace_below_is_that_of_the_active_one_on_the_output() {
         let niri = State {
             workspaces: vec![
                 workspace("eDP-1", false),
@@ -699,22 +777,22 @@ mod tests {
             ],
             ..State::default()
         };
-        assert_eq!(neighbours(&niri, Some("eDP-1")), (true, true));
-        assert_eq!(neighbours(&niri, Some("HDMI-A-1")), (false, false));
-        assert_eq!(neighbours(&niri, Some("DP-2")), (false, false));
+        assert!(workspace_below(&niri, Some("eDP-1")));
+        assert!(!workspace_below(&niri, Some("HDMI-A-1")));
+        assert!(!workspace_below(&niri, Some("DP-2")));
     }
 
     #[test]
-    fn the_first_and_last_workspaces_have_one_neighbour() {
+    fn the_last_workspace_has_none_below() {
         let first = State {
             workspaces: vec![workspace("eDP-1", true), workspace("eDP-1", false)],
             ..State::default()
         };
-        assert_eq!(neighbours(&first, Some("eDP-1")), (false, true));
+        assert!(workspace_below(&first, Some("eDP-1")));
         let last = State {
             workspaces: vec![workspace("eDP-1", false), workspace("eDP-1", true)],
             ..State::default()
         };
-        assert_eq!(neighbours(&last, Some("eDP-1")), (true, false));
+        assert!(!workspace_below(&last, Some("eDP-1")));
     }
 }
